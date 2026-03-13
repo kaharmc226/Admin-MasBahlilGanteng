@@ -1,0 +1,13 @@
+node_modules
+.DS_Store
+dist
+.env
+*.log
+backend_ai/__pycache__
+backend_ai/venv
+.vscode
+.gemini
+.agent
+brain
+artifacts
+.system_generated
