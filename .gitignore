@@ -1,0 +1,16 @@
+node_modules
+.DS_Store
+dist
+.env
+*.log
+**/__pycache__
+**/venv
+.vscode
+.gemini
+.agent
+brain
+artifacts
+.system_generated
+hackaton/node_modules
+hackaton/dist
+hackaton/.env
