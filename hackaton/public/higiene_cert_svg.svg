@@ -1,0 +1,36 @@
+<svg width="842" height="1191" viewBox="0 0 842 1191" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="842" height="1191" fill="#f8fafc"/>
+  <rect x="30" y="30" width="782" height="1131" stroke="#0284c7" stroke-width="4"/>
+  <rect x="40" y="40" width="762" height="1111" stroke="#0284c7" stroke-width="1"/>
+  
+  <rect x="100" y="80" width="100" height="100" rx="20" fill="#0284c7"/>
+  <path d="M125 130L140 145L170 115" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <text x="230" y="115" font-family="sans-serif" font-weight="900" font-size="28" fill="#0f172a">REPUBLIK INDONESIA</text>
+  <text x="230" y="150" font-family="sans-serif" font-weight="700" font-size="18" fill="#0284c7">KEMENTERIAN KESEHATAN • BIDANG SANITASI</text>
+  
+  <line x1="80" y1="200" x2="762" y2="200" stroke="#0f172a" stroke-width="4"/>
+  
+  <text x="421" y="280" text-anchor="middle" font-family="sans-serif" font-weight="950" font-size="44" fill="#0f172a">SERTIFIKAT HIGIENE SANITASI</text>
+  <text x="421" y="330" text-anchor="middle" font-family="sans-serif" font-weight="800" font-size="20" fill="#64748b">NOMOR IZIN: SLHS/2026/00713/JKT-T</text>
+  
+  <text x="100" y="450" font-family="sans-serif" font-size="20" font-weight="800" fill="#64748b">DIBERIKAN KEPADA :</text>
+  <text x="100" y="510" font-family="serif" font-weight="950" font-size="48" fill="#0f172a">PT. NUSANTARA MEGAH JAYA</text>
+  <text x="100" y="550" font-family="sans-serif" font-size="22" font-weight="700" fill="#0284c7">Unit Dapur Sentral I Jakarta Timur</text>
+  
+  <rect x="100" y="620" width="642" height="200" rx="30" fill="#f0f9ff" stroke="#0284c7" stroke-width="1"/>
+  <text x="140" y="680" font-family="sans-serif" font-size="20" font-weight="600" fill="#0c4a6e">
+    <tspan x="140" dy="1.5em">Berdasarkan hasil pemeriksaan laboratorium dan inspeksi sanitasi</tspan>
+    <tspan x="140" dy="1.5em">lingkungan kerja, unit ini dinyatakan telah memenuhi seluruh standar</tspan>
+    <tspan x="140" dy="1.5em">kelaikan higiene pangan untuk operasional masal.</tspan>
+  </text>
+  
+  <rect x="100" y="880" width="160" height="160" rx="20" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+  <circle cx="180" cy="960" r="50" fill="#f0fdf4"/>
+  <path d="M160 960L175 975L205 945" stroke="#10b981" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="180" y="1030" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="900" fill="#10b981">SANITIZED &amp; VERIFIED</text>
+  
+  <text x="742" y="930" text-anchor="end" font-family="sans-serif" font-size="18">Jakarta, 10 Februari 2026</text>
+  <text x="646" y="1050" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="24" fill="#0f172a">DR. RADITYA WIRAWAN</text>
+  <text x="646" y="1080" text-anchor="middle" font-family="sans-serif" font-weight="800" font-size="16" fill="#64748b">Tim Ahli Kesehatan Masyarakat</text>
+</svg>

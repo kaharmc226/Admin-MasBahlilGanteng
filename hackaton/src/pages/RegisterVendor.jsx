@@ -5,7 +5,29 @@ import { Upload, CheckCircle, ArrowLeft, Building, FileText, Users, Microscope, 
 
 const RegisterVendor = () => {
   const [step, setStep] = useState(1)
+  const [namaUsah, setNamaUsaha] = useState('')
+  const [alamat, setAlamat] = useState('')
+  const [uploads, setUploads] = useState({ nib: false, higiene: false, gizi: false })
   const navigate = useNavigate()
+
+  const handleRegister = () => {
+    if (!namaUsah || !alamat) {
+      alert("Mohon lengkapi data dasar usaha.");
+      setStep(1);
+      return;
+    }
+    const newVendor = {
+      nama_vendor: namaUsah,
+      region: 'Jakarta Pusat (Head)', // Default for demo
+      status_verifikasi: 'pending',
+      izin_usaha: `REG-${Math.floor(Math.random() * 9000) + 1000}/MBG/2026`,
+      alamat: alamat,
+      date_pendaftaran: new Date().toLocaleDateString('id-ID')
+    }
+    const existing = JSON.parse(localStorage.getItem('traksi_v_reg_queue') || '[]');
+    localStorage.setItem('traksi_v_reg_queue', JSON.stringify([newVendor, ...existing]));
+    setStep(3);
+  }
 
   const Motif = ({ icon: Icon, top, right, bottom, left, color }) => (
     <div style={{ position: 'absolute', top, right, bottom, left, opacity: 0.05, pointerEvents: 'none', zIndex: 0 }}>
@@ -23,11 +45,11 @@ const RegisterVendor = () => {
             <div style={{ display: 'grid', gap: '1.5rem' }}>
               <div>
                 <label style={{ display: 'block', fontWeight: '700', marginBottom: '8px' }}>Nama Usaha / Catering</label>
-                <input type="text" placeholder="Contoh: Dapur Sehat Nusantara" className="card" style={{ width: '100%', padding: '1rem', border: '1.5px solid var(--border)', borderRadius: '15px' }} />
+                <input value={namaUsah} onChange={(e) => setNamaUsaha(e.target.value)} type="text" placeholder="Contoh: Dapur Sehat Nusantara" className="card" style={{ width: '100%', padding: '1rem', border: '1.5px solid var(--border)', borderRadius: '15px' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontWeight: '700', marginBottom: '8px' }}>Alamat Utama</label>
-                <textarea placeholder="Alamat kantor pusat..." className="card" style={{ width: '100%', padding: '1rem', border: '1.5px solid var(--border)', borderRadius: '15px', height: '100px' }} />
+                <textarea value={alamat} onChange={(e) => setAlamat(e.target.value)} placeholder="Alamat kantor pusat..." className="card" style={{ width: '100%', padding: '1rem', border: '1.5px solid var(--border)', borderRadius: '15px', height: '100px' }} />
               </div>
               <button onClick={() => setStep(2)} className="btn-primary" style={{ padding: '1.2rem', borderRadius: '50px', marginTop: '1rem', border: 'none', color: 'white', fontWeight: '800' }}>Lanjut ke Dokumen</button>
             </div>
@@ -40,21 +62,21 @@ const RegisterVendor = () => {
             <p style={{ color: 'var(--text-muted)', marginBottom: '2.5rem' }}>Sesuai standar MBG Nasional, lampirkan dokumen berikut.</p>
             <div style={{ display: 'grid', gap: '1rem' }}>
               {[
-                { label: 'Izin Usaha (NIB)', icon: <Building size={20}/> },
-                { label: 'Sertifikasi Higiene Dapur', icon: <FileText size={20}/> },
-                { label: 'Data Karyawan & Ahli Gizi', icon: <Users size={20}/> }
+                { id: 'nib', label: 'Izin Usaha (NIB)', icon: <Building size={20}/> },
+                { id: 'higiene', label: 'Sertifikasi Higiene Dapur', icon: <FileText size={20}/> },
+                { id: 'gizi', label: 'Data Karyawan & Ahli Gizi', icon: <Users size={20}/> }
               ].map((d, i) => (
-                <div key={i} style={{ padding: '1.5rem', border: '2px dashed var(--border)', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={i} style={{ padding: '1.5rem', border: uploads[d.id] ? '2px solid var(--primary)' : '2px dashed var(--border)', background: uploads[d.id] ? 'var(--primary-light)' : 'transparent', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.3s' }}>
                   <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                    {d.icon}
+                    {uploads[d.id] ? <CheckCircle size={20} color="var(--primary)" /> : d.icon}
                     <span style={{ fontWeight: '700' }}>{d.label}</span>
                   </div>
-                  <button style={{ background: 'var(--bg)', border: 'none', padding: '8px 15px', borderRadius: '10px', fontWeight: '800', color: 'var(--primary)', cursor: 'pointer' }}>Upload</button>
+                  <button onClick={() => setUploads({...uploads, [d.id]: true})} style={{ background: 'var(--bg)', border: 'none', padding: '8px 15px', borderRadius: '10px', fontWeight: '800', color: uploads[d.id] ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer' }}>{uploads[d.id] ? 'Berhasil' : 'Pilih File'}</button>
                 </div>
               ))}
               <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
                  <button onClick={() => setStep(1)} className="btn-outline" style={{ flex: 1, padding: '1.2rem', borderRadius: '50px' }}>Kembali</button>
-                 <button onClick={() => setStep(3)} className="btn-primary" style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '800' }}>Kirim Registrasi</button>
+                 <button onClick={handleRegister} className="btn-primary" style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '800' }}>Kirim Registrasi</button>
               </div>
             </div>
           </motion.div>

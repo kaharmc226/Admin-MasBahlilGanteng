@@ -52,15 +52,18 @@ const LandingPage = () => {
         rotate: [0, 10, -10, 0],
       }}
       transition={{ 
-        duration: 5, 
+        duration: 8, 
         repeat: Infinity, 
         ease: "easeInOut",
         delay: delay 
       }}
       style={{ 
         position: 'absolute', 
-        opacity: 0.15,
+        opacity: 0.1,
         zIndex: 1,
+        willChange: 'transform',
+        backfaceVisibility: 'hidden',
+        WebkitFontSmoothing: 'antialiased',
         ...style 
       }}
     >
@@ -69,7 +72,7 @@ const LandingPage = () => {
   )
 
   return (
-    <div className="food-pattern" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-main)', overflowX: 'hidden' }}>
+    <div className="premium-mesh" style={{ minHeight: '100vh', color: 'var(--text-main)', overflowX: 'hidden', position: 'relative' }}>
       
       {/* Decorative Ornaments */}
       <FoodMotif style={{ top: '15%', left: '10%' }} delay={0}><Apple size={120} color="var(--primary)" /></FoodMotif>
@@ -77,8 +80,12 @@ const LandingPage = () => {
       <FoodMotif style={{ bottom: '10%', left: '5%' }} delay={2}><Leaf size={100} color="var(--secondary)" /></FoodMotif>
       <FoodMotif style={{ top: '40%', right: '5%' }} delay={0.5}><HandPlatter size={110} color="var(--banana)" /></FoodMotif>
 
-      {/* Navbar */}
-      <nav style={{ padding: '1.25rem 3rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 1000, background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(25px)', borderBottom: '1px solid var(--border)' }}>
+      {/* Optimized Static Glows */}
+      <div style={{ position: 'absolute', top: '5%', left: '10%', width: '400px', height: '400px', background: 'var(--primary)', opacity: 0.05, borderRadius: '50%', filter: 'blur(100px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '5%', right: '5%', width: '500px', height: '500px', background: 'var(--carrot)', opacity: 0.05, borderRadius: '50%', filter: 'blur(120px)', pointerEvents: 'none' }} />
+
+      {/* Navbar - Reduced blur for performance */}
+      <nav style={{ padding: '1.25rem 3rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 1000, background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(10px)', borderBottom: '1px solid var(--border)' }}>
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h1 style={{ fontSize: '1.75rem', fontWeight: '900', letterSpacing: '-1.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', borderRadius: '12px', display: 'grid', placeItems: 'center', boxShadow: '0 8px 20px rgba(16, 185, 129, 0.2)' }}>
@@ -134,21 +141,23 @@ const LandingPage = () => {
               transition={{ delay: 0.3 }}
               style={{ fontSize: '1.5rem', color: 'var(--text-muted)', maxWidth: '650px', marginBottom: '4rem', lineHeight: '1.6', fontWeight: '500' }}
             >
-              Platform monitoring gizi revolusioner yang menghubungkan dapur sehat dengan ribuan sekolah melalui transparansi Blockchain & AI Logistik.
-            </motion.p>
-
-            <motion.div 
+              Platform monitoring gizi revolusioner yang menghubungkan dapur sehat dengan ribuan sekolah melalui transparansi Blockchain (Hyperledger Fabric/Ethereum Layer 2).
+            </motion.p>            <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.4 }}
-              style={{ display: 'flex', gap: '1.5rem' }}
+              style={{ display: 'flex', gap: '1.5rem', position: 'relative', zIndex: 100 }}
             >
-              <Link to="/login" className="btn-primary" style={{ textDecoration: 'none', fontSize: '1.2rem', padding: '1.3rem 4rem', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', background: 'var(--carrot)', boxShadow: '0 15px 35px rgba(249, 115, 22, 0.3)', border: 'none' }}>
-                Cek Menu Hari Ini <Utensils size={24} />
-              </Link>
-              <button className="btn-outline" style={{ borderColor: 'var(--border)', color: 'var(--text-main)', background: 'white', fontSize: '1.2rem', padding: '1.3rem 4rem', borderRadius: '50px', boxShadow: '0 10px 20px rgba(0,0,0,0.03)', fontWeight: '800' }}>
-                Pelajari Alur
-              </button>
+              <motion.div whileHover={{ scale: 1.05, y: -5 }} whileTap={{ scale: 0.95 }}>
+                <Link to="/login" className="btn-primary" style={{ textDecoration: 'none', fontSize: '1.2rem', padding: '1.5rem 4rem', borderRadius: '60px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', background: 'linear-gradient(to right, var(--primary), var(--secondary))', boxShadow: '0 20px 40px rgba(16, 185, 129, 0.3)', border: 'none', fontWeight: '900' }}>
+                  Akses Dashboard <ArrowRight size={24} />
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                 <Link to="/registrasi-vendor" className="btn-outline" style={{ textDecoration: 'none', display: 'block', borderColor: 'var(--primary)', color: 'var(--primary)', background: 'white', fontSize: '1.2rem', padding: '1.4rem 4rem', borderRadius: '60px', boxShadow: '0 10px 20px rgba(0,0,0,0.03)', fontWeight: '800' }}>
+                   Daftar Vendor
+                 </Link>
+              </motion.div>
             </motion.div>
           </motion.div>
 
@@ -158,33 +167,65 @@ const LandingPage = () => {
             transition={{ type: 'spring', damping: 20 }}
             style={{ position: 'relative' }}
           >
-            <div style={{ 
-              position: 'relative', 
-              borderRadius: '50px', 
-              overflow: 'hidden', 
-              boxShadow: '0 50px 100px rgba(0,0,0,0.1)',
-              background: 'white',
-              padding: '2rem',
-              border: '10px solid white'
-            }}>
-              <img 
-                src="/mbg_cartoon.png" 
-                alt="MBG Healthy Food Illustration" 
-                style={{ width: '100%', height: 'auto', borderRadius: '30px' }}
-              />
-              <div style={{ position: 'absolute', bottom: '2rem', right: '2rem', background: 'white', padding: '1.5rem', borderRadius: '25px', boxShadow: '0 15px 30px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{ position: 'relative' }}>
+              <div style={{ 
+                position: 'relative', 
+                borderRadius: '50px', 
+                overflow: 'hidden', 
+                boxShadow: '0 30px 60px rgba(0,0,0,0.08)',
+                background: 'white',
+                padding: '2rem',
+                border: '10px solid white',
+                willChange: 'transform'
+              }}>
+                <img 
+                  src="/mbg_cartoon.png" 
+                  alt="MBG Healthy Food Illustration" 
+                  style={{ width: '100%', height: 'auto', borderRadius: '30px' }}
+                />
+              </div>
+
+              {/* Floating Cards (Moved outside overflow:hidden) */}
+              <div className="animate-pulse-glow" style={{ position: 'absolute', bottom: '2rem', right: '1rem', background: 'white', padding: '1.5rem', borderRadius: '25px', display: 'flex', alignItems: 'center', gap: '15px', zIndex: 20, boxShadow: '0 15px 30px rgba(16, 185, 129, 0.15)' }}>
                  <div style={{ background: 'var(--primary-light)', padding: '10px', borderRadius: '12px' }}><CheckCircle color="var(--primary)" /></div>
                  <div>
-                    <p style={{ fontWeight: '900', fontSize: '1.1rem' }}>98% Gizi Optimal</p>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Data tervalidasi AI</p>
+                    <p style={{ fontWeight: '900', fontSize: '1.1rem' }}>Data Immutable</p>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Via Smart Contract</p>
                  </div>
               </div>
+
+              <motion.div 
+                 initial={{ y: 20, opacity: 0 }}
+                 animate={{ y: 0, opacity: 1 }}
+                 transition={{ delay: 0.8, type: 'spring' }}
+                  style={{ position: 'absolute', top: '10%', left: '-4rem', background: 'white', padding: '1.2rem 2rem', borderRadius: '30px', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', display: 'flex', gap: '15px', alignItems: 'center', zIndex: 20 }}>
+                 <div style={{ background: 'var(--carrot)', padding: '14px', borderRadius: '18px' }}><TrendingDown color="white" /></div>
+                 <div>
+                   <p style={{ fontWeight: '950', fontSize: '1.4rem', color: 'var(--text-main)', margin: 0, whiteSpace: 'nowrap' }}>Stunting -15%</p>
+                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700', margin: 0 }}>Target Gizi Nasional</p>
+                 </div>
+              </motion.div>
             </div>
             
-            {/* Soft decorative spheres */}
-            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 4, repeat: Infinity }} style={{ position: 'absolute', top: '-30px', left: '-30px', width: '80px', height: '80px', background: 'var(--banana)', borderRadius: '50%', filter: 'blur(20px)', opacity: 0.3 }} />
-            <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 5, repeat: Infinity, delay: 1 }} style={{ position: 'absolute', bottom: '-40px', left: '20%', width: '120px', height: '120px', background: 'var(--carrot)', borderRadius: '50%', filter: 'blur(30px)', opacity: 0.2 }} />
+            {/* Optimized decorative spheres */}
+            <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 6, repeat: Infinity }} style={{ position: 'absolute', top: '-30px', left: '-30px', width: '80px', height: '80px', background: 'var(--banana)', borderRadius: '50%', filter: 'blur(15px)', opacity: 0.2, transform: 'translateZ(0)' }} />
+            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 8, repeat: Infinity, delay: 1 }} style={{ position: 'absolute', bottom: '-40px', left: '20%', width: '120px', height: '120px', background: 'var(--carrot)', borderRadius: '50%', filter: 'blur(20px)', opacity: 0.15, transform: 'translateZ(0)' }} />
           </motion.div>
+        </div>
+      </section>
+
+      {/* Marquee Partner/Sponsor Area */}
+      <section style={{ padding: '2rem 0', background: 'white', position: 'relative', zIndex: 10, borderBottom: '1px solid var(--border)' }}>
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontWeight: '800', marginBottom: '1rem', letterSpacing: '1px' }}>TERINTEGRASI DENGAN INFRASTRUKTUR NASIONAL</p>
+        <div className="marquee-container">
+          <div className="marquee-content">
+            {['KEMENTERIAN KESEHATAN', 'BADAN GIZI NASIONAL', 'HYPERLEDGER FABRIC', 'BPOM RI', 'SATGAS MBG NASIONAL', 'DAPUR SEHAT INDONESIA', 'KEMENTERIAN PENDIDIKAN'].map((text, i) => (
+              <span key={i} style={{ fontSize: '1.2rem', fontWeight: '950', color: 'var(--text-main)', opacity: 0.4, padding: '0 2rem' }}>{text}</span>
+            ))}
+            {['KEMENTERIAN KESEHATAN', 'BADAN GIZI NASIONAL', 'HYPERLEDGER FABRIC', 'BPOM RI', 'SATGAS MBG NASIONAL', 'DAPUR SEHAT INDONESIA', 'KEMENTERIAN PENDIDIKAN'].map((text, i) => (
+              <span key={`clone-${i}`} style={{ fontSize: '1.2rem', fontWeight: '950', color: 'var(--text-main)', opacity: 0.4, padding: '0 2rem' }}>{text}</span>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -241,7 +282,7 @@ const LandingPage = () => {
       </section>
 
       {/* Keamanan Section */}
-      <section id="keamanan" style={{ padding: '10rem 3rem', background: 'white', position: 'relative', zIndex: 10 }}>
+      <section id="keamanan" className="premium-dark" style={{ padding: '10rem 3rem', position: 'relative', zIndex: 10 }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div className="grid" style={{ gridTemplateColumns: '1.2fr 1fr', gap: '6rem', alignItems: 'center' }}>
             <motion.div 
@@ -250,17 +291,17 @@ const LandingPage = () => {
               viewport={{ once: true }}
               style={{ position: 'relative' }}
             >
-              <div style={{ position: 'absolute', top: '-40px', left: '-40px', opacity: 0.05 }}><ShieldAlert size={200} color="var(--primary)" /></div>
-              <h2 style={{ fontSize: '4rem', fontWeight: '950', color: 'var(--text-main)', marginBottom: '2.5rem', letterSpacing: '-2px' }}>Keamanan Gizi & Transparansi</h2>
-              <p style={{ fontSize: '1.4rem', color: 'var(--text-muted)', marginBottom: '3rem', lineHeight: '1.7', fontWeight: '500' }}>
-                Kami mengintegrasikan teknologi Blockchain untuk memastikan setiap data pengiriman dan kualitas nutrisi tervalidasi secara permanen. Tidak ada porsi yang hilang, tidak ada gizi yang terabaikan.
+              <div style={{ position: 'absolute', top: '-40px', left: '-40px', opacity: 0.1 }}><ShieldAlert size={200} color="var(--primary)" /></div>
+              <h2 style={{ fontSize: '4rem', fontWeight: '950', color: '#fff', marginBottom: '2.5rem', letterSpacing: '-2px' }}>Keamanan Gizi & Transparansi</h2>
+              <p style={{ fontSize: '1.3rem', color: '#a7f3d0', marginBottom: '3rem', lineHeight: '1.7', fontWeight: '500' }}>
+                Menggunakan <strong>Blockchain (Hyperledger Fabric/Ethereum Layer 2)</strong> dengan sifat <em>immutable</em> untuk memastikan tidak ada manipulasi data pengiriman atau markup anggaran. Sistem didukung <strong>End-to-End Encryption (AES-256)</strong>, <strong>MFA</strong>, dan <strong>RBAC</strong> yang ketat agar privasi vendor dan pemerintah terjamin.
               </p>
               <div style={{ display: 'flex', gap: '2rem' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--primary-light)', padding: '1rem 2rem', borderRadius: '15px' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(16, 185, 129, 0.2)', padding: '1rem 2rem', borderRadius: '15px' }}>
                     <CheckCircle color="var(--primary)" />
                     <span style={{ fontWeight: '800', color: 'var(--primary)' }}>Data Terenkripsi</span>
                  </div>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--banana-light)', padding: '1rem 2rem', borderRadius: '15px' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(234, 179, 8, 0.2)', padding: '1rem 2rem', borderRadius: '15px' }}>
                     <Lock color="var(--banana)" />
                     <span style={{ fontWeight: '800', color: 'var(--banana)' }}>Audit Real-time</span>
                  </div>
@@ -271,13 +312,15 @@ const LandingPage = () => {
               initial={{ scale: 0.9, opacity: 0 }} 
               whileInView={{ scale: 1, opacity: 1 }} 
               viewport={{ once: true }}
-              style={{ background: 'var(--bg)', padding: '4rem', borderRadius: '50px', border: '1px solid var(--border)', boxShadow: '0 40px 100px rgba(0,0,0,0.05)' }}
+              style={{ background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(20px)', padding: '4rem', borderRadius: '50px', border: '1px solid rgba(255, 255, 255, 0.1)', boxShadow: '0 40px 100px rgba(0,0,0,0.2)' }}
             >
-               <h3 style={{ fontSize: '2.2rem', fontWeight: '950', marginBottom: '1.5rem', color: 'var(--primary)', letterSpacing: '-1px' }}>Kualitas Tak Terkompromi</h3>
-               <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', marginBottom: '3rem', lineHeight: '1.7', fontWeight: '500' }}>Setiap hidangan MBG melewati 3 tahap validasi: Ahli Gizi, Verifikasi Robotik AI, dan Konfirmasi Sekolah.</p>
-               <div style={{ padding: '2.5rem', background: 'white', borderRadius: '30px', border: '2px dashed var(--primary)' }}>
-                  <p style={{ fontWeight: '950', color: 'var(--primary)', fontSize: '1.3rem', marginBottom: '10px' }}>Audit Gizi Nasional</p>
-                  <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', fontWeight: '600' }}>Laporan kepatuhan periode Maret 2026: <span style={{ color: 'var(--secondary)', fontWeight: '900' }}>99.7% Terpenuhi</span>.</p>
+               <h3 style={{ fontSize: '2.2rem', fontWeight: '950', marginBottom: '1.5rem', color: 'var(--primary)', letterSpacing: '-1px' }}>Skalabilitas Microservices</h3>
+               <p style={{ fontSize: '1.2rem', color: '#a7f3d0', marginBottom: '3rem', lineHeight: '1.7', fontWeight: '500' }}>
+                 Arsitektur sistem dibangun atas <strong>Microservices dengan Docker & Kubernetes</strong>, memastikan layanan tetap stabil dan lancar dalam melayani ribuan dapur dan jutaan siswa di seluruh Nusantara secara serentak.
+               </p>
+               <div style={{ padding: '2.5rem', background: 'rgba(255,255,255,0.95)', borderRadius: '30px', border: '2px dashed var(--primary)' }}>
+                  <p style={{ fontWeight: '950', color: 'var(--primary)', fontSize: '1.3rem', marginBottom: '10px' }}>Infrastruktur Tangguh</p>
+                  <p style={{ fontSize: '1.1rem', color: 'var(--text-main)', fontWeight: '600' }}>Sistem siap menghandle pencatatan <span style={{ color: 'var(--secondary)', fontWeight: '900' }}>Jutaan Transaksi Serentak</span>.</p>
                </div>
             </motion.div>
           </div>
@@ -285,7 +328,7 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer id="kontak" style={{ padding: '8rem 3rem 4rem', background: 'white', borderTop: '1px solid var(--border)', position: 'relative', zIndex: 10 }}>
+      <footer id="kontak" style={{ padding: '8rem 3rem 4rem', background: 'var(--primary-light)', borderTop: '1px solid var(--border)', position: 'relative', zIndex: 10 }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6rem' }}>
             <div style={{ maxWidth: '500px' }}>

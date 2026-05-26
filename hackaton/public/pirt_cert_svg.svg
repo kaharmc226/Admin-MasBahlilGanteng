@@ -1,0 +1,29 @@
+<svg width="842" height="1191" viewBox="0 0 842 1191" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="842" height="1191" fill="#fffcf0"/>
+  <rect x="25" y="25" width="792" height="1141" stroke="#f97316" stroke-width="6"/>
+  
+  <rect x="0" y="0" width="842" height="180" fill="#f97316"/>
+  <text x="421" y="80" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="36" fill="white">DINAS KESEHATAN KOTA</text>
+  <text x="421" y="130" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="20" fill="white">IZIN PRODUKSI PANGAN INDUSTRI RUMAH TANGGA (P-IRT)</text>
+  
+  <text x="421" y="280" text-anchor="middle" font-family="serif" font-weight="900" font-size="52" fill="#431407">SERTIFIKAT P-IRT</text>
+  <text x="421" y="340" text-anchor="middle" font-family="sans-serif" font-weight="800" font-size="24" fill="#7c2d12">NO REGISTRASI: 2063175017728-26</text>
+  
+  <rect x="100" y="420" width="642" height="250" rx="10" fill="white" stroke="#fb923c" stroke-width="2" stroke-dasharray="10 10"/>
+  <text x="421" y="480" text-anchor="middle" font-family="sans-serif" font-size="22" font-weight="600" fill="#431407">Diberikan kepada :</text>
+  <text x="421" y="550" text-anchor="middle" font-family="serif" font-weight="900" font-size="42" fill="#111827">PT. NUSANTARA MEGAH JAYA</text>
+  <text x="421" y="610" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#7c2d12">Alamat: Sentra Kuliner Jakarta Timur</text>
+  
+  <text x="100" y="750" font-family="sans-serif" font-size="20" fill="#431407" font-weight="500">
+    <tspan x="100" dy="1.5em">Berdasarkan hasil pemeriksaan sarana dan prasarana produksi pangan,</tspan>
+    <tspan x="100" dy="1.5em">unit tersebut di atas dinyatakan telah memenuhi standar keamanan pangan</tspan>
+    <tspan x="100" dy="1.5em">untuk kategori Produk Pangan Olahan Siap Saji.</tspan>
+  </text>
+  
+  <text x="742" y="980" text-anchor="end" font-family="sans-serif" font-size="18">Jakarta, 20 Maret 2026</text>
+  <text x="646" y="1080" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="22" fill="#111827">HJ. SITI AMINAH, S.Kep</text>
+  <text x="646" y="1110" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="16" fill="#7c2d12">Kepala Dinas Kesehatan Jakarta Timur</text>
+  
+  <rect x="100" y="980" width="150" height="150" fill="#fef3c7" stroke="#f97316" stroke-width="2"/>
+  <text x="175" y="1060" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="900" fill="#9a3412">QR CODE<br/>P-IRT VERIFIED</text>
+</svg>

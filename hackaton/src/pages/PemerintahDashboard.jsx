@@ -50,6 +50,7 @@ import {
 } from 'recharts'
 import { motion, AnimatePresence } from 'framer-motion'
 import { mockData } from '../data/mockData'
+import Sidebar from '../components/Sidebar'
 
 // --- Sub-components (Moved Outside) ---
 
@@ -73,7 +74,17 @@ const Header = ({ title, subtitle, showAdd = false, onAdd, isVendor, isMapping }
   </div>
 )
 
-const AddFormModal = ({ onClose, isVendor, isMapping }) => {
+const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleSave = () => {
+    setIsSaving(true)
+    setTimeout(() => {
+      setIsSaving(false)
+      onSave(isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target')
+    }, 1200)
+  }
+
   const getFields = () => {
     if (isVendor) return (
       <>
@@ -124,7 +135,9 @@ const AddFormModal = ({ onClose, isVendor, isMapping }) => {
             {getFields()}
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
                <button onClick={onClose} className="btn-outline" style={{ flex: 1, borderRadius: '50px', padding: '1.2rem', fontWeight: '800' }}>Batal</button>
-               <button onClick={onClose} className="btn-primary" style={{ flex: 1, borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', background: 'linear-gradient(to right, var(--primary), var(--secondary))' }}>Simpan Data</button>
+               <button onClick={handleSave} className="btn-primary" style={{ flex: 1, borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', background: 'linear-gradient(to right, var(--primary), var(--secondary))' }}>
+                 {isSaving ? 'Menyimpan...' : 'Simpan Data'}
+               </button>
             </div>
          </div>
       </motion.div>
@@ -132,10 +145,21 @@ const AddFormModal = ({ onClose, isVendor, isMapping }) => {
   )
 }
 
-const PemerintahDashboard = () => {
+const PemerintahDashboard = ({ user, onLogout }) => {
   const location = useLocation()
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showToast, setShowToast] = useState({ show: false, message: '' })
   
+  const triggerToast = (msg) => {
+    setShowToast({ show: true, message: msg })
+    setTimeout(() => setShowToast({ show: false, message: '' }), 3000)
+  }
+
+  const handleModalSave = (type) => {
+    setShowAddForm(false)
+    triggerToast(`Data ${type} baru berhasil ditambahkan!`)
+  }
+
   const path = location.pathname.replace(/\/$/, '')
   const isMain = path === '/pemerintah'
   const isVendor = path === '/pemerintah/vendor'
@@ -144,25 +168,82 @@ const PemerintahDashboard = () => {
   const isStatistik = path === '/pemerintah/statistik'
   const isAlert = path === '/pemerintah/alert'
 
-  // Data Matching Portal Screenshots
-  const genderData = mockData.summary_nasional.map(v => ({
-    name: v.jenjang,
-    LakiLaki: Math.round(v.penerima * 0.51),
-    Perempuan: Math.round(v.penerima * 0.49)
+  // 1. Queue Pendaftaran dari LocalStorage (Simulasi Registrasi Baru)
+  const [regQueue, setRegQueue] = useState(() => {
+    return JSON.parse(localStorage.getItem('traksi_v_reg_queue') || '[]');
+  });
+
+  const [activeVendors, setActiveVendors] = useState(() => {
+    const saved = localStorage.getItem('traksi_v_active_vendors');
+    return saved ? JSON.parse(saved) : mockData.vendors;
+  });
+
+  const handleApproveVendor = (vendor) => {
+    const isConfirm = window.confirm(`Sahkan ${vendor.nama_vendor} sebagai Vendor MBG Resmi?`);
+    if (isConfirm) {
+      const newActive = [ { ...vendor, status_verifikasi: 'approved' }, ...activeVendors ];
+      setActiveVendors(newActive);
+      localStorage.setItem('traksi_v_active_vendors', JSON.stringify(newActive));
+      
+      const newQueue = regQueue.filter(v => v.izin_usaha !== vendor.izin_usaha);
+      setRegQueue(newQueue);
+      localStorage.setItem('traksi_v_reg_queue', JSON.stringify(newQueue));
+      
+      triggerToast(`${vendor.nama_vendor} telah resmi disahkan oleh Pemerintah!`);
+    }
+  }
+
+  // Data Matching Portal Screenshots (Adapted for new territory data)
+  const wilayahKeys = ['tk', 'kb', 'tpa', 'sps', 'pkbm', 'skb', 'sd', 'smp', 'sma', 'smk', 'slb'];
+  const genderData = wilayahKeys.map(key => ({
+    name: key.toUpperCase(),
+    LakiLaki: Math.round(mockData.wilayahTotals[key].jml * 0.51),
+    Perempuan: Math.round(mockData.wilayahTotals[key].jml * 0.49)
   }))
 
-  const characteristicData = mockData.summary_nasional.map(v => ({
-    name: v.jenjang,
-    Alergi: Math.round(v.kondisi_khusus * 0.65),
-    Fobia: Math.round(v.kondisi_khusus * 0.1),
-    Intoleran: Math.round(v.kondisi_khusus * 0.25)
+  const characteristicData = wilayahKeys.map(key => ({
+    name: key.toUpperCase(),
+    Alergi: Math.round(mockData.wilayahTotals[key].jml * 0.05),
+    Fobia: Math.round(mockData.wilayahTotals[key].jml * 0.01),
+    Intoleran: Math.round(mockData.wilayahTotals[key].jml * 0.02)
   }))
 
   const renderContent = () => {
     if (isVendor) return (
       <div className="grid">
         <Header title="Audit Vendor Nasional" subtitle="Verifikasi izin usaha dan standar operasional MBG." showAdd onAdd={() => setShowAddForm(true)} isVendor={isVendor} />
-        <div className="card" style={{ borderRadius: '32px', padding: '1.5rem', background: 'white' }}>
+        <div className="card dashboard-card-vibrant" style={{ borderRadius: '32px', padding: '2.5rem' }}>
+          <h3 style={{ marginBottom: '2rem', fontWeight: '950', color: 'var(--primary)' }}>Menunggu Verifikasi (Queue)</h3>
+          {regQueue.length === 0 ? (
+            <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700', background: 'var(--bg)', borderRadius: '20px' }}>Tidak ada antrian pendaftaran vendor baru.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.8rem', marginBottom: '3rem' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '900' }}>
+                  <th>NAMA VENDOR</th>
+                  <th>IZIN REG</th>
+                  <th>TANGGAL DAFTAR</th>
+                  <th>STATUS</th>
+                  <th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {regQueue.map((v, i) => (
+                  <tr key={i} style={{ background: 'var(--bg)' }}>
+                    <td style={{ padding: '1.5rem', fontWeight: '900', borderRadius: '20px 0 0 20px' }}>{v.nama_vendor}</td>
+                    <td style={{ padding: '1.5rem', fontWeight: '700' }}>{v.izin_usaha}</td>
+                    <td style={{ padding: '1.5rem', fontWeight: '700' }}>{v.date_pendaftaran}</td>
+                    <td style={{ padding: '1.5rem' }}><span className="badge badge-warning" style={{ fontWeight: '900' }}>PENDING REVIEW</span></td>
+                    <td style={{ padding: '1.5rem', borderRadius: '0 20px 20px 0' }}>
+                       <button onClick={() => handleApproveVendor(v)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: '15px', border: 'none', fontWeight: '900', color: 'white', cursor: 'pointer' }}>SAHKAN VENDOR</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <h3 style={{ marginBottom: '2rem', fontWeight: '950', marginTop: '2rem' }}>Daftar Vendor Aktif</h3>
           <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.8rem' }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '900' }}>
@@ -174,7 +255,7 @@ const PemerintahDashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {mockData.vendors.map((v, i) => (
+              {activeVendors.map((v, i) => (
                 <tr key={i} style={{ background: 'var(--bg)' }}>
                   <td style={{ padding: '1.5rem', fontWeight: '900', borderRadius: '20px 0 0 20px' }}>{v.nama_vendor}</td>
                   <td style={{ padding: '1.5rem', color: 'var(--primary)', fontWeight: '700' }}>{v.izin_usaha}</td>
@@ -189,7 +270,7 @@ const PemerintahDashboard = () => {
                      </span>
                   </td>
                   <td style={{ padding: '1.5rem', borderRadius: '0 20px 20px 0' }}>
-                     <button style={{ color: 'var(--primary)', background: 'none', border: 'none', fontWeight: '900' }}>Detail Audit</button>
+                     <button onClick={() => triggerToast(`Memuat detail audit untuk ${v.nama_vendor}...`)} style={{ color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Detail Audit</button>
                   </td>
                 </tr>
               ))}
@@ -246,7 +327,7 @@ const PemerintahDashboard = () => {
                       {mockData.sekolah.map(s => <option key={s.id_sekolah}>{s.nama_sekolah}</option>)}
                    </select>
                 </div>
-                <button className="btn-primary" style={{ padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', marginTop: '1rem' }}>Sahkan Hubungan Mapping</button>
+                <button onClick={() => triggerToast('Hubungan mapping dapur dan sekolah berhasil disahkan!')} className="btn-primary" style={{ padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', marginTop: '1rem', cursor: 'pointer' }}>Sahkan Hubungan Mapping</button>
              </div>
           </div>
         </div>
@@ -260,7 +341,7 @@ const PemerintahDashboard = () => {
           <div className="card" style={{ padding: '2.5rem', borderRadius: '40px', background: 'white' }}>
              <h3 style={{ fontWeight: '900', marginBottom: '2rem' }}>Penerima Manfaat per Jenjang</h3>
              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={mockData.summary_nasional}>
+                <BarChart data={wilayahKeys.map(k => ({ jenjang: k.toUpperCase(), penerima: mockData.wilayahTotals[k].jml }))}>
                    <CartesianGrid strokeDasharray="3 3" />
                    <XAxis dataKey="jenjang" />
                    <YAxis />
@@ -272,7 +353,7 @@ const PemerintahDashboard = () => {
           <div className="card" style={{ padding: '2.5rem', borderRadius: '40px', background: 'white' }}>
              <h3 style={{ fontWeight: '900', marginBottom: '2rem' }}>Audit Gizi (Kondisi Khusus)</h3>
              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={mockData.summary_nasional}>
+                <AreaChart data={wilayahKeys.map(k => ({ jenjang: k.toUpperCase(), kondisi_khusus: Math.round(mockData.wilayahTotals[k].jml * 0.08) }))}>
                    <XAxis dataKey="jenjang" />
                    <YAxis />
                    <Tooltip />
@@ -291,7 +372,7 @@ const PemerintahDashboard = () => {
           {[
             { icon: <AlertTriangle color="#EF4444" />, title: 'Keterlambatan Dapur Jaktim', detail: 'SDN 06 Baru belum menerima drop 404 porsi hingga 12:30 WIB.', time: '10 Menit Lalu' },
             { icon: <BadgeAlert color="var(--carrot)" />, title: 'Keluhan Feedback Tinggi', detail: 'Vendor Dapur Nusantara mendapatkan rating rendah di area Pasar Rebo.', time: '1 Jam Lalu' },
-            { icon: <ShieldCheck color="var(--primary)" />, title: 'Audit Keamanan Sukses', detail: 'Validasi harian gizi 12 sekolah Jakarta Timur telah diverifikasi.', time: '3 Jam Lalu' }
+            { icon: <ShieldCheck color="var(--primary)" />, title: 'Smart Contract Audit Valid', detail: 'Validasi harian gizi 12 sekolah Jakarta Timur telah diverifikasi di Blockchain.', time: '3 Jam Lalu' }
           ].map((a, i) => (
             <div key={i} className="card" style={{ padding: '2rem', borderRadius: '30px', display: 'flex', gap: '25px', alignItems: 'center', background: 'white' }}>
               <div style={{ background: 'var(--bg)', padding: '20px', borderRadius: '20px' }}>{a.icon}</div>
@@ -333,44 +414,67 @@ const PemerintahDashboard = () => {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ position: 'relative', zIndex: 1 }}>
         <Header title="Monitoring Gizi Nasional" subtitle="Portal Transparansi Program Makan Bergizi Gratis (MBG)." />
         
+        <div style={{ display: 'flex', gap: '15px', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
+           <div className="badge" style={{ background: '#064E3B', color: '#34D399', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+             <Fingerprint size={16} /> Admin Autentikasi MFA Aktif
+           </div>
+           <div className="badge" style={{ background: '#1E3A8A', color: '#93C5FD', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+             <Lock size={16} /> AES-256 Terenkripsi E2E
+           </div>
+           <div className="badge" style={{ background: '#701A75', color: '#F0ABFC', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+             <Globe size={16} /> Jaringan Blockchain Tersinkron
+           </div>
+        </div>
+
         {/* 1. Portal Summary Table (Matching Official UI) */}
         <div className="card" style={{ borderRadius: '40px', padding: '2.5rem', marginBottom: '3rem', overflow: 'hidden' }}>
           <h3 style={{ marginBottom: '2rem', fontWeight: '950', fontSize: '1.4rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <FileText color="var(--primary)" /> Rekapitulasi Nasional Satuan Pendidikan 2026
           </h3>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', borderRadius: '20px', overflow: 'hidden' }}>
+            <table style={{ minWidth: '1500px', width: '100%', borderCollapse: 'collapse', borderRadius: '15px', overflow: 'hidden', textAlign: 'center' }}>
               <thead>
-                <tr style={{ background: '#22D3EE', color: 'white', textAlign: 'left' }}>
-                  <th style={{ padding: '1.2rem', fontWeight: '900' }}>Tahun</th>
-                  <th style={{ padding: '1.2rem', fontWeight: '900' }}>Jenjang</th>
-                  <th style={{ padding: '1.2rem', fontWeight: '900' }}>Satuan Pendidikan</th>
-                  <th style={{ padding: '1.2rem', fontWeight: '900' }}>Negeri</th>
-                  <th style={{ padding: '1.2rem', fontWeight: '900' }}>Swasta</th>
-                  <th style={{ padding: '1.2rem', fontWeight: '900' }}>Penerima Manfaat</th>
-                  <th style={{ padding: '1.2rem', fontWeight: '900' }}>Kondisi Khusus</th>
+                <tr style={{ background: '#22D3EE', color: 'white' }}>
+                  <th rowSpan={2} style={{ padding: '1rem', fontWeight: '900', borderRight: '1px solid rgba(255,255,255,0.2)' }}>No</th>
+                  <th rowSpan={2} style={{ padding: '1rem', fontWeight: '900', borderRight: '1px solid rgba(255,255,255,0.2)', textAlign: 'left' }}>Wilayah</th>
+                  {['Total', 'TK', 'KB', 'TPA', 'SPS', 'PKBM', 'SKB', 'SD', 'SMP', 'SMA', 'SMK', 'SLB'].map((col, idx) => (
+                    <th key={idx} colSpan={3} style={{ padding: '0.8rem', fontWeight: '900', borderRight: '1px solid rgba(255,255,255,0.2)', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>{col}</th>
+                  ))}
+                </tr>
+                <tr style={{ background: '#06B6D4', color: 'white', fontSize: '0.8rem' }}>
+                  {Array.from({ length: 12 }).map((_, idx) => (
+                    <React.Fragment key={idx}>
+                      <th style={{ padding: '0.5rem', fontWeight: '800', borderRight: '1px solid rgba(255,255,255,0.2)' }}>Jml</th>
+                      <th style={{ padding: '0.5rem', fontWeight: '800', borderRight: '1px solid rgba(255,255,255,0.2)' }}>N</th>
+                      <th style={{ padding: '0.5rem', fontWeight: '800', borderRight: '1px solid rgba(255,255,255,0.2)' }}>S</th>
+                    </React.Fragment>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {mockData.summary_nasional.map((row, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #E5E7EB', fontWeight: '700', color: '#4B5563' }}>
-                    <td style={{ padding: '1rem' }}>2026</td>
-                    <td style={{ padding: '1rem', color: 'var(--primary)' }}>{row.jenjang}</td>
-                    <td style={{ padding: '1rem' }}>{row.satuan.toLocaleString()}</td>
-                    <td style={{ padding: '1rem' }}>{row.negeri.toLocaleString()}</td>
-                    <td style={{ padding: '1rem' }}>{row.swasta.toLocaleString()}</td>
-                    <td style={{ padding: '1rem', fontWeight: '900', color: 'var(--text-main)' }}>{row.penerima.toLocaleString()}</td>
-                    <td style={{ padding: '1rem', color: '#EF4444' }}>{row.kondisi_khusus.toLocaleString()}</td>
+                {mockData.wilayahData.map((row, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #E5E7EB', fontWeight: '700', color: '#4B5563', fontSize: '0.85rem' }}>
+                    <td style={{ padding: '0.8rem' }}>{i + 1}</td>
+                    <td style={{ padding: '0.8rem', textAlign: 'left', fontWeight: '800', color: 'var(--text-main)' }}>{row.wilayah}</td>
+                    {['total', 'tk', 'kb', 'tpa', 'sps', 'pkbm', 'skb', 'sd', 'smp', 'sma', 'smk', 'slb'].map((k, idx) => (
+                      <React.Fragment key={idx}>
+                        <td style={{ padding: '0.8rem', background: '#F9FAFB' }}>{row[k].jml}</td>
+                        <td style={{ padding: '0.8rem' }}>{row[k].n}</td>
+                        <td style={{ padding: '0.8rem' }}>{row[k].s}</td>
+                      </React.Fragment>
+                    ))}
                   </tr>
                 ))}
                 {/* Total Row */}
-                <tr style={{ background: '#ECFEFF', fontWeight: '950', color: 'var(--text-main)' }}>
-                  <td colSpan={2} style={{ padding: '1.2rem', textAlign: 'center' }}>TOTAL</td>
-                  <td style={{ padding: '1.2rem' }}>15.470</td>
-                  <td style={{ padding: '1.2rem' }}>9.048</td>
-                  <td style={{ padding: '1.2rem' }}>6.422</td>
-                  <td style={{ padding: '1.2rem' }}>2.631.906</td>
-                  <td style={{ padding: '1.2rem' }}>92.919</td>
+                <tr style={{ background: '#ECFEFF', fontWeight: '950', color: 'var(--text-main)', fontSize: '0.9rem' }}>
+                  <td colSpan={2} style={{ padding: '1rem', textAlign: 'center' }}>TOTAL</td>
+                  {['total', 'tk', 'kb', 'tpa', 'sps', 'pkbm', 'skb', 'sd', 'smp', 'sma', 'smk', 'slb'].map((k, idx) => (
+                    <React.Fragment key={idx}>
+                      <td style={{ padding: '1rem', color: 'var(--primary)', background: 'rgba(34,211,238,0.1)' }}>{mockData.wilayahTotals[k].jml}</td>
+                      <td style={{ padding: '1rem' }}>{mockData.wilayahTotals[k].n}</td>
+                      <td style={{ padding: '1rem' }}>{mockData.wilayahTotals[k].s}</td>
+                    </React.Fragment>
+                  ))}
                 </tr>
               </tbody>
             </table>
@@ -420,14 +524,62 @@ const PemerintahDashboard = () => {
       </motion.div>
     )
     
-    return null
+    return (
+      <div style={{ textAlign: 'center', padding: '5rem' }}>
+        <h2 style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--text-muted)' }}>Silahkan Pilih Menu di Samping</h2>
+      </div>
+    )
   }
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', padding: '2rem' }}>
-      <AnimatePresence mode="wait">
-        {renderContent()}
+    <div className="layout-wrapper premium-mesh mesh-pemerintah">
+      <Sidebar user={user} onLogout={onLogout} />
+      <div className="main-content" style={{ position: 'relative', zIndex: 1, padding: '3rem' }}>
+        <Motif icon={Apple} top="50px" right="50px" color="var(--primary)" />
+        <Motif icon={Carrot} bottom="100px" left="50px" color="var(--carrot)" />
+      <AnimatePresence>
+        {showToast.show && (
+          <motion.div 
+            initial={{ opacity: 0, y: -50, x: '-50%' }} 
+            animate={{ opacity: 1, y: 20, x: '-50%' }} 
+            exit={{ opacity: 0, y: -50, x: '-50%' }} 
+            style={{ 
+              position: 'fixed', top: 0, left: '50%', zIndex: 3000, 
+              background: 'var(--primary)', 
+              color: 'white', padding: '1.2rem 2.5rem', borderRadius: '50px', 
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '15px' 
+            }}
+          >
+            <ShieldCheck size={24} />
+            <span style={{ fontWeight: '900' }}>{showToast.message}</span>
+          </motion.div>
+        )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {showAddForm && (
+          <AddFormModal 
+            onClose={() => setShowAddForm(false)} 
+            onSave={handleModalSave}
+            isVendor={isVendor} 
+            isMapping={isMapping} 
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key={location.pathname}
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -30 }}
+          transition={{ duration: 0.3 }}
+          style={{ position: 'relative', zIndex: 1 }}
+        >
+          {renderContent()}
+        </motion.div>
+      </AnimatePresence>
+      </div>
     </div>
   )
 }

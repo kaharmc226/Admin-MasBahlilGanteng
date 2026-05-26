@@ -36,16 +36,13 @@ function App() {
   // Helper component for Protected Routes
   const ProtectedRoute = ({ children, role }) => {
     if (!user) return <Navigate to="/login" />
-    if (user.role !== role) return <Navigate to="/" />
-    return (
-      <div className="layout-wrapper">
-        <Sidebar user={user} onLogout={handleLogout} />
-        <main className="main-content">
-          <Navbar user={user} />
-          {children}
-        </main>
-      </div>
-    )
+    if (user.role !== role) {
+      // Small adjustment for underscores vs dashes in roles
+      const normalizedRole = user.role.replace('_', '-');
+      const normalizedReqRole = role.replace('_', '-');
+      if (normalizedRole !== normalizedReqRole) return <Navigate to="/" />
+    }
+    return children
   }
 
   return (
@@ -57,19 +54,19 @@ function App() {
       {/* Role Based Routes */}
       <Route 
         path="/vendor/*" 
-        element={<ProtectedRoute role="vendor"><VendorDashboard /></ProtectedRoute>} 
+        element={<ProtectedRoute role="vendor"><VendorDashboard user={user} onLogout={handleLogout} /></ProtectedRoute>} 
       />
       <Route 
         path="/ahli-gizi/*" 
-        element={<ProtectedRoute role="ahli_gizi"><AhliGiziDashboard /></ProtectedRoute>} 
+        element={<ProtectedRoute role="ahli_gizi"><AhliGiziDashboard user={user} onLogout={handleLogout} /></ProtectedRoute>} 
       />
       <Route 
         path="/sekolah/*" 
-        element={<ProtectedRoute role="sekolah"><SekolahDashboard /></ProtectedRoute>} 
+        element={<ProtectedRoute role="sekolah"><SekolahDashboard user={user} onLogout={handleLogout} /></ProtectedRoute>} 
       />
       <Route 
         path="/pemerintah/*" 
-        element={<ProtectedRoute role="pemerintah"><PemerintahDashboard /></ProtectedRoute>} 
+        element={<ProtectedRoute role="pemerintah"><PemerintahDashboard user={user} onLogout={handleLogout} /></ProtectedRoute>} 
       />
       
       {/* Handle potential dashes or underscores from login */}

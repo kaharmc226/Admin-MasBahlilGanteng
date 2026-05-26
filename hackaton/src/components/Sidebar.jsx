@@ -59,7 +59,7 @@ const Sidebar = ({ user, onLogout }) => {
     pemerintah: pemerintahMenu
   }
 
-  const currentMenu = menuMap[user.role] || []
+  const currentMenu = menuMap[user?.role] || []
 
   return (
     <aside className="sidebar premium-glass" style={{
@@ -133,12 +133,12 @@ const Sidebar = ({ user, onLogout }) => {
             color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '1.2rem',
             boxShadow: '0 8px 15px rgba(16, 185, 129, 0.2)'
           }}>
-            {user.name.charAt(0)}
+            {user?.name?.charAt(0) || 'U'}
           </div>
           <div style={{ overflow: 'hidden' }}>
-            <p style={{ fontWeight: '800', fontSize: '0.95rem', color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{user.name}</p>
+            <p style={{ fontWeight: '800', fontSize: '0.95rem', color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{user?.name || 'User'}</p>
             <p style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              {user.role.replace('_', ' ')}
+              {user?.role?.replace('_', ' ') || 'Guest'}
             </p>
           </div>
         </motion.div>

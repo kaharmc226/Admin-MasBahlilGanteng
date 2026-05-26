@@ -5,7 +5,9 @@ import { ShieldCheck, User, Building, GraduationCap, Microscope, Carrot } from '
 
 const Login = ({ onLogin }) => {
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [role, setRole] = useState('vendor')
+  const [errorMsg, setErrorMsg] = useState('')
   const navigate = useNavigate()
 
   const roles = [
@@ -17,11 +19,27 @@ const Login = ({ onLogin }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    setErrorMsg('')
+
+    const validUsers = {
+      vendor: { email: 'v.jaktim@traksi.id', pass: 'pass123', name: 'Vendor Jakarta Timur' },
+      ahli_gizi: { email: 'nutri.jaktim@traksi.id', pass: 'pass123', name: 'Ahli Gizi Jakarta Timur' },
+      sekolah: { email: 'sdn06@sekolah.traksi.id', pass: 'pass123', name: 'Admin SDN 06 Baru' },
+      pemerintah: { email: 'gov.dki@traksi.id', pass: 'pass123', name: 'Gov DKI Jakarta' }
+    }
+
+    const expected = validUsers[role]
+
+    if (email !== expected.email || password !== expected.pass) {
+      setErrorMsg(`Kredensial salah! Gunakan Email: ${expected.email} | Password: pass123`)
+      return
+    }
+
     const userData = {
       id: 1,
-      name: `Admin ${role.replace('_', ' ').toUpperCase()}`,
+      name: expected.name,
       role: role,
-      email: email || `${role}@traksi.id`,
+      email: expected.email,
     }
     onLogin(userData)
     const targetPath = role.replace('_', '-')
@@ -94,7 +112,7 @@ const Login = ({ onLogin }) => {
                 <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-main)' }}>Email Institusi</label>
                 <input 
                   type="email" 
-                  placeholder="admin.mbg@traksi.id" 
+                  placeholder="Masukkan email resmi..." 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   style={{
@@ -113,6 +131,8 @@ const Login = ({ onLogin }) => {
                 <input 
                   type="password" 
                   placeholder="••••••••••••" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   style={{
                     width: '100%', padding: '1.2rem', borderRadius: 'var(--radius)', 
                     border: '1px solid var(--border)', outline: 'none', background: 'white',
@@ -123,6 +143,12 @@ const Login = ({ onLogin }) => {
                   onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
                 />
               </div>
+
+              {errorMsg && (
+                <div style={{ background: 'var(--error-light)', color: 'var(--error)', padding: '1rem', borderRadius: '15px', marginBottom: '1.5rem', fontWeight: '800', border: '1px solid var(--error)', fontSize: '0.9rem' }}>
+                  {errorMsg}
+                </div>
+              )}
 
               <motion.button 
                 whileHover={{ scale: 1.02 }}
