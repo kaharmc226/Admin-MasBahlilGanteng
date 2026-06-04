@@ -22,6 +22,21 @@ const Sidebar = ({ user, onLogout }) => {
   const navigate = useNavigate()
   const location = useLocation()
 
+  const handleQuickSwitch = (targetRole) => {
+    const rolesInfo = {
+      vendor: { id: 1, name: 'Vendor Jakarta Timur', role: 'vendor', email: 'v.jaktim@traksi.id' },
+      ahli_gizi: { id: 1, name: 'Ahli Gizi Jakarta Timur', role: 'ahli_gizi', email: 'nutri.jaktim@traksi.id' },
+      sekolah: { id: 1, name: 'Admin SDN 06 Baru', role: 'sekolah', email: 'sdn06@sekolah.traksi.id' },
+      pemerintah: { id: 1, name: 'Gov DKI Jakarta', role: 'pemerintah', email: 'gov.dki@traksi.id' }
+    }
+    const userData = rolesInfo[targetRole]
+    if (userData) {
+      localStorage.setItem('traksi_user', JSON.stringify(userData))
+      const targetPath = targetRole.replace('_', '-')
+      window.location.href = `/${targetPath}`
+    }
+  }
+
   const vendorMenu = [
     { title: 'Dashboard', path: '/vendor', icon: <Home size={20}/> },
     { title: 'Dokumen Vendor', path: '/vendor/dokumen', icon: <FileText size={20}/> },
@@ -122,6 +137,48 @@ const Sidebar = ({ user, onLogout }) => {
           })}
         </ul>
       </nav>
+
+      {/* Simulator / Quick Switcher */}
+      <div style={{ padding: '1.25rem', borderTop: '1px solid var(--border)', background: 'rgba(16, 185, 129, 0.02)' }}>
+        <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Zap size={14} color="var(--primary)" fill="var(--primary)" /> SIMULATOR PERAN
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+          {[
+            { id: 'vendor', label: 'Vendor' },
+            { id: 'ahli_gizi', label: 'Ahli Gizi' },
+            { id: 'sekolah', label: 'Sekolah' },
+            { id: 'pemerintah', label: 'Pemda' }
+          ].map((r) => {
+            const isCurrent = user?.role === r.id;
+            return (
+              <motion.button
+                key={r.id}
+                whileHover={{ scale: isCurrent ? 1 : 1.03 }}
+                whileTap={{ scale: isCurrent ? 1 : 0.97 }}
+                onClick={() => !isCurrent && handleQuickSwitch(r.id)}
+                style={{
+                  padding: '0.6rem 0.4rem',
+                  fontSize: '0.75rem',
+                  fontWeight: '800',
+                  borderRadius: '10px',
+                  border: '1px solid',
+                  borderColor: isCurrent ? 'var(--primary)' : 'var(--border)',
+                  background: isCurrent ? 'var(--primary-light)' : 'white',
+                  color: isCurrent ? 'var(--primary)' : 'var(--text-main)',
+                  cursor: isCurrent ? 'default' : 'pointer',
+                  opacity: isCurrent ? 1 : 0.8,
+                  transition: 'all 0.2s',
+                  textAlign: 'center',
+                  boxShadow: isCurrent ? 'none' : '0 2px 4px rgba(0,0,0,0.02)'
+                }}
+              >
+                {r.label}
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
 
       <div style={{ padding: '1.5rem', background: 'var(--primary-light)', borderTop: '1px solid var(--border)' }}>
         <motion.div 

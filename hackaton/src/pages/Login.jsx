@@ -4,8 +4,8 @@ import { motion } from 'framer-motion'
 import { ShieldCheck, User, Building, GraduationCap, Microscope, Carrot } from 'lucide-react'
 
 const Login = ({ onLogin }) => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('v.jaktim@traksi.id')
+  const [password, setPassword] = useState('pass123')
   const [role, setRole] = useState('vendor')
   const [errorMsg, setErrorMsg] = useState('')
   const navigate = useNavigate()
@@ -16,6 +16,21 @@ const Login = ({ onLogin }) => {
     { id: 'sekolah', icon: <GraduationCap size={24}/>, title: 'Sekolah', desc: 'Penerima manfaat & feedback.' },
     { id: 'pemerintah', icon: <ShieldCheck size={24}/>, title: 'Pemerintah', desc: 'Dinas/Kementerian pengawas.' }
   ]
+
+  const handleRoleSelect = (selectedRole) => {
+    setRole(selectedRole)
+    const validUsers = {
+      vendor: { email: 'v.jaktim@traksi.id', pass: 'pass123' },
+      ahli_gizi: { email: 'nutri.jaktim@traksi.id', pass: 'pass123' },
+      sekolah: { email: 'sdn06@sekolah.traksi.id', pass: 'pass123' },
+      pemerintah: { email: 'gov.dki@traksi.id', pass: 'pass123' }
+    }
+    const creds = validUsers[selectedRole]
+    if (creds) {
+      setEmail(creds.email)
+      setPassword(creds.pass)
+    }
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -86,7 +101,7 @@ const Login = ({ onLogin }) => {
                     whileHover={{ y: -5 }}
                     whileTap={{ scale: 0.98 }}
                     key={r.id} 
-                    onClick={() => setRole(r.id)}
+                    onClick={() => handleRoleSelect(r.id)}
                     style={{
                       padding: '1.5rem',
                       border: '2px solid',

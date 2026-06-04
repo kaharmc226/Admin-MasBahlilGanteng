@@ -11,17 +11,13 @@ import Sidebar from './components/Sidebar'
 import Navbar from './components/Navbar'
 
 function App() {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('traksi_user')
+    return savedUser ? JSON.parse(savedUser) : null
+  })
   const location = useLocation()
   
   const isAuthPage = location.pathname === '/' || location.pathname === '/login'
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem('traksi_user')
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
-    }
-  }, [])
 
   const handleLogin = (userData) => {
     setUser(userData)
