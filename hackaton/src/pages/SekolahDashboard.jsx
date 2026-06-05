@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { 
   School, 
@@ -28,7 +28,8 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { mockData } from '../data/mockData'
-import Sidebar from '../components/Sidebar'
+import api from '../api'
+import DashboardLayout from '../components/DashboardLayout'
 
 // --- Sub-components (Moved Outside) ---
 
@@ -52,7 +53,8 @@ const Header = ({ title, subtitle, showAdd = false, onAdd, isFeedback }) => (
   </div>
 )
 
-const AddFormModal = ({ onClose, isFeedback }) => {
+  const [rating, setRating] = useState(4);
+  
   const getFields = () => {
     if (isFeedback) return (
       <>
@@ -63,7 +65,7 @@ const AddFormModal = ({ onClose, isFeedback }) => {
         <div>
           <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Rating Rasa (1-5)</label>
           <div style={{ display: 'flex', gap: '10px' }}>
-            {[1,2,3,4,5].map(s => <Star key={s} size={32} color="var(--banana)" fill={s <= 4 ? "var(--banana)" : "none"} style={{ cursor: 'pointer' }} />)}
+            {[1,2,3,4,5].map(s => <Star key={s} size={32} color="var(--banana)" fill={s <= rating ? "var(--banana)" : "none"} style={{ cursor: 'pointer' }} onClick={() => setRating(s)} />)}
           </div>
         </div>
         <div>
@@ -95,21 +97,23 @@ const AddFormModal = ({ onClose, isFeedback }) => {
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'grid', placeItems: 'center', backdropFilter: 'blur(8px)' }}>
-      <motion.div initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} className="card" style={{ width: '90%', maxWidth: '550px', padding: '3.5rem', borderRadius: '45px', position: 'relative' }}>
-         <button onClick={onClose} style={{ position: 'absolute', top: '25px', right: '25px', background: 'var(--bg)', border: 'none', padding: '10px', borderRadius: '50%', cursor: 'pointer' }}><X size={20}/></button>
-         <h2 style={{ marginBottom: '2.5rem', fontWeight: '950', fontSize: '2.4rem', letterSpacing: '-1.5px' }}>{isFeedback ? 'Beri Feedback' : 'Lapor Kendala'}</h2>
+    <motion.div 
+      initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+      style={{ overflow: 'hidden', marginBottom: '2rem' }}
+    >
+      <div style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '100%', border: '1.5px solid var(--border)' }}>
+         <h2 style={{ marginBottom: '2.5rem', fontWeight: '950', fontSize: '2rem', letterSpacing: '-1px' }}>{isFeedback ? 'Beri Feedback' : 'Lapor Kendala'}</h2>
          <div style={{ display: 'grid', gap: '1.5rem' }}>
             {getFields()}
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-               <button onClick={onClose} className="btn-outline" style={{ flex: 1, borderRadius: '50px', padding: '1.2rem', fontWeight: '800' }}>Batal</button>
+               <button onClick={onClose} style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-main)', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer' }}>Batal</button>
                <button onClick={() => {
                  alert(isFeedback ? "✅ Feedback berhasil dikirm ke Ahli Gizi Pusat!" : "⚠️ Kendala berhasil dilaporkan ke Vendor & Pemerintah!");
                  onClose();
-               }} className="btn-primary" style={{ flex: 1, borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', background: 'linear-gradient(to right, var(--primary), var(--secondary))' }}>Kirim</button>
+               }} className="btn-primary" style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', background: 'var(--primary)', cursor: 'pointer' }}>Kirim</button>
             </div>
          </div>
-      </motion.div>
+      </div>
     </motion.div>
   )
 }
@@ -117,18 +121,35 @@ const AddFormModal = ({ onClose, isFeedback }) => {
 const SekolahDashboard = ({ user, onLogout }) => {
   const location = useLocation()
   const [showAddForm, setShowAddForm] = useState(false)
+  const [feedbackRating, setFeedbackRating] = useState(4)
   
   const path = location.pathname.replace(/\/$/, '')
   const isMain = path === '/sekolah'
   const isKonfirmasi = path === '/sekolah/konfirmasi'
   const isFeedback = path === '/sekolah/feedback'
 
-  const [prodList, setProdList] = useState(() => {
-    const saved = localStorage.getItem('traksi_v_production')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [distribusi, setDistribusi] = useState([])
+  const [feedback, setFeedback] = useState([])
 
-  const activeDelivery = prodList[0] || {
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [dist, fb] = await Promise.all([api.getDistribusi(), api.getFeedback()])
+        setDistribusi(dist)
+        setFeedback(fb)
+      } catch (err) { console.error('Failed to fetch:', err) }
+    }
+    fetchData()
+  }, [])
+
+  const activeDelivery = distribusi[0] ? {
+    id: distribusi[0].kode_transaksi,
+    vendor: 'Dapur Sehat Nusantara',
+    status: distribusi[0].status,
+    time: distribusi[0].waktu_kirim ? new Date(distribusi[0].waktu_kirim).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : '-',
+    menuName: distribusi[0].nama_menu || 'Menu Hari Ini',
+    progress: distribusi[0].status === 'SELESAI' ? 100 : 50
+  } : {
     id: 'TX-0000',
     vendor: 'Menunggu Vendor...',
     status: 'Sistem Standby',
@@ -140,6 +161,11 @@ const SekolahDashboard = ({ user, onLogout }) => {
   const renderContent = () => {
     if (isKonfirmasi) return (
       <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '2rem', position: 'relative', zIndex: 1, width: '100%' }}>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <AnimatePresence>
+            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} />}
+          </AnimatePresence>
+        </div>
         <div className="card dashboard-card-vibrant" style={{ padding: '3.5rem', borderRadius: '40px' }}>
           <h2 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '1rem', letterSpacing: '-1px' }}>Logistik Tiba</h2>
           <div className="animate-pulse-glow" style={{ marginBottom: '3rem', padding: '2.5rem', background: 'var(--primary-light)', borderRadius: '24px', border: '2px solid var(--primary)' }}>
@@ -191,6 +217,9 @@ const SekolahDashboard = ({ user, onLogout }) => {
     )
     if (isFeedback) return (
       <div className="grid" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
+        <AnimatePresence>
+          {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={true} />}
+        </AnimatePresence>
         <div className="card" style={{ padding: '4.5rem', borderRadius: '45px', maxWidth: '850px', margin: '0 auto', boxShadow: '0 40px 80px rgba(0,0,0,0.05)' }}>
           <h2 style={{ fontSize: '3rem', fontWeight: '950', marginBottom: '1rem', letterSpacing: '-2px' }}>Suara Siswa</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '3.5rem', fontSize: '1.2rem', fontWeight: '500' }}>Feedback ini langsung terhubung ke dashboard ahli gizi nasional.</p>
@@ -198,7 +227,7 @@ const SekolahDashboard = ({ user, onLogout }) => {
           <div style={{ marginBottom: '4rem' }}>
             <p style={{ fontWeight: '950', marginBottom: '1.5rem', fontSize: '1.3rem' }}>Bagaimana rasa "{activeDelivery.menuName}" hari ini?</p>
             <div style={{ display: 'flex', gap: '20px' }}>
-               {[1,2,3,4,5].map(s => <motion.div whileHover={{ scale: 1.2 }} key={s}><Star size={54} fill={s <= 4 ? "var(--banana)" : "none"} color="var(--banana)" style={{ cursor: 'pointer' }} /></motion.div>)}
+               {[1,2,3,4,5].map(s => <motion.div whileHover={{ scale: 1.2 }} key={s}><Star size={54} fill={s <= feedbackRating ? "var(--banana)" : "none"} color="var(--banana)" style={{ cursor: 'pointer' }} onClick={() => setFeedbackRating(s)} /></motion.div>)}
             </div>
           </div>
           
@@ -219,98 +248,73 @@ const SekolahDashboard = ({ user, onLogout }) => {
   }
 
   return (
-    <div className="layout-wrapper premium-mesh mesh-sekolah">
-      <Sidebar user={user} onLogout={onLogout} />
-      <div className="main-content" style={{ padding: '3rem' }}>
-        <Motif icon={Apple} top="50px" right="50px" color="var(--primary)" />
-        <Motif icon={Carrot} bottom="100px" left="50px" color="var(--carrot)" />
-        <Motif icon={Leaf} top="400px" right="100px" color="var(--secondary)" />
-        <Motif icon={Leaf} top="400px" right="100px" color="var(--secondary)" />
-
-      <AnimatePresence>
-        {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={isFeedback} />}
-      </AnimatePresence>
-
-      <AnimatePresence mode="wait">
-        <motion.div 
-          key={location.pathname}
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -30 }}
-          transition={{ duration: 0.3 }}
-          style={{ position: 'relative', zIndex: 1 }}
-        >
-          {isMain ? (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4rem' }}>
-                <div>
-                   <h1 style={{ fontSize: '3.5rem', fontWeight: '950', letterSpacing: '-3px', color: 'var(--text-main)', textTransform: 'uppercase' }}>SDN 06 BARU</h1>
-                   <p style={{ color: 'var(--text-muted)', fontSize: '1.4rem', fontWeight: '600' }}>Pusat Penerimaan Gizi Nasional Wilayah Jakarta Timur.</p>
-                </div>
-                <div style={{ padding: '25px 45px', background: 'var(--banana-light)', borderRadius: '35px', display: 'flex', gap: '25px', alignItems: 'center', border: '2px solid var(--banana)', boxShadow: '0 15px 35px rgba(234, 179, 8, 0.1)' }}>
-                   <div style={{ background: 'white', padding: '15px', borderRadius: '20px', boxShadow: '0 8px 25px rgba(234, 179, 8, 0.15)' }}><Users size={35} color="var(--banana)" /></div>
-                   <div>
-                      <p style={{ fontWeight: '950', fontSize: '2.5rem', lineHeight: '0.9' }}>404</p>
-                      <p style={{ fontSize: '0.8rem', fontWeight: '900', color: 'var(--banana)', letterSpacing: '2px', marginTop: '5px' }}>SISWA TERDATA</p>
-                   </div>
-                </div>
+    <DashboardLayout user={user} onLogout={onLogout}>
+      {isMain ? (
+        <>
+          <AnimatePresence>
+            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} />}
+          </AnimatePresence>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div>
+              <h1 style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-1px' }}>SDN 06 Baru</h1>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: '500' }}>Pusat Penerimaan Gizi Nasional — Jakarta Timur</p>
+            </div>
+            <div style={{ padding: '12px 24px', background: 'var(--banana-light)', borderRadius: '14px', display: 'flex', gap: '12px', alignItems: 'center', border: '1px solid var(--banana)' }}>
+              <Users size={20} color="var(--banana)" />
+              <div>
+                <p style={{ fontWeight: '800', fontSize: '1.2rem', lineHeight: '1' }}>404</p>
+                <p style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--banana)' }}>SISWA TERDATA</p>
               </div>
+            </div>
+          </div>
 
-              <div className="grid" style={{ gridTemplateColumns: '1.6fr 1fr', gap: '3rem' }}>
-                <div className="card" style={{ background: 'var(--primary)', color: 'white', padding: '4rem', borderRadius: '50px', border: 'none', boxShadow: '0 35px 70px rgba(16, 185, 129, 0.25)', overflow: 'hidden', position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: '-20px', right: '-20px', opacity: 0.1 }}><Apple size={200} color="white" /></div>
-                  <div style={{ position: 'relative', zIndex: 2 }}>
-                    <span style={{ background: 'rgba(255,255,255,0.25)', padding: '10px 25px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: '900', backdropFilter: 'blur(10px)' }}>ID TRANS: {activeDelivery.id}</span>
-                    <p style={{ fontSize: '1.2rem', fontWeight: '700', marginTop: '2.5rem', opacity: 0.9 }}>MENU UTAMA HARI INI:</p>
-                    <h2 style={{ fontSize: '3.8rem', fontWeight: '950', marginTop: '1rem', letterSpacing: '-2px' }}>{activeDelivery.menuName}</h2>
-                    
-                    <div style={{ marginTop: '4rem', display: 'flex', gap: '3rem', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '2.5rem' }}>
-                      <div>
-                         <p style={{ fontSize: '0.8rem', fontWeight: '900', opacity: 0.7, textTransform: 'uppercase' }}>Update Waktu</p>
-                         <p style={{ fontSize: '1.4rem', fontWeight: '900' }}>{activeDelivery.time}</p>
-                      </div>
-                      <div>
-                         <p style={{ fontSize: '0.8rem', fontWeight: '900', opacity: 0.7, textTransform: 'uppercase' }}>Status</p>
-                         <p style={{ fontSize: '1.4rem', fontWeight: '900' }}>{activeDelivery.status}</p>
-                      </div>
-                    </div>
+          <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem' }}>
+            <div className="card" style={{ background: 'var(--role-primary)', color: 'white', padding: '2.5rem', borderRadius: '20px', border: 'none', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'relative', zIndex: 2 }}>
+                <span style={{ background: 'rgba(255,255,255,0.2)', padding: '6px 14px', borderRadius: '50px', fontSize: '0.75rem', fontWeight: '700' }}>ID TRANS: {activeDelivery.id}</span>
+                <p style={{ fontSize: '0.9rem', fontWeight: '600', marginTop: '1.5rem', opacity: 0.8 }}>MENU UTAMA HARI INI:</p>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: '900', marginTop: '0.5rem', letterSpacing: '-1px', color: 'white' }}>{activeDelivery.menuName}</h2>
+                <div style={{ marginTop: '2rem', display: 'flex', gap: '2rem', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '1.5rem' }}>
+                  <div>
+                    <p style={{ fontSize: '0.7rem', fontWeight: '700', opacity: 0.7 }}>Update Waktu</p>
+                    <p style={{ fontSize: '1.1rem', fontWeight: '800', color: 'white' }}>{activeDelivery.time}</p>
                   </div>
-                </div>
-
-                <div style={{ display: 'grid', gap: '2rem' }}>
-                  <div className="card" style={{ borderRadius: '35px', padding: '2.5rem', background: 'var(--carrot)', color: 'white', border: 'none', boxShadow: '0 20px 40px rgba(249, 115, 22, 0.2)' }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                        <p style={{ fontWeight: '900', fontSize: '1.1rem' }}>Saran Penyajian</p>
-                        <Info size={24} />
-                     </div>
-                     <p style={{ fontSize: '1.1rem', lineHeight: '1.6', fontWeight: '700' }}>Pastikan makanan disajikan dalam keadaan hangat sesuai protokol standar gizi MBG.</p>
-                  </div>
-                  
-                  <div className="card" style={{ borderRadius: '35px', padding: '2.5rem', border: '1px solid var(--border)' }}>
-                     <h3 style={{ fontWeight: '900', marginBottom: '1.5rem' }}>Bantuan Cepat</h3>
-                     <div style={{ display: 'grid', gap: '1rem' }}>
-                        <button style={{ width: '100%', textAlign: 'left', padding: '1.2rem', borderRadius: '18px', background: 'var(--bg)', border: 'none', color: 'var(--text-main)', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                           Hubungi Vendor <ChevronRight size={18} />
-                        </button>
-                        <button onClick={() => setShowAddForm(true)} style={{ width: '100%', textAlign: 'left', padding: '1.2rem', borderRadius: '18px', background: 'var(--bg)', border: 'none', color: 'var(--text-main)', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                           Laporkan Kendala <ChevronRight size={18} />
-                        </button>
-                     </div>
+                  <div>
+                    <p style={{ fontSize: '0.7rem', fontWeight: '700', opacity: 0.7 }}>Status</p>
+                    <p style={{ fontSize: '1.1rem', fontWeight: '800', color: 'white' }}>{activeDelivery.status}</p>
                   </div>
                 </div>
               </div>
-            </>
-          ) : (
-            <>
-              {isKonfirmasi && <Header title="Konfirmasi Kedatangan" subtitle="Manajemen bukti serah terima logistik gizi nasional." showAdd onAdd={() => setShowAddForm(true)} />}
-              {isFeedback && <Header title="Pusat Feedback Sekolah" subtitle="Suara institusi untuk standar gizi masa depan." />}
-              {renderContent()}
-            </>
-          )}
-        </motion.div>
-      </AnimatePresence>
-      </div>
-    </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <div className="card" style={{ borderRadius: '16px', padding: '1.5rem', background: 'var(--carrot)', color: 'white', border: 'none' }}>
+                <p style={{ fontWeight: '700', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Saran Penyajian</p>
+                <p style={{ fontSize: '0.85rem', lineHeight: '1.5', fontWeight: '500' }}>Pastikan makanan disajikan dalam keadaan hangat sesuai protokol standar gizi MBG.</p>
+              </div>
+              
+              <div className="card" style={{ borderRadius: '16px', padding: '1.5rem' }}>
+                <h4 style={{ fontWeight: '700', marginBottom: '0.75rem', fontSize: '0.9rem' }}>Bantuan Cepat</h4>
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                  <button style={{ width: '100%', textAlign: 'left', padding: '0.8rem', borderRadius: '10px', background: 'var(--bg)', border: 'none', color: 'var(--text-main)', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                    Hubungi Vendor <ChevronRight size={16} />
+                  </button>
+                  <button onClick={() => setShowAddForm(true)} style={{ width: '100%', textAlign: 'left', padding: '0.8rem', borderRadius: '10px', background: 'var(--bg)', border: 'none', color: 'var(--text-main)', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                    Laporkan Kendala <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {isKonfirmasi && <Header title="Konfirmasi Kedatangan" subtitle="Manajemen bukti serah terima logistik gizi nasional." showAdd onAdd={() => setShowAddForm(true)} />}
+          {isFeedback && <Header title="Pusat Feedback Sekolah" subtitle="Suara institusi untuk standar gizi masa depan." />}
+          {renderContent()}
+        </>
+      )}
+    </DashboardLayout>
   )
 }
 

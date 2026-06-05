@@ -7,8 +7,6 @@ import VendorDashboard from './pages/VendorDashboard'
 import AhliGiziDashboard from './pages/AhliGiziDashboard'
 import SekolahDashboard from './pages/SekolahDashboard'
 import PemerintahDashboard from './pages/PemerintahDashboard'
-import Sidebar from './components/Sidebar'
-import Navbar from './components/Navbar'
 
 function App() {
   const [user, setUser] = useState(() => {

@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { 
   Plus, 
@@ -32,8 +32,8 @@ import {
   Apple
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { mockData } from "../data/mockData"
-import Sidebar from "../components/Sidebar"
+import api from "../api"
+import DashboardLayout from "../components/DashboardLayout"
 
 const Header = ({ title }) => (
   <div className="card dashboard-card-vibrant" style={{ 
@@ -498,12 +498,11 @@ const AddDapurForm = ({ onClose, onSave }) => {
 
   return (
     <motion.div 
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 10000, display: 'grid', placeItems: 'center', backdropFilter: 'blur(10px)' }}
+      initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+      style={{ overflow: 'hidden', marginBottom: '2rem' }}
     >
-      <motion.div 
-        initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
-        style={{ background: 'white', padding: '3rem', borderRadius: '40px', width: '100%', maxWidth: '500px', boxShadow: '0 30px 60px rgba(0,0,0,0.3)' }}
+      <div 
+        style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '100%', border: '1.5px solid var(--border)' }}
       >
         <div className="flex justify-between" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontWeight: '950', fontSize: '1.8rem' }}>Registrasi Dapur Baru</h2>
@@ -547,7 +546,7 @@ const AddDapurForm = ({ onClose, onSave }) => {
              Daftarkan Dapur Sekarang
            </button>
         </div>
-      </motion.div>
+      </div>
     </motion.div>
   )
 }
@@ -591,12 +590,11 @@ const AddMenuForm = ({ onClose, onSave, editData }) => {
 
   return (
     <motion.div 
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'grid', placeItems: 'center', backdropFilter: 'blur(15px)', overflowY: 'auto', padding: '2rem' }}
+      initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+      style={{ overflow: 'hidden', marginBottom: '2rem' }}
     >
-      <motion.div 
-        initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }}
-        style={{ background: 'white', padding: '3rem', borderRadius: '40px', width: '100%', maxWidth: '650px', boxShadow: '0 40px 80px rgba(0,0,0,0.4)' }}
+      <div 
+        style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '100%', border: '1.5px solid var(--border)' }}
       >
         <div className="flex justify-between" style={{ marginBottom: '2.5rem' }}>
           <div>
@@ -670,7 +668,7 @@ const AddMenuForm = ({ onClose, onSave, editData }) => {
             Selesaikan & Ajukan ke Ahli Gizi
           </button>
         </div>
-      </motion.div>
+      </div>
     </motion.div>
   )
 }
@@ -683,42 +681,51 @@ const VendorDashboard = ({ user, onLogout }) => {
   const [activeDoc, setActiveDoc] = useState(null)
   const [selectedAuditMenu, setSelectedAuditMenu] = useState(null)
   
-  // Persistence Logic: Load from LocalStorage or Fallback to Mock
-  const [dapurs, setDapurs] = useState(() => {
-    try {
-      const saved = localStorage.getItem('traksi_dapur_ledger');
-      return saved ? JSON.parse(saved) : mockData.dapurs;
-    } catch (e) {
-      return mockData.dapurs;
-    }
-  })
+  // API-driven state
+  const [dapurs, setDapurs] = useState([])
+  const [menus, setMenus] = useState([])
+  const [dokumen, setDokumen] = useState([])
+  const [produksi, setProduksi] = useState([])
+  const [distribusi, setDistribusi] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const [menus, setMenus] = useState(() => {
-    try {
-      const saved = localStorage.getItem('traksi_menu_ledger');
-      return saved ? JSON.parse(saved) : mockData.menus;
-    } catch (e) {
-      return mockData.menus;
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [d, m, dok, prod, dist] = await Promise.all([
+          api.getDapur(),
+          api.getMenus(),
+          api.getDokumen(1),
+          api.getProduksi(),
+          api.getDistribusi()
+        ])
+        setDapurs(d)
+        setMenus(m)
+        setDokumen(dok)
+        setProduksi(prod)
+        setDistribusi(dist)
+      } catch (err) {
+        console.error('Failed to fetch data:', err)
+      } finally {
+        setLoading(false)
+      }
     }
-  })
+    fetchData()
+  }, [])
 
-  const handleAddDapur = (newDapur) => {
-    const ledgerEntry = { 
-      ...newDapur, 
-      id: Date.now(),
-      hash: '0x' + Math.random().toString(16).slice(2, 12).toUpperCase(),
-      timestamp: new Date().toLocaleString()
-    };
-    const updatedLedger = [...dapurs, ledgerEntry];
-    setDapurs(updatedLedger);
-    localStorage.setItem('traksi_dapur_ledger', JSON.stringify(updatedLedger));
+  const handleAddDapur = async (newDapur) => {
+    try {
+      const created = await api.createDapur({ id_vendor: 1, lokasi: newDapur.lokasi, kapasitas_produksi: newDapur.kapasitas_produksi || newDapur.kapasitas_production })
+      setDapurs(prev => [...prev, { ...created, id: created.id_dapur }])
+    } catch (err) { console.error(err) }
   }
 
-  const handleDeleteDapur = (id) => {
-    if (confirm("⚠️ Apakah Anda yakin ingin menghapus operasional dapur ini dari Ledger? Tindakan ini akan dicatat dalam histori sistem.")) {
-      const updatedLedger = dapurs.filter(d => d.id !== id);
-      setDapurs(updatedLedger);
-      localStorage.setItem('traksi_dapur_ledger', JSON.stringify(updatedLedger));
+  const handleDeleteDapur = async (id) => {
+    if (confirm("Apakah Anda yakin ingin menghapus dapur ini?")) {
+      try {
+        await api.deleteDapur(id)
+        setDapurs(prev => prev.filter(d => (d.id_dapur || d.id) !== id))
+      } catch (err) { console.error(err) }
     }
   }
 
@@ -727,16 +734,28 @@ const VendorDashboard = ({ user, onLogout }) => {
     url: "https://maps.google.com/maps?q=Kendari&output=embed"
   })
 
-  const handleAddMenu = (newMenu) => {
-    let updatedLedger;
-    if (editingMenu) {
-      updatedLedger = menus.map(m => m.id === newMenu.id ? newMenu : m);
-    } else {
-      updatedLedger = [...menus, newMenu];
-    }
-    setMenus(updatedLedger);
-    localStorage.setItem('traksi_menu_ledger', JSON.stringify(updatedLedger));
-    setEditingMenu(null);
+  const handleAddMenu = async (newMenu) => {
+    try {
+      if (editingMenu) {
+        await api.updateMenu(newMenu.id || newMenu.id_menu, {
+          nama_menu: newMenu.nama_menu,
+          bahan: newMenu.bahan,
+          nilai_gizi: newMenu.nilai_gizi,
+          tanggal: newMenu.date || newMenu.tanggal
+        })
+        setMenus(prev => prev.map(m => (m.id_menu || m.id) === (newMenu.id || newMenu.id_menu) ? { ...m, ...newMenu } : m))
+      } else {
+        const created = await api.createMenu({
+          id_vendor: 1,
+          nama_menu: newMenu.nama_menu,
+          bahan: newMenu.bahan,
+          nilai_gizi: newMenu.nilai_gizi || {},
+          tanggal: newMenu.date || newMenu.tanggal || new Date().toISOString().split('T')[0]
+        })
+        setMenus(prev => [...prev, created])
+      }
+      setEditingMenu(null)
+    } catch (err) { console.error(err) }
   }
 
   const path = location.pathname.replace(/\/$/, '')
@@ -792,6 +811,11 @@ const VendorDashboard = ({ user, onLogout }) => {
     if (isDapur) return (
       <div className="grid" style={{ gap: '2rem' }}>
         <Header title="Manajemen Dapur Satuan" />
+        <AnimatePresence>
+          {showAddForm && (
+            <AddDapurForm onClose={() => setShowAddForm(false)} onSave={handleAddDapur} />
+          )}
+        </AnimatePresence>
         <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
           <div className="flex justify-between" style={{ marginBottom: '2rem' }}>
             <h3 style={{ fontWeight: '950' }}>Daftar Dapur Terdaftar</h3>
@@ -810,7 +834,7 @@ const VendorDashboard = ({ user, onLogout }) => {
                   <div style={{ background: 'white', padding: '12px', borderRadius: '15px' }}><Store color="var(--primary)" size={24} /></div>
                   <div>
                     <h4 style={{ fontWeight: '900' }}>Dapur {d.lokasi}</h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: D-00{d.id.toString().slice(-3)} | Kapasitas: {d.kapasitas_produksi} Porsi/Hari</p>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: D-00{(d.id_dapur || d.id || 0).toString().slice(-3)} | Kapasitas: {d.kapasitas_produksi} Porsi/Hari</p>
                     {d.hash && (
                       <p style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: '800', fontFamily: 'monospace', marginTop: '4px' }}>
                         🔗 LEDGER HASH: {d.hash}
@@ -841,6 +865,15 @@ const VendorDashboard = ({ user, onLogout }) => {
     if (isMenu) return (
       <div className="grid" style={{ gap: '2rem' }}>
         <Header title="Katalog Menu Gizi" />
+        <AnimatePresence>
+          {showMenuForm && (
+            <AddMenuForm
+              onClose={() => { setShowMenuForm(false); setEditingMenu(null); }}
+              onSave={handleAddMenu}
+              editData={editingMenu}
+            />
+          )}
+        </AnimatePresence>
         <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
@@ -1216,201 +1249,106 @@ const VendorDashboard = ({ user, onLogout }) => {
   }
 
   return (
-    <div className="layout-wrapper premium-mesh mesh-vendor" style={{ minHeight: '100vh', display: 'flex' }}>
-      {/* Fixed Layout with Explicit Sidebar Separation */}
-      <div style={{ width: '280px', flexShrink: 0 }}>
-        <Sidebar user={user} onLogout={onLogout} />
-      </div>
-      
-      {/* Decorative Food Elements - Fixed and more diverse */}
-      <FoodItem3D top="5%" left="320px" src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=200" size={180} delay={0} rotate={15} />
-      <FoodItem3D bottom="10%" right="5%" src="https://images.unsplash.com/photo-1560806887-1e4cd0b6bcd6?auto=format&fit=crop&q=80&w=150" size={150} delay={2} rotate={-20} />
-      <FoodItem3D top="45%" right="2%" src="https://images.unsplash.com/photo-1557800636-894a64c1696f?auto=format&fit=crop&q=80&w=180" size={170} delay={4} rotate={45} />
-      <FoodItem3D bottom="25%" left="350px" src="https://images.unsplash.com/photo-1518635017498-87f514b751ba?auto=format&fit=crop&q=80&w=150" size={140} delay={1} rotate={-10} />
-      <FoodItem3D top="65%" left="420px" src="https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&q=80&w=160" size={160} delay={3} rotate={30} />
-      <FoodItem3D top="2%" right="20%" src="https://images.unsplash.com/photo-1584270354949-c26b0d5b4a0c?auto=format&fit=crop&q=80&w=140" size={130} delay={5} rotate={-5} />
-      <FoodItem3D bottom="5%" right="30%" src="https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&q=80&w=130" size={120} delay={6} rotate={10} />
+    <DashboardLayout user={user} onLogout={onLogout}>
+      {isMain ? (
+        <>
+          <WelcomeBanner name="Vendor Jakarta Timur" />
 
-      {/* Enhanced Multi-color Background Orbs */}
-      <FloatingShape initial={{ top: '5%', right: '10%' }} animate={{ y: [0, 100, 0], x: [0, 50, 0] }} duration={25} color="rgba(59, 130, 246, 0.2)" size="700px" />
-      <FloatingShape initial={{ bottom: '5%', left: '300px' }} animate={{ y: [0, -120, 0], scale: [1, 1.2, 1] }} duration={22} color="rgba(249, 115, 22, 0.15)" size="600px" />
-      <FloatingShape initial={{ top: '40%', left: '50%' }} animate={{ opacity: [0.1, 0.2, 0.1], x: [-50, 50, -50] }} duration={30} color="rgba(234, 179, 8, 0.15)" size="500px" />
+          <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem", marginBottom: "2rem" }}>
+            {stats.map((stat, i) => (
+              <div
+                key={i}
+                className="card dashboard-card-vibrant"
+                style={{
+                  padding: "2rem",
+                  borderRadius: "20px",
+                  display: "flex",
+                  flexDirection: 'column',
+                  gap: "16px",
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+              >
+                <div style={{ background: `${stat.color}15`, padding: "1rem", borderRadius: "14px", color: stat.color, width: 'fit-content' }}>
+                  {stat.icon}
+                </div>
+                <div>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "700", marginBottom: "4px", textTransform: 'uppercase', letterSpacing: '1px' }}>{stat.title}</p>
+                  <h3 style={{ fontSize: "2rem", fontWeight: "900", color: 'var(--text-main)', letterSpacing: '-1px' }}>{stat.value}</h3>
+                </div>
+              </div>
+            ))}
+          </div>
 
-      <div className="main-content" style={{ 
-        flex: 1, 
-        padding: "3.5rem", 
-        minHeight: '100vh', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        position: 'relative',
-        zIndex: 1,
-        overflowX: 'hidden',
-        background: 'transparent'
-      }}>
-        {/* Decorative Grid Overlay for texture */}
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(16, 185, 129, 0.05) 1px, transparent 1px)', backgroundSize: '40px 40px', zIndex: 0 }}></div>
-
-        <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <AnimatePresence mode="wait">
-            <motion.div 
-              key={location.pathname} 
-              initial={{ opacity: 0, y: 15 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-            >
-              <Motif icon={Apple} top="15%" right="5%" color="var(--primary)" />
-              <Motif icon={UtensilsCrossed} bottom="20%" right="10%" color="var(--secondary)" />
-              <Motif icon={Package} top="40%" left="5%" color="var(--primary)" />
-
-              {isMain ? (
-                <>
-                  <Header title="OPERATIONAL CENTER" />
-                  <WelcomeBanner name="Vendor Jakarta Timur" />
-
-                  <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: "2.5rem", marginBottom: "4rem" }}>
-                     {stats.map((stat, i) => (
-                       <motion.div 
-                        key={i} 
-                        whileHover={{ y: -10, boxShadow: '0 30px 60px rgba(6, 78, 59, 0.12)' }}
-                        className="card dashboard-card-vibrant" 
-                        style={{ 
-                          padding: "3rem 2.5rem", 
-                          borderRadius: "40px", 
-                          display: "flex", 
-                          flexDirection: 'column',
-                          gap: "25px",
-                          background: 'rgba(255, 255, 255, 0.9)',
-                          border: '1px solid white',
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}
-                       >
-                         {/* Subtle card icon bg */}
-                         <div style={{ position: 'absolute', right: '-20px', bottom: '-20px', opacity: 0.03, transform: 'rotate(-20deg)' }}>
-                            {stat.icon}
-                         </div>
-
-                         <div style={{ background: `${stat.color}15`, padding: "1.4rem", borderRadius: "24px", color: stat.color, width: 'fit-content' }}>
-                           {stat.icon}
-                         </div>
-                         <div>
-                           <p style={{ fontSize: "1rem", color: "var(--text-muted)", fontWeight: "800", marginBottom: "6px", textTransform: 'uppercase', letterSpacing: '2px' }}>{stat.title}</p>
-                           <h3 style={{ fontSize: "2.8rem", fontWeight: "950", color: 'var(--text-main)', letterSpacing: '-2px' }}>{stat.value}</h3>
-                         </div>
-                         <div style={{ marginTop: '5px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                               <span style={{ fontSize: '0.75rem', fontWeight: '900', color: 'var(--text-muted)' }}>Kapasitas Produksi</span>
-                               <span style={{ fontSize: '0.75rem', fontWeight: '900', color: stat.color }}>82%</span>
-                            </div>
-                            <div style={{ height: '6px', width: '100%', background: 'var(--bg)', borderRadius: '10px' }}>
-                               <motion.div initial={{ width: 0 }} animate={{ width: '82%' }} transition={{ duration: 1.5, delay: 0.5 }} style={{ height: '100%', background: stat.color, borderRadius: '10px' }}></motion.div>
-                            </div>
-                         </div>
-                       </motion.div>
-                     ))}
-                  </div>
-
-                  <div className="card dashboard-card-vibrant" style={{ 
-                    padding: "4rem", 
-                    borderRadius: "50px", 
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    boxShadow: '0 50px 100px rgba(6, 78, 59, 0.08)',
-                    border: '1px solid white'
-                  }}>
-                    <div className="flex justify-between" style={{ marginBottom: "3.5rem" }}>
-                      <div className="flex" style={{ gap: "25px" }}>
-                        <div style={{ width: '60px', height: '60px', background: 'var(--primary-light)', borderRadius: '20px', display: 'grid', placeItems: 'center', boxShadow: '0 10px 20px rgba(16, 185, 129, 0.1)' }}>
-                          <Activity color="var(--primary)" size={32} />
-                        </div>
-                        <div>
-                          <h3 style={{ fontSize: "1.8rem", fontWeight: "950", letterSpacing: '-1px' }}>Feed Logistik Terkini</h3>
-                          <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: '700' }}>Pemantauan distribusi armada gizi nasional secara real-time</p>
-                        </div>
+          <div className="card dashboard-card-vibrant" style={{
+            padding: "2rem",
+            borderRadius: "20px",
+          }}>
+            <div className="flex justify-between" style={{ marginBottom: "1.5rem" }}>
+              <div className="flex" style={{ gap: "15px" }}>
+                <div style={{ width: '44px', height: '44px', background: 'var(--role-light)', borderRadius: '12px', display: 'grid', placeItems: 'center' }}>
+                  <Activity color="var(--role-primary)" size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.2rem", fontWeight: "800", letterSpacing: '-0.5px' }}>Feed Logistik Terkini</h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '500' }}>Pemantauan distribusi armada gizi</p>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {prodList.map((item, i) => {
+                const allPending = menus.every(m => m.status_validasi === 'pending');
+                const displayStatus = allPending ? "MENUNGGU VALIDASI" : item.status;
+                
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      padding: "1.25rem",
+                      borderRadius: "14px",
+                      border: "1px solid var(--border)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      background: 'var(--bg)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div className="flex" style={{ gap: "15px" }}>
+                      <div style={{ background: 'white', width: "44px", height: "44px", borderRadius: "12px", display: "grid", placeItems: "center", color: "var(--role-primary)" }}>
+                        <Truck size={20} />
                       </div>
-                      <button style={{ background: 'var(--bg)', border: 'none', padding: '1rem 2rem', borderRadius: '16px', fontWeight: '900', color: 'var(--primary)', cursor: 'pointer', transition: '0.3s' }}>Audit Seluruh Log</button>
+                      <div>
+                        <h4 style={{ fontSize: "0.95rem", fontWeight: "700", marginBottom: "2px" }}>{item.school}</h4>
+                        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "500" }}>{item.menuName}</p>
+                      </div>
                     </div>
-                    
-                    <div className="grid" style={{ gap: "1.8rem" }}>
-                      {prodList.map((item, i) => {
-                        const allPending = menus.every(m => m.status_validasi === 'pending');
-                        const displayStatus = allPending ? "MENUNGGU VALIDASI" : item.status;
-                        
-                        return (
-                          <motion.div 
-                            key={i} 
-                            whileHover={{ x: 15, background: 'var(--primary-light)', borderColor: 'var(--primary)' }}
-                            style={{ 
-                              padding: "2rem", 
-                              borderRadius: "32px", 
-                              border: "2px solid var(--border)", 
-                              display: "flex", 
-                              justifyContent: "space-between", 
-                              alignItems: "center", 
-                              background: 'white',
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease'
-                            }}
-                          >
-                            <div className="flex" style={{ gap: "30px" }}>
-                              <div style={{ background: "var(--bg)", width: "75px", height: "75px", borderRadius: "24px", display: "grid", placeItems: "center", color: "var(--primary)", boxShadow: '0 10px 25px rgba(0,0,0,0.03)' }}>
-                                <Truck size={32} />
-                              </div>
-                              <div>
-                                <h4 style={{ fontSize: "1.4rem", fontWeight: "950", marginBottom: "8px", color: 'var(--text-main)' }}>{item.school}</h4>
-                                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                                  <p style={{ fontSize: "1rem", color: "var(--text-muted)", fontWeight: "700" }}>{item.menuName}</p>
-                                  <div style={{ width: '6px', height: '6px', background: 'var(--border)', borderRadius: '50%' }}></div>
-                                  <p style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: '900', letterSpacing: '1px' }}>ID-{8900 + i}</p>
-                                </div>
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                              <span className="badge" style={{ 
-                                background: displayStatus === "SELESAI" ? "var(--primary)" : displayStatus === "MENUNGGU VALIDASI" ? "var(--banana)" : "var(--primary)", 
-                                color: 'white',
-                                padding: "12px 24px",
-                                borderRadius: "200px",
-                                fontWeight: "950",
-                                fontSize: "0.8rem",
-                                boxShadow: `0 10px 20px ${displayStatus === "SELESAI" ? 'rgba(16, 185, 129, 0.3)' : 'rgba(234, 179, 8, 0.3)'}`
-                              }}>
-                                {displayStatus}
-                              </span>
-                              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '900' }}>{item.date}</p>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
+                    <span className="badge" style={{
+                      background: displayStatus === "SELESAI" ? "var(--role-primary)" : displayStatus === "MENUNGGU VALIDASI" ? "var(--banana)" : "var(--role-primary)",
+                      color: 'white',
+                      padding: "6px 14px",
+                      borderRadius: "50px",
+                      fontWeight: "700",
+                      fontSize: "0.7rem"
+                    }}>
+                      {displayStatus}
+                    </span>
                   </div>
-                </>
-              ) : renderContent()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-        
-        <Footer />
-      </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      ) : renderContent()}
 
       <AnimatePresence>
         {activeDoc && (
           <PdfModal doc={activeDoc} onClose={() => setActiveDoc(null)} />
         )}
-        {showAddForm && (
-          <AddDapurForm onClose={() => setShowAddForm(false)} onSave={handleAddDapur} />
-        )}
-        {showMenuForm && (
-          <AddMenuForm 
-            onClose={() => { setShowMenuForm(false); setEditingMenu(null); }} 
-            onSave={handleAddMenu} 
-            editData={editingMenu}
-          />
-        )}
         {selectedAuditMenu && <VisualAuditModal menu={selectedAuditMenu} onClose={() => setSelectedAuditMenu(null)} />}
       </AnimatePresence>
-    </div>
+    </DashboardLayout>
   )
 }
 

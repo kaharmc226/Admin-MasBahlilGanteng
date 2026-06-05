@@ -68,8 +68,8 @@ const NUTRITION_DATABASE = {
   ]
 }
 import { motion, AnimatePresence } from 'framer-motion'
-import { mockData } from '../data/mockData'
-import Sidebar from '../components/Sidebar'
+import api from '../api'
+import DashboardLayout from '../components/DashboardLayout'
 
 // --- Sub-components (Moved Outside to prevent re-mounting issues) ---
 
@@ -268,10 +268,12 @@ const FoodItem3D = ({ src, top, left, right, bottom, size = 120, delay = 0, rota
 )
 
 const StandardModal = ({ onClose, onSave, standard, setStandard, isEdit = false }) => (
-  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'grid', placeItems: 'center', backdropFilter: 'blur(8px)' }}>
-    <motion.div initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} className="card" style={{ width: '90%', maxWidth: '550px', padding: '3.5rem', borderRadius: '45px', position: 'relative' }}>
-       <button onClick={onClose} style={{ position: 'absolute', top: '25px', right: '25px', background: 'var(--bg)', border: 'none', padding: '10px', borderRadius: '50%', cursor: 'pointer' }}><X size={20}/></button>
-       <h2 style={{ marginBottom: '2.5rem', fontWeight: '950', fontSize: '2.4rem', letterSpacing: '-1.5px' }}>{isEdit ? 'Edit Data Standar' : 'Tambah Standar Gizi'}</h2>
+  <motion.div 
+    initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+    style={{ overflow: 'hidden', marginBottom: '2rem' }}
+  >
+    <div style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '100%', border: '1.5px solid var(--border)' }}>
+       <h2 style={{ marginBottom: '2rem', fontWeight: '950', fontSize: '1.8rem', letterSpacing: '-1px' }}>{isEdit ? 'Edit Data Standar' : 'Tambah Standar Gizi'}</h2>
        <form onSubmit={(e) => { e.preventDefault(); onSave(); }} style={{ display: 'grid', gap: '1.5rem' }}>
           <div>
             <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Nama Zat Gizi</label>
@@ -318,22 +320,32 @@ const StandardModal = ({ onClose, onSave, standard, setStandard, isEdit = false 
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Detail Sumber & Catatan</label>
+            <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Rincian Lanjutan</label>
             <textarea 
               value={standard.details}
               onChange={(e) => setStandard({...standard, details: e.target.value})}
-              placeholder="Contoh: Sumber dari protein hewani..." 
-              style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)', height: '80px' }} 
+              placeholder="Tambahkan informasi teknis, sumber alternatif, atau peringatan medis..." 
+              style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)', minHeight: '100px', resize: 'vertical', fontFamily: 'inherit' }} 
             />
           </div>
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-             <button type="button" onClick={onClose} className="btn-outline" style={{ flex: 1, borderRadius: '50px', padding: '1.2rem', fontWeight: '800' }}>Batal</button>
-             <button type="submit" className="btn-primary" style={{ flex: 1, borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', background: 'linear-gradient(to right, var(--primary), var(--secondary))' }}>
-               {isEdit ? 'Simpan Perubahan' : 'Terbitkan Standar'}
-             </button>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+            <button 
+              type="button"
+              onClick={onClose}
+              style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-main)', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer' }}
+            >
+              Batal
+            </button>
+            <button 
+              type="submit"
+              className="btn-primary" 
+              style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer', background: standard.color || 'var(--primary)' }}
+            >
+              {isEdit ? 'Simpan Perubahan' : 'Tetapkan Standar'}
+            </button>
           </div>
        </form>
-    </motion.div>
+    </div>
   </motion.div>
 )
 
@@ -346,11 +358,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
   const [aiResult, setAiResult] = useState(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
   
-  const [standards, setStandards] = useState([
-    { title: 'Protein', requirement: '20g - 35g', color: 'var(--primary)', desc: 'Esensial untuk pertumbuhan otot dan jaringan anak.', details: 'Sumber utama: Daging sapi rendah lemak, ayam tanpa kulit, telur, dan tempe.' },
-    { title: 'Kalori', requirement: '500kcal - 750kcal', color: 'var(--carrot)', desc: 'Energi harian optimal untuk aktivitas belajar.', details: 'Keseimbangan karbohidrat kompleks (nasi merah/putih) dan serat sayuran.' },
-    { title: 'Lemak Sehat', requirement: '10g - 25g', color: 'var(--secondary)', desc: 'Mendukung fungsi otak dan penyerapan vitamin.', details: 'Gunakan minyak zaitun atau minyak kelapa sawit bersertifikat fortifikasi.' }
-  ])
+  const [standards, setStandards] = useState([])
 
   const [formStandard, setFormStandard] = useState({ title: '', requirement: '', color: 'var(--primary)', desc: '', details: '' })
   const [ahliSuggestion, setAhliSuggestion] = useState('')
@@ -360,14 +368,23 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
   const isValidasi = path === '/ahli-gizi/validasi'
   const isStandar = path === '/ahli-gizi/standar'
 
-  const [menus, setMenus] = useState(() => {
-    const saved = localStorage.getItem('traksi_v_menus')
-    return saved ? JSON.parse(saved) : mockData.menus
-  })
-  const selectedMenu = menus[selectedMenuIdx] || menus[0]
+  const [menus, setMenus] = useState([])
+  const selectedMenu = menus[selectedMenuIdx] || menus[0] || {}
+
+  // Fetch data from API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [m, s] = await Promise.all([api.getMenus(), api.getStandarGizi()])
+        setMenus(m)
+        setStandards(s.map(st => ({ ...st, desc: st.deskripsi, details: st.detail })))
+      } catch (err) { console.error('Failed to fetch:', err) }
+    }
+    fetchData()
+  }, [])
 
   useEffect(() => {
-    // Validasi Node Blockchain - Simulating new format
+    if (!selectedMenu?.nilai_gizi) return
     const fetchNutritionProof = async () => {
       setIsAiLoading(true)
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -385,7 +402,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
 
     fetchNutritionProof()
     setAhliSuggestion('')
-  }, [selectedMenuIdx, selectedMenu.bahan])
+  }, [selectedMenuIdx, selectedMenu?.bahan])
 
   const triggerToast = (message, type = 'success') => {
     setShowToast({ show: true, message, type })
@@ -396,34 +413,41 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
     setIsGenerating(true)
     setTimeout(() => {
       setIsGenerating(false)
-      triggerToast('Laporan Gizi Tersimpan Secara Immutable di Jaringan Blockchain!', 'success')
+      triggerToast('Laporan Gizi Tersimpan!', 'success')
     }, 3000)
   }
 
-  const handleApprove = (id) => {
-    const newMenus = menus.map(m => m.id === id ? { ...m, status_validasi: 'approved', notes: ahliSuggestion ? [...(m.notes || []), `Ahli Gizi: ${ahliSuggestion}`] : m.notes } : m)
-    setMenus(newMenus)
-    localStorage.setItem('traksi_v_menus', JSON.stringify(newMenus))
-    triggerToast('Menu berhasil disahkan untuk distribusi nasional.')
+  const handleApprove = async (id) => {
+    try {
+      await api.createValidasiLog({ id_menu: id, id_user: user.id_user || 3, aksi: 'approved', catatan: ahliSuggestion || null })
+      setMenus(prev => prev.map(m => (m.id_menu || m.id) === id ? { ...m, status_validasi: 'approved' } : m))
+      triggerToast('Menu berhasil disahkan untuk distribusi nasional.')
+    } catch (err) { console.error(err) }
   }
 
-  const handleReject = (id) => {
-    const newMenus = menus.map(m => m.id === id ? { ...m, status_validasi: 'rejected', notes: ahliSuggestion ? [...(m.notes || []), `Ahli Gizi Revisi: ${ahliSuggestion}`] : m.notes } : m)
-    setMenus(newMenus)
-    localStorage.setItem('traksi_v_menus', JSON.stringify(newMenus))
-    triggerToast('Permintaan revisi dikirim ke vendor.', 'warning')
+  const handleReject = async (id) => {
+    try {
+      await api.createValidasiLog({ id_menu: id, id_user: user.id_user || 3, aksi: 'rejected', catatan: ahliSuggestion || null })
+      setMenus(prev => prev.map(m => (m.id_menu || m.id) === id ? { ...m, status_validasi: 'rejected' } : m))
+      triggerToast('Permintaan revisi dikirim ke vendor.', 'warning')
+    } catch (err) { console.error(err) }
   }
 
-  const handleSaveStandard = () => {
-    if (showModal.mode === 'add') {
-      setStandards([...standards, formStandard])
-      triggerToast('Standar gizi baru berhasil ditambahkan.')
-    } else {
-      const updated = [...standards]
-      updated[showModal.index] = formStandard
-      setStandards(updated)
-      triggerToast('Data standar berhasil diperbarui.')
-    }
+  const handleSaveStandard = async () => {
+    try {
+      if (showModal.mode === 'add') {
+        const created = await api.createStandarGizi({ title: formStandard.title, requirement: formStandard.requirement, color: formStandard.color, deskripsi: formStandard.desc, detail: formStandard.details, id_user_pembuat: user.id_user || 3 })
+        setStandards(prev => [...prev, { ...created, desc: formStandard.desc, details: formStandard.details }])
+        triggerToast('Standar gizi baru berhasil ditambahkan.')
+      } else {
+        const std = standards[showModal.index]
+        await api.updateStandarGizi(std.id_standar, { title: formStandard.title, requirement: formStandard.requirement, color: formStandard.color, deskripsi: formStandard.desc, detail: formStandard.details })
+        const updated = [...standards]
+        updated[showModal.index] = { ...std, ...formStandard }
+        setStandards(updated)
+        triggerToast('Data standar berhasil diperbarui.')
+      }
+    } catch (err) { console.error(err) }
     setShowModal({ show: false, mode: 'add', index: -1 })
     setFormStandard({ title: '', requirement: '', color: 'var(--primary)', desc: '', details: '' })
   }
@@ -531,9 +555,9 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                   </div>
 
                   {/* Tray Visual Section */}
-                  <div style={{ position: 'relative', height: '350px', width: '100%', margin: '0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '2rem' }}>
+                  <div style={{ height: '350px', width: '100%', display: 'grid', gridTemplateColumns: '1fr 350px 1fr', gap: '1rem', alignItems: 'center', marginBottom: '2rem' }}>
                      {/* Annotations Left */}
-                     <div style={{ position: 'absolute', left: '0', top: '10%', zIndex: 10 }}>
+                     <div>
                         {[{n: 'Tahu Goreng', t: '~30 g'}, {n: 'Nasi Putih', t: '~100 g'}, {n: 'Chicken Wings', t: '~48 g'}].map((b, i) => (
                           <motion.div key={i} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.1 }} style={{ textAlign: 'right', marginBottom: '30px', position: 'relative' }}>
                              <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.1rem', margin: 0, lineHeight: '1.1' }}>{b.n}</p>
@@ -546,14 +570,14 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                      </div>
 
                      {/* Main Tray Image Container */}
-                     <div style={{ position: 'relative', width: '350px', height: '300px', display: 'grid', placeItems: 'center' }}>
+                     <div style={{ position: 'relative', width: '100%', height: '300px', display: 'grid', placeItems: 'center' }}>
                         <div style={{ width: '100%', height: '100%', border: '12px solid #cbd5e1', borderRadius: '40px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 30px 60px -12px rgba(0,0,0,0.25)', position: 'relative' }}>
                            <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=600" alt="Menu Tray" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                      </div>
 
                      {/* Annotations Right */}
-                     <div style={{ position: 'absolute', right: '0', top: '15%', zIndex: 10 }}>
+                     <div>
                         {[{n: 'Pisang', t: '~50 g'}, {n: 'Tumis Buncis+Jagung', t: '~50 g'}].map((b, i) => (
                           <motion.div key={i} initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: (i+3) * 0.1 }} style={{ textAlign: 'left', marginBottom: '35px' }}>
                              <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.1rem', margin: 0, lineHeight: '1.1' }}>{b.n}</p>
@@ -666,7 +690,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
 
     if (isStandar) return (
       <div style={{ position: 'relative', zIndex: 1 }}>
-        <Header title="Standar Nutrisi Nasional" />
+        <Header title="Standar & Regulasi Gizi" />
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
           <button onClick={() => {
             setFormStandard({ title: '', requirement: '', color: 'var(--primary)', desc: '', details: '' });
@@ -675,6 +699,17 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
             <Plus size={20} /> Tambah Standar
           </button>
         </div>
+        <AnimatePresence>
+          {showModal.show && (
+            <StandardModal 
+              onClose={() => setShowModal({ show: false, mode: 'add', index: -1 })} 
+              onSave={handleSaveStandard}
+              standard={formStandard}
+              setStandard={setFormStandard}
+              isEdit={showModal.mode === 'edit'}
+            />
+          )}
+        </AnimatePresence>
         <div className="card shadow-sm" style={{ padding: '0', borderRadius: '30px', overflow: 'hidden', border: '1.5px solid var(--border)', background: 'white', marginBottom: '5rem', position: 'relative', zIndex: 1, boxShadow: '0 20px 40px rgba(0,0,0,0.02)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -815,153 +850,75 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
   }
 
   return (
-    <div className="layout-wrapper premium-mesh mesh-ahligizi" style={{ minHeight: '100vh', display: 'flex' }}>
-      <div style={{ width: '280px', flexShrink: 0 }}>
-        <Sidebar user={user} onLogout={onLogout} />
-      </div>
+    <DashboardLayout user={user} onLogout={onLogout}>
+      <AnimatePresence>
+        {showToast.show && (
+          <motion.div 
+            initial={{ opacity: 0, y: -50, x: '-50%' }} 
+            animate={{ opacity: 1, y: 20, x: '-50%' }} 
+            exit={{ opacity: 0, y: -50, x: '-50%' }} 
+            style={{ 
+              position: 'fixed', top: 0, left: '50%', zIndex: 3000, 
+              background: showToast.type === 'info' ? 'var(--role-primary)' : showToast.type === 'warning' ? 'var(--carrot)' : 'var(--role-primary)', 
+              color: 'white', padding: '0.9rem 2rem', borderRadius: '50px', 
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '10px' 
+            }}
+          >
+            {showToast.type === 'warning' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+            <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>{showToast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Decorative Food Elements - Fixed and more diverse */}
-      <FoodItem3D top="5%" left="320px" src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=200" size={180} delay={0} rotate={15} />
-      <FoodItem3D bottom="10%" right="5%" src="https://images.unsplash.com/photo-1560806887-1e4cd0b6bcd6?auto=format&fit=crop&q=80&w=150" size={150} delay={2} rotate={-20} />
-      <FoodItem3D top="45%" right="2%" src="https://images.unsplash.com/photo-1557800636-894a64c1696f?auto=format&fit=crop&q=80&w=180" size={170} delay={4} rotate={45} />
-      <FoodItem3D bottom="25%" left="350px" src="https://images.unsplash.com/photo-1518635017498-87f514b751ba?auto=format&fit=crop&q=80&w=150" size={140} delay={1} rotate={-10} />
-      <FoodItem3D top="65%" left="420px" src="https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&q=80&w=160" size={160} delay={3} rotate={30} />
-      <FoodItem3D top="2%" right="20%" src="https://images.unsplash.com/photo-1584270354949-c26b0d5b4a0c?auto=format&fit=crop&q=80&w=140" size={130} delay={5} rotate={-5} />
-      <FoodItem3D bottom="5%" right="30%" src="https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&q=80&w=130" size={120} delay={6} rotate={10} />
 
-      {/* Enhanced Multi-color Background Orbs */}
-      <FloatingShape initial={{ top: '5%', right: '10%' }} animate={{ y: [0, 100, 0], x: [0, 50, 0] }} duration={25} color="rgba(59, 130, 246, 0.2)" size="700px" />
-      <FloatingShape initial={{ bottom: '5%', left: '300px' }} animate={{ y: [0, -120, 0], scale: [1, 1.2, 1] }} duration={22} color="rgba(249, 115, 22, 0.15)" size="600px" />
-      <FloatingShape initial={{ top: '40%', left: '50%' }} animate={{ opacity: [0.1, 0.2, 0.1], x: [-50, 50, -50] }} duration={30} color="rgba(234, 179, 8, 0.15)" size="500px" />
 
-      <div className="main-content" style={{ 
-        flex: 1, 
-        padding: "3.5rem", 
-        minHeight: '100vh', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        position: 'relative',
-        zIndex: 1,
-        overflowX: 'hidden',
-        background: 'transparent'
-      }}>
-        {/* Decorative Grid Overlay for texture */}
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(16, 185, 129, 0.05) 1px, transparent 1px)', backgroundSize: '40px 40px', zIndex: 0 }}></div>
-        
-        <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <Motif icon={Apple} top="50px" right="50px" color="var(--primary)" />
-          <Motif icon={Carrot} bottom="100px" left="50px" color="var(--carrot)" />
-          <Motif icon={Leaf} top="400px" right="100px" color="var(--secondary)" />
+      {isMain ? (
+        <>
+          <WelcomeBanner name="Ahli Gizi Jakarta Timur" />
 
-          <AnimatePresence>
-            {showToast.show && (
-              <motion.div 
-                initial={{ opacity: 0, y: -50, x: '-50%' }} 
-                animate={{ opacity: 1, y: 20, x: '-50%' }} 
-                exit={{ opacity: 0, y: -50, x: '-50%' }} 
-                style={{ 
-                  position: 'fixed', top: 0, left: '50%', zIndex: 3000, 
-                  background: showToast.type === 'info' ? 'var(--secondary)' : showToast.type === 'warning' ? 'var(--carrot)' : 'var(--primary)', 
-                  color: 'white', padding: '1.2rem 2.5rem', borderRadius: '50px', 
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '15px' 
-                }}
-              >
-                {showToast.type === 'warning' ? <AlertCircle size={24} /> : <CheckCircle2 size={24} />}
-                <span style={{ fontWeight: '900' }}>{showToast.message}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+            <div className="card dashboard-card-vibrant" style={{ borderRadius: '20px', textAlign: 'center', padding: '2rem' }}>
+              <div style={{ background: 'var(--role-light)', width: '50px', height: '50px', borderRadius: '14px', display: 'grid', placeItems: 'center', margin: '0 auto 1rem' }}><Utensils color="var(--role-primary)" size={24} /></div>
+              <h1 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '4px' }}>{menus.filter(m => m.status_validasi === 'pending').length}</h1>
+              <p style={{ fontWeight: '600', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Menu Antre Validasi</p>
+            </div>
+            <div className="card dashboard-card-vibrant" style={{ borderRadius: '20px', textAlign: 'center', padding: '2rem', borderColor: 'var(--carrot)' }}>
+              <div style={{ background: 'var(--carrot-light)', width: '50px', height: '50px', borderRadius: '14px', display: 'grid', placeItems: 'center', margin: '0 auto 1rem' }}><AlertTriangle color="var(--carrot)" size={24} /></div>
+              <h1 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '4px', color: 'var(--carrot)' }}>{menus.filter(m => m.status_validasi === 'rejected').length}</h1>
+              <p style={{ fontWeight: '600', color: 'var(--carrot)', fontSize: '0.85rem' }}>Revisi Menu Menunggu</p>
+            </div>
+            <div className="card dashboard-card-vibrant" style={{ borderRadius: '20px', textAlign: 'center', padding: '2rem' }}>
+              <div style={{ background: 'var(--banana-light)', width: '50px', height: '50px', borderRadius: '14px', display: 'grid', placeItems: 'center', margin: '0 auto 1rem' }}><ShieldCheck color="var(--banana)" size={24} /></div>
+              <h1 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '4px' }}>{menus.filter(m => m.status_validasi === 'approved').length}</h1>
+              <p style={{ fontWeight: '600', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Menu Disetujui</p>
+            </div>
+          </div>
 
-          <AnimatePresence>
-            {showModal.show && (
-              <StandardModal 
-                onClose={() => setShowModal({ show: false, mode: 'add', index: -1 })} 
-                onSave={handleSaveStandard}
-                standard={formStandard}
-                setStandard={setFormStandard}
-                isEdit={showModal.mode === 'edit'}
-              />
-            )}
-          </AnimatePresence>
-
-          <AnimatePresence mode="wait">
-            <motion.div 
-              key={location.pathname}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -30 }}
-              transition={{ duration: 0.3 }}
-              style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column' }}
+          <div className="card dashboard-card-vibrant" style={{ borderRadius: '20px', padding: '2.5rem', position: 'relative', overflow: 'hidden' }}>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '1rem' }}>Pencatatan Gizi ke Ledger</h3>
+            <p style={{ color: 'var(--text-muted)', lineHeight: '1.7', marginBottom: '1.5rem', maxWidth: '600px' }}>
+              Sistem Blockchain mencatat setiap validasi ke Smart Contract immutable. Data terenkripsi AES-256.
+            </p>
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleGenerateReport}
+              disabled={isGenerating}
+              className="btn-primary" 
+              style={{ padding: '0.9rem 2rem', borderRadius: '14px', background: 'var(--role-primary)', border: 'none', color: 'white', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
             >
-              {isMain ? (
-                <>
-                  <Header title="AUDIT & STANDARDIZASI" />
-                  <WelcomeBanner name="Ahli Gizi Jakarta Timur" />
-
-                  <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '2.5rem', marginBottom: '4rem' }}>
-                    <motion.div initial={{ y: 20 }} animate={{ y: 0 }} transition={{ delay: 0.1 }} className="card dashboard-card-vibrant" style={{ borderRadius: '40px', textAlign: 'center', padding: '3.5rem' }}>
-                      <div style={{ background: 'var(--primary-light)', width: '70px', height: '70px', borderRadius: '22px', display: 'grid', placeItems: 'center', margin: '0 auto 1.5rem' }}><Utensils color="var(--primary)" size={32} /></div>
-                      <h1 style={{ fontSize: '3.5rem', fontWeight: '950', marginBottom: '8px', color: 'var(--text-main)' }}>{menus.filter(m => m.status_validasi === 'pending').length}</h1>
-                      <p style={{ fontWeight: '800', color: 'var(--text-muted)', fontSize: '1rem' }}>Menu Antre Validasi</p>
-                    </motion.div>
-                    <motion.div initial={{ y: 20 }} animate={{ y: 0 }} transition={{ delay: 0.2 }} className="card dashboard-card-vibrant animate-pulse-glow" style={{ borderRadius: '40px', textAlign: 'center', padding: '3.5rem', borderColor: 'var(--carrot)' }}>
-                      <div style={{ background: 'var(--carrot-light)', width: '70px', height: '70px', borderRadius: '22px', display: 'grid', placeItems: 'center', margin: '0 auto 1.5rem' }}><AlertTriangle color="var(--carrot)" size={32} /></div>
-                      <h1 style={{ fontSize: '3.5rem', fontWeight: '950', marginBottom: '8px', color: 'var(--carrot)' }}>{menus.filter(m => m.status_validasi === 'rejected').length}</h1>
-                      <p style={{ fontWeight: '800', color: 'var(--carrot)', fontSize: '1rem' }}>Revisi Menu Menunggu</p>
-                    </motion.div>
-                    <motion.div initial={{ y: 20 }} animate={{ y: 0 }} transition={{ delay: 0.3 }} className="card dashboard-card-vibrant" style={{ borderRadius: '40px', textAlign: 'center', padding: '3.5rem' }}>
-                      <div style={{ background: 'var(--banana-light)', width: '70px', height: '70px', borderRadius: '22px', display: 'grid', placeItems: 'center', margin: '0 auto 1.5rem' }}><ShieldCheck color="var(--banana)" size={32} /></div>
-                      <h1 style={{ fontSize: '3.5rem', fontWeight: '950', marginBottom: '8px', color: 'var(--text-main)' }}>{menus.filter(m => m.status_validasi === 'approved').length}</h1>
-                      <p style={{ fontWeight: '800', color: 'var(--text-muted)', fontSize: '1rem' }}>Menu Disetujui</p>
-                    </motion.div>
-                  </div>
-
-                  <div className="card dashboard-card-vibrant" style={{ borderRadius: '50px', padding: '4.5rem', display: 'flex', gap: '5rem', alignItems: 'center', border: '1.5px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', top: '-50px', right: '-50px', opacity: 0.05 }}><FileText size={400} /></div>
-                    <div style={{ flex: 1.5, position: 'relative', zIndex: 1 }}>
-                      <h3 style={{ fontSize: '2.5rem', fontWeight: '950', marginBottom: '1.5rem', letterSpacing: '-1.5px' }}>Pencatatan Gizi ke Ledger</h3>
-                      <p style={{ fontSize: '1.3rem', color: 'var(--text-muted)', lineHeight: '1.8', marginBottom: '3rem', fontWeight: '500' }}>
-                        Sistem <strong>Blockchain</strong> mencatat setiap validasi harian Anda ke dalam <em>Smart Contract</em> yang <em>immutable</em>. Data terenkripsi dengan AES-256 dan memastikan laporan kesehatan nasional terhindar dari manipulasi.
-                      </p>
-                      <motion.button 
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={handleGenerateReport}
-                        disabled={isGenerating}
-                        className="btn-primary" 
-                        style={{ padding: '1.5rem 4rem', borderRadius: '60px', background: 'linear-gradient(to right, var(--primary), var(--secondary))', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer', boxShadow: '0 20px 40px rgba(16, 185, 129, 0.25)', minWidth: '300px', justifyContent: 'center' }}
-                      >
-                        {isGenerating ? (
-                          <>
-                            <Loader2 className="animate-spin" size={24} /> 
-                            Mencatat Transaksi...
-                          </>
-                        ) : (
-                          <>
-                            <Zap size={24} fill="white" />
-                            Simpan ke Blockchain
-                          </>
-                        )}
-                      </motion.button>
-                    </div>
-                    <div style={{ flex: 1, position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'center' }}>
-                      <div style={{ width: '400px', height: '400px', background: 'var(--bg)', borderRadius: '60px', display: 'grid', placeItems: 'center', border: '25px solid var(--primary-light)', boxShadow: 'inset 0 0 50px rgba(0,0,0,0.02)' }}>
-                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}>
-                          <Microscope size={180} color="var(--primary)" strokeWidth={1} />
-                        </motion.div>
-                      </div>
-                    </div>
-                  </div>
-                </>
+              {isGenerating ? (
+                <><Loader2 className="animate-spin" size={20} /> Mencatat...</>
               ) : (
-                renderContent()
+                <><Zap size={20} fill="white" /> Simpan ke Blockchain</>
               )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-        <Footer />
-      </div>
-    </div>
+            </motion.button>
+          </div>
+        </>
+      ) : (
+        renderContent()
+      )}
+    </DashboardLayout>
   )
 }
 
