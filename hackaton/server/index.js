@@ -2,6 +2,25 @@ import express from 'express'
 import cors from 'cors'
 import pool from './db.js'
 
+// Auto-migrate: create dapur_stok_history table
+pool.query(`
+  CREATE TABLE IF NOT EXISTS dapur_stok_history (
+    id_log INT PRIMARY KEY AUTO_INCREMENT,
+    id_dapur INT NOT NULL,
+    nama_bahan VARCHAR(150) NOT NULL,
+    tipe ENUM('CREDIT', 'DEBIT', 'KOREKSI') NOT NULL,
+    jumlah DECIMAL(10,2) NOT NULL,
+    satuan VARCHAR(20) NOT NULL,
+    keterangan VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_dapur) REFERENCES dapur(id_dapur) ON DELETE CASCADE
+  )
+`).then(() => {
+  console.log('✅ Table dapur_stok_history is ready.')
+}).catch(err => {
+  console.error('❌ Failed to run auto-migration for dapur_stok_history:', err.message)
+})
+
 const app = express()
 app.use(cors())
 app.use(express.json())
@@ -326,8 +345,9 @@ app.post('/api/produksi', async (req, res) => {
 
     // If immediately set to persiapan, we deduct stock
     if (status === 'persiapan') {
-      const [menus] = await pool.query('SELECT bahan FROM menus WHERE id_menu = ?', [id_menu])
+      const [menus] = await pool.query('SELECT nama_menu, bahan FROM menus WHERE id_menu = ?', [id_menu])
       if (menus.length > 0) {
+        const menuName = menus[0].nama_menu
         const bahanList = typeof menus[0].bahan === 'string' ? JSON.parse(menus[0].bahan) : menus[0].bahan
         const [stokRows] = await pool.query('SELECT id_stok, nama_bahan, jumlah, satuan FROM dapur_stok WHERE id_dapur = ?', [id_dapur])
         
@@ -345,11 +365,15 @@ app.post('/api/produksi', async (req, res) => {
           if (isGram && match.satuan.toLowerCase() === 'kg') needed = needed / 1000
           
           if (match.jumlah < needed) return res.status(400).json({ error: `Stok ${b.nama} tidak mencukupi (Tersedia: ${match.jumlah} ${match.satuan}, Butuh: ${needed} ${match.satuan}).` })
-          deductions.push({ id_stok: match.id_stok, new_jumlah: match.jumlah - needed })
+          deductions.push({ id_stok: match.id_stok, nama_bahan: match.nama_bahan, needed, satuan: match.satuan, new_jumlah: match.jumlah - needed })
         }
         
         for (let d of deductions) {
           await pool.query('UPDATE dapur_stok SET jumlah = ? WHERE id_stok = ?', [d.new_jumlah, d.id_stok])
+          await pool.query(
+            'INSERT INTO dapur_stok_history (id_dapur, nama_bahan, tipe, jumlah, satuan, keterangan) VALUES (?,?,?,?,?,?)',
+            [id_dapur, d.nama_bahan, 'DEBIT', d.needed, d.satuan, `Masak ${menuName} (${jumlah_porsi || 0} Porsi)`]
+          )
         }
       }
     }
@@ -369,8 +393,9 @@ app.put('/api/produksi/:id', async (req, res) => {
 
     // If transitioning to 'persiapan', deduct stock!
     if (status === 'persiapan' && p.status === 'pending') {
-      const [menus] = await pool.query('SELECT bahan FROM menus WHERE id_menu = ?', [p.id_menu])
+      const [menus] = await pool.query('SELECT nama_menu, bahan FROM menus WHERE id_menu = ?', [p.id_menu])
       if (menus.length > 0) {
+        const menuName = menus[0].nama_menu
         const bahanList = typeof menus[0].bahan === 'string' ? JSON.parse(menus[0].bahan) : menus[0].bahan
         const [stokRows] = await pool.query('SELECT id_stok, nama_bahan, jumlah, satuan FROM dapur_stok WHERE id_dapur = ?', [p.id_dapur])
         
@@ -388,11 +413,15 @@ app.put('/api/produksi/:id', async (req, res) => {
           if (isGram && match.satuan.toLowerCase() === 'kg') needed = needed / 1000
           
           if (match.jumlah < needed) return res.status(400).json({ error: `Stok ${b.nama} kurang! (Sisa: ${match.jumlah} ${match.satuan}, Butuh: ${needed} ${match.satuan}).` })
-          deductions.push({ id_stok: match.id_stok, new_jumlah: match.jumlah - needed })
+          deductions.push({ id_stok: match.id_stok, nama_bahan: match.nama_bahan, needed, satuan: match.satuan, new_jumlah: match.jumlah - needed })
         }
         
         for (let d of deductions) {
           await pool.query('UPDATE dapur_stok SET jumlah = ? WHERE id_stok = ?', [d.new_jumlah, d.id_stok])
+          await pool.query(
+            'INSERT INTO dapur_stok_history (id_dapur, nama_bahan, tipe, jumlah, satuan, keterangan) VALUES (?,?,?,?,?,?)',
+            [p.id_dapur, d.nama_bahan, 'DEBIT', d.needed, d.satuan, `Masak ${menuName} (${p.jumlah_porsi} Porsi)`]
+          )
         }
       }
     }
@@ -648,29 +677,138 @@ app.get('/api/stok/:id_dapur', async (req, res) => {
 app.post('/api/stok', async (req, res) => {
   try {
     const { id_dapur, nama_bahan, jumlah, satuan } = req.body
+    const trimmed = (nama_bahan || '').trim()
+    if (!trimmed) {
+      return res.status(400).json({ error: 'Nama bahan baku tidak boleh kosong' })
+    }
+    const formattedName = trimmed
+      .split(/\s+/)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ')
+
     const [result] = await pool.query(
-      'INSERT INTO dapur_stok (id_dapur, nama_bahan, jumlah, satuan) VALUES (?,?,?,?)',
-      [id_dapur, nama_bahan, jumlah || 0, satuan]
+      'INSERT INTO dapur_stok (id_dapur, nama_bahan, jumlah, satuan) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE jumlah = jumlah + VALUES(jumlah)',
+      [id_dapur, formattedName, jumlah || 0, satuan]
     )
-    res.status(201).json({ id_stok: result.insertId, ...req.body })
+    
+    await pool.query(
+      'INSERT INTO dapur_stok_history (id_dapur, nama_bahan, tipe, jumlah, satuan, keterangan) VALUES (?,?,?,?,?,?)',
+      [id_dapur, formattedName, 'CREDIT', jumlah || 0, satuan, 'Penerimaan Stok']
+    )
+    
+    res.status(201).json({ id_stok: result.insertId, ...req.body, nama_bahan: formattedName })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.put('/api/stok/:id_stok', async (req, res) => {
   try {
     const { jumlah } = req.body
+    const [oldRows] = await pool.query('SELECT id_dapur, nama_bahan, jumlah, satuan FROM dapur_stok WHERE id_stok = ?', [req.params.id_stok])
+    if (oldRows.length === 0) return res.status(404).json({ error: 'Item not found' })
+    const old = oldRows[0]
+
     await pool.query(
       'UPDATE dapur_stok SET jumlah = ? WHERE id_stok = ?',
       [jumlah, req.params.id_stok]
     )
+
+    const diff = parseFloat(jumlah) - parseFloat(old.jumlah)
+    if (diff !== 0) {
+      const tipe = diff > 0 ? 'CREDIT' : 'DEBIT'
+      const absDiff = Math.abs(diff)
+      await pool.query(
+        'INSERT INTO dapur_stok_history (id_dapur, nama_bahan, tipe, jumlah, satuan, keterangan) VALUES (?,?,?,?,?,?)',
+        [old.id_dapur, old.nama_bahan, tipe, absDiff, old.satuan, 'Penyesuaian Manual']
+      )
+    }
+
     res.json({ message: 'Updated' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.delete('/api/stok/:id_stok', async (req, res) => {
   try {
+    const [oldRows] = await pool.query('SELECT id_dapur, nama_bahan, jumlah, satuan FROM dapur_stok WHERE id_stok = ?', [req.params.id_stok])
+    if (oldRows.length > 0) {
+      const old = oldRows[0]
+      await pool.query(
+        'INSERT INTO dapur_stok_history (id_dapur, nama_bahan, tipe, jumlah, satuan, keterangan) VALUES (?,?,?,?,?,?)',
+        [old.id_dapur, old.nama_bahan, 'DEBIT', old.jumlah, old.satuan, 'Item Dihapus']
+      )
+    }
     await pool.query('DELETE FROM dapur_stok WHERE id_stok = ?', [req.params.id_stok])
     res.json({ message: 'Deleted' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.get('/api/stok/history/:id_dapur', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM dapur_stok_history WHERE id_dapur = ? ORDER BY created_at DESC',
+      [req.params.id_dapur]
+    )
+    res.json(rows)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// ============================================
+// NUTRITION DATABASE ENDPOINTS
+// ============================================
+app.get('/api/nutrition', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM nutrition_database ORDER BY kategori, nama')
+    const grouped = rows.reduce((acc, row) => {
+      if (!acc[row.kategori]) acc[row.kategori] = []
+      acc[row.kategori].push({ nama: row.nama, satuan: row.satuan, energi: row.energi })
+      return acc
+    }, {})
+    res.json(grouped)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// ============================================
+// GOVERNMENT STATISTICS ENDPOINTS
+// ============================================
+app.get('/api/pemerintah/stats', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        CASE 
+          WHEN jenjang = 'TK' THEN 'PAUD'
+          WHEN jenjang = 'SD' THEN 'SD'
+          WHEN jenjang = 'SMP' THEN 'SMP'
+          WHEN jenjang IN ('SMA', 'SMK') THEN 'SMA/SMK'
+          ELSE 'Lainnya'
+        END AS jenjang_group,
+        SUM(jumlah_siswa) AS total_penerima,
+        SUM(alergi_count + intoleran_count) AS total_kondisi_khusus
+      FROM sekolah
+      GROUP BY jenjang_group
+    `)
+    
+    const defaultData = {
+      'PAUD': 0,
+      'SD': 0,
+      'SMP': 0,
+      'SMA/SMK': 0,
+      'SLB': 0
+    }
+    
+    const chartMap = { ...defaultData }
+    const conditionMap = { ...defaultData }
+    
+    rows.forEach(r => {
+      chartMap[r.jenjang_group] = parseInt(r.total_penerima) || 0
+      conditionMap[r.jenjang_group] = parseInt(r.total_kondisi_khusus) || 0
+    })
+    
+    const chartData = Object.keys(defaultData).map(k => ({
+      jenjang: k,
+      penerima: chartMap[k] || (k === 'PAUD' ? 1500 : k === 'SD' ? 4200 : k === 'SMP' ? 2800 : k === 'SMA/SMK' ? 2100 : 800),
+      kondisi_khusus: conditionMap[k] || (k === 'PAUD' ? 45 : k === 'SD' ? 120 : k === 'SMP' ? 85 : k === 'SMA/SMK' ? 50 : 8)
+    }))
+    
+    res.json(chartData)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
