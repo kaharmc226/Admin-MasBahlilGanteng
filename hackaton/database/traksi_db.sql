@@ -89,6 +89,25 @@ INSERT INTO dapur (id_dapur, id_vendor, lokasi, kapasitas_produksi) VALUES
 (1, 1, 'Jakarta Timur', 5000);
 
 -- ============================================
+-- 4b. DAPUR STOK (Kitchen inventory)
+-- ============================================
+CREATE TABLE dapur_stok (
+  id_stok INT PRIMARY KEY AUTO_INCREMENT,
+  id_dapur INT NOT NULL,
+  nama_bahan VARCHAR(150) NOT NULL,
+  jumlah DECIMAL(10,2) NOT NULL DEFAULT 0,
+  satuan VARCHAR(20) NOT NULL,
+  last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_dapur) REFERENCES dapur(id_dapur) ON DELETE CASCADE,
+  UNIQUE KEY unique_stok (id_dapur, nama_bahan)
+);
+
+INSERT INTO dapur_stok (id_stok, id_dapur, nama_bahan, jumlah, satuan) VALUES
+(1, 1, 'Beras Putih', 250.00, 'kg'),
+(2, 1, 'Daging Ayam', 100.00, 'kg'),
+(3, 1, 'Sayur Bayam', 50.00, 'ikat');
+
+-- ============================================
 -- 5. MAPPING DAPUR-SEKOLAH
 -- ============================================
 CREATE TABLE mapping_dapur_sekolah (
@@ -327,6 +346,18 @@ INSERT INTO dokumen_vendor (id_vendor, nama_dokumen, jenis, status, tanggal_berl
 (1, 'Izin Usaha MBG B-992', 'izin_usaha', 'valid', '2026-01-01', '2027-01-01'),
 (1, 'Sertifikat Halal MUI', 'sertifikat_halal', 'valid', '2025-06-15', '2027-06-15'),
 (1, 'Sertifikat Laik Hygiene', 'sertifikat_laik_hygiene', 'valid', '2026-02-01', '2027-02-01');
+
+-- ============================================
+-- 16. NUTRITION DATABASE (Nutrition reference facts)
+-- ============================================
+CREATE TABLE nutrition_database (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  kategori VARCHAR(50) NOT NULL,
+  nama VARCHAR(150) NOT NULL,
+  satuan VARCHAR(50) NOT NULL,
+  energi VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- ============================================
 -- INDEXES for performance

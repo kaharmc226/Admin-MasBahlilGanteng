@@ -81,3 +81,54 @@ INSERT INTO validasi_log (id_menu, id_user, aksi, catatan) VALUES
 (103, 3, 'approved', 'Menu seimbang dengan protein tinggi dan serat brokoli yang baik. Disetujui.'),
 (104, 3, 'approved', 'Komposisi karbohidrat dan lemak seimbang. Sesuai standar nasional.'),
 (105, 3, 'approved', 'Telah disesuaikan dengan opsi kecap rendah natrium.');
+
+-- 12. SEED ADDITIONAL DAPUR STOK
+INSERT INTO dapur_stok (id_dapur, nama_bahan, jumlah, satuan) VALUES
+(1, 'Ayam Fillet', 850.00, 'kg'),
+(1, 'Jamur Kuping', 150.00, 'kg'),
+(1, 'Nasi Putih', 1200.00, 'kg'),
+(1, 'Brokoli', 450.00, 'kg'),
+(1, 'Apel', 500.00, 'kg'),
+(1, 'Tahu Goreng', 400.00, 'pcs'),
+(1, 'Chicken Wings', 600.00, 'pcs'),
+(1, 'Pisang', 800.00, 'pcs'),
+(1, 'Tumis Buncis + Jagung', 350.00, 'kg'),
+(2, 'Nasi Kuning', 900.00, 'kg'),
+(2, 'Ayam Suwir', 500.00, 'kg'),
+(2, 'Telur Dadar Iris', 300.00, 'kg'),
+(2, 'Timun & Tomat', 250.00, 'kg'),
+(2, 'Daging Sapi', 600.00, 'kg'),
+(2, 'Paprika & Bawang Bombay', 200.00, 'kg'),
+(2, 'Melon', 400.00, 'kg')
+ON DUPLICATE KEY UPDATE jumlah = VALUES(jumlah);
+
+-- 13. SEED NUTRITION DATABASE
+INSERT INTO nutrition_database (kategori, nama, satuan, energi) VALUES
+('makanan_pokok', 'Nasi putih', '100 gram', '175 kkal'),
+('makanan_pokok', 'Nasi merah', '100 gram', '110 kkal'),
+('makanan_pokok', 'Kentang rebus', '100 gram', '87 kkal'),
+('makanan_pokok', 'Ubi jalar', '100 gram', '86 kkal'),
+('makanan_pokok', 'Singkong', '100 gram', '160 kkal'),
+('makanan_pokok', 'Roti putih', '1 iris', '66 kkal'),
+('makanan_pokok', 'Roti gandum', '1 iris', '67 kkal'),
+('makanan_pokok', 'Mi goreng instan', '80 gram', '350 kkal'),
+('lauk_sayur', 'Dada ayam (kulit)', '100 gram', '216 kkal'),
+('lauk_sayur', 'Dada ayam (no kulit)', '100 gram', '184 kkal'),
+('lauk_sayur', 'Bebek goreng', '100 gram', '286 kkal'),
+('lauk_sayur', 'Ikan kembung', '100 gram', '167 kkal'),
+('lauk_sayur', 'Udang goreng', '100 gram', '150 kkal'),
+('lauk_sayur', 'Bakso sapi', '100 gram', '202 kkal'),
+('lauk_sayur', 'Chicken nugget', '100 gram', '297 kkal'),
+('lauk_sayur', 'Telur dadar', '1 btr besar', '93 kkal'),
+('lauk_sayur', 'Tempe goreng', '1 porsi', '118 kkal'),
+('lauk_sayur', 'Tahu isi', '1 porsi', '124 kkal'),
+('lauk_sayur', 'Tumis kangkung', '85 gram', '155 kkal'),
+('lauk_sayur', 'Perkedel kentang', '75 gram', '117 kkal'),
+('buah', 'Apel', '1 buah sedang', '72 kkal'),
+('buah', 'Pisang', '1 buah sedang', '105 kkal'),
+('buah', 'Jambu biji', '1 buah', '37 kkal'),
+('buah', 'Jambu air', '1 buah', '55 kkal'),
+('buah', 'Alpukat', '100 gram', '322 kkal'),
+('buah', 'Jeruk', '1 buah', '62 kkal'),
+('buah', 'Buah naga', '1 buah sedang', '50 kkal'),
+('buah', 'Pepaya', '100 gram', '39 kkal');
