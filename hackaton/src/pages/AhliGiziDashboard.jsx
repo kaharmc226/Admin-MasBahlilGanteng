@@ -81,9 +81,9 @@ const Motif = ({ icon: Icon, top, right, bottom, left, color }) => (
 
 const Header = ({ title }) => (
   <div className="card dashboard-card-vibrant" style={{ 
-    marginBottom: "3.5rem", 
-    padding: '1.5rem 2.5rem',
-    borderRadius: '35px',
+    marginBottom: '1.5rem', 
+    padding: '1rem 1.5rem',
+    borderRadius: '16px',
     background: 'white',
     border: '1px solid white',
     boxShadow: '0 20px 40px rgba(0,0,0,0.03)',
@@ -108,7 +108,7 @@ const Header = ({ title }) => (
     
     <div style={{ 
       padding: '0.6rem 1.4rem', 
-      borderRadius: '20px', 
+      borderRadius: '8px', 
       display: 'flex', 
       alignItems: 'center', 
       gap: '15px',
@@ -145,9 +145,9 @@ const WelcomeBanner = ({ name }) => (
     animate={{ scale: 1, opacity: 1 }}
     style={{ 
       background: 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)',
-      padding: '3rem',
-      borderRadius: '40px',
-      marginBottom: '3rem',
+      padding: '1.5rem',
+      borderRadius: '16px',
+      marginBottom: '1.5rem',
       position: 'relative',
       overflow: 'hidden',
       color: 'white',
@@ -177,9 +177,9 @@ const WelcomeBanner = ({ name }) => (
 
 const Footer = () => (
   <div className="card dashboard-card-vibrant" style={{ 
-    marginTop: '5rem', 
-    padding: '2rem 3rem', 
-    borderRadius: '35px',
+    marginTop: '2rem', 
+    padding: '1.5rem', 
+    borderRadius: '16px',
     background: 'white',
     border: '1px solid white',
     boxShadow: '0 -10px 40px rgba(0,0,0,0.02)',
@@ -268,15 +268,51 @@ const FoodItem3D = ({ src, top, left, right, bottom, size = 120, delay = 0, rota
 )
 
 const StandardModal = ({ onClose, onSave, standard, setStandard, isEdit = false }) => (
-  <motion.div 
-    initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-    style={{ overflow: 'hidden', marginBottom: '2rem' }}
+  <div 
+    style={{ 
+      position: 'fixed', 
+      inset: 0, 
+      background: 'rgba(15, 23, 42, 0.4)', 
+      backdropFilter: 'blur(8px)', 
+      zIndex: 9999, 
+      display: 'flex', 
+      justifyContent: 'flex-end' 
+    }}
+    onClick={onClose}
   >
-    <div style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '100%', border: '1.5px solid var(--border)' }}>
-       <h2 style={{ marginBottom: '2rem', fontWeight: '950', fontSize: '1.8rem', letterSpacing: '-1px' }}>{isEdit ? 'Edit Data Standar' : 'Tambah Standar Gizi'}</h2>
-       <form onSubmit={(e) => { e.preventDefault(); onSave(); }} style={{ display: 'grid', gap: '1.5rem' }}>
+    <motion.div 
+      initial={{ x: '100%' }} 
+      animate={{ x: 0 }} 
+      exit={{ x: '100%' }} 
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      style={{ 
+        width: '100%', 
+        maxWidth: '400px', 
+        height: '100%', 
+        background: 'white', 
+        boxShadow: '-10px 0 40px rgba(0,0,0,0.1)', 
+        padding: '1.5rem', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justifyContent: 'space-between',
+        overflowY: 'auto'
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div>
+        <div className="flex justify-between" style={{ marginBottom: '1.5rem', alignItems: 'center' }}>
           <div>
-            <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Nama Zat Gizi</label>
+            <h2 style={{ fontWeight: '950', fontSize: '1.8rem', color: '#0f172a', letterSpacing: '-0.5px' }}>{isEdit ? 'Edit Data Standar' : 'Tambah Standar Gizi'}</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600', marginTop: '4px' }}>Tetapkan standar kecukupan nutrisi program MBG.</p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
+            <X size={20} color="#64748b" />
+          </button>
+        </div>
+
+        <form onSubmit={(e) => { e.preventDefault(); onSave(); }} style={{ display: 'grid', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA ZAT GIZI</label>
             <input 
               required
               value={standard.title}
@@ -287,7 +323,7 @@ const StandardModal = ({ onClose, onSave, standard, setStandard, isEdit = false 
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
-              <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Rentang Kebutuhan (Min - Max)</label>
+              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>RENTANG KEBUTUHAN</label>
               <input 
                 required
                 value={standard.requirement}
@@ -297,7 +333,7 @@ const StandardModal = ({ onClose, onSave, standard, setStandard, isEdit = false 
               />
             </div>
             <div>
-               <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Pilih Warna Aksen</label>
+               <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>WARNA AKSEN</label>
                <select 
                  value={standard.color} 
                  onChange={(e) => setStandard({...standard, color: e.target.value})}
@@ -311,42 +347,35 @@ const StandardModal = ({ onClose, onSave, standard, setStandard, isEdit = false 
             </div>
           </div>
           <div>
-            <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Deskripsi Ringkas</label>
+            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DESKRIPSI RINGKAS</label>
             <textarea 
               value={standard.desc}
               onChange={(e) => setStandard({...standard, desc: e.target.value})}
               placeholder="Manfaat bagi anak sekolah..." 
-              style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)', height: '80px' }} 
+              style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)', height: '80px', fontFamily: 'inherit' }} 
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Rincian Lanjutan</label>
+            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>RINCIAN LANJUTAN</label>
             <textarea 
               value={standard.details}
               onChange={(e) => setStandard({...standard, details: e.target.value})}
-              placeholder="Tambahkan informasi teknis, sumber alternatif, atau peringatan medis..." 
+              placeholder="Tambahkan informasi teknis, rujukan sumber..." 
               style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)', minHeight: '100px', resize: 'vertical', fontFamily: 'inherit' }} 
             />
           </div>
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-            <button 
-              type="button"
-              onClick={onClose}
-              style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-main)', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer' }}
-            >
-              Batal
-            </button>
-            <button 
-              type="submit"
-              className="btn-primary" 
-              style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer', background: standard.color || 'var(--primary)' }}
-            >
-              {isEdit ? 'Simpan Perubahan' : 'Tetapkan Standar'}
-            </button>
-          </div>
-       </form>
-    </div>
-  </motion.div>
+          
+          <button 
+            type="submit"
+            className="btn-primary" 
+            style={{ width: '100%', padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '1rem', cursor: 'pointer', background: standard.color || 'var(--primary)' }}
+          >
+            {isEdit ? 'Simpan Perubahan' : 'Tetapkan Standar'}
+          </button>
+        </form>
+      </div>
+    </motion.div>
+  </div>
 )
 
 const AhliGiziDashboard = ({ user, onLogout }) => {
@@ -359,6 +388,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
   const [isAiLoading, setIsAiLoading] = useState(false)
   
   const [standards, setStandards] = useState([])
+  const [nutritionDb, setNutritionDb] = useState(NUTRITION_DATABASE)
 
   const [formStandard, setFormStandard] = useState({ title: '', requirement: '', color: 'var(--primary)', desc: '', details: '' })
   const [ahliSuggestion, setAhliSuggestion] = useState('')
@@ -375,9 +405,12 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [m, s] = await Promise.all([api.getMenus(), api.getStandarGizi()])
+        const [m, s, nut] = await Promise.all([api.getMenus(), api.getStandarGizi(), api.getNutrition()])
         setMenus(m)
         setStandards(s.map(st => ({ ...st, desc: st.deskripsi, details: st.detail })))
+        if (nut && Object.keys(nut).length > 0) {
+          setNutritionDb(nut)
+        }
       } catch (err) { console.error('Failed to fetch:', err) }
     }
     fetchData()
@@ -459,14 +492,14 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
 
   const renderContent = () => {
     if (isValidasi) return (
-      <div className="grid" style={{ gap: '2rem' }}>
+      <div className="grid" style={{ gap: '1rem' }}>
         <Header title="Validasi & Audit Menu Nasional" />
         <div className="grid" style={{ gridTemplateColumns: '1fr 2.2fr', gap: '2.5rem', position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <h3 style={{ fontSize: '1.4rem', fontWeight: '900', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '12px', letterSpacing: '-1px' }}>
             <ClipboardList size={26} color="var(--primary)" /> Antrian Validasi
           </h3>
-          <div style={{ padding: '1.25rem', background: 'white', border: '1.5px solid var(--border)', borderRadius: '20px', display: 'flex', gap: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
+          <div style={{ padding: '1.25rem', background: 'white', border: '1.5px solid var(--border)', borderRadius: '8px', display: 'flex', gap: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
             <Search size={20} color="var(--text-muted)" />
             <input placeholder="Cari Vendor atau Menu..." style={{ border: 'none', width: '100%', outline: 'none', fontWeight: '600', fontSize: '1rem' }} />
           </div>
@@ -512,28 +545,28 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             className="dashboard-card-vibrant" 
-            style={{ padding: '3.5rem', borderRadius: '45px', background: 'white', position: 'relative', overflow: 'hidden' }}
+            style={{ padding: '3.5rem', borderRadius: '16px', background: 'white', position: 'relative', overflow: 'hidden' }}
           >
             <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '10px', background: 'linear-gradient(to right, var(--primary), var(--secondary))' }} />
             
-            <div className="flex justify-between" style={{ marginBottom: '3rem', alignItems: 'flex-start' }}>
+            <div className="flex justify-between" style={{ marginBottom: '1.5rem', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <h2 style={{ fontSize: '2.8rem', fontWeight: '950', letterSpacing: '-1px', color: 'var(--text-main)' }}>{selectedMenu.nama_menu}</h2>
                 <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', fontWeight: '600', marginTop: '5px' }}>Audit Komposisi & Kelayakan Gizi Program MBG</p>
               </div>
               <div style={{ marginLeft: '20px' }}>
                  {selectedMenu?.status_validasi === 'approved' ? (
-                   <div style={{ background: 'var(--primary-light)', padding: '12px 25px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid var(--primary)' }}>
+                   <div style={{ background: 'var(--primary-light)', padding: '12px 25px', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid var(--primary)' }}>
                       <CheckCircle2 color="var(--primary)" size={20} />
                       <span style={{ color: 'var(--primary)', fontWeight: '900', fontSize: '0.9rem' }}>MENU DISAHKAN</span>
                    </div>
                  ) : selectedMenu?.status_validasi === 'rejected' ? (
-                   <div style={{ background: 'var(--error-light)', padding: '12px 25px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid var(--error)' }}>
+                   <div style={{ background: 'var(--error-light)', padding: '12px 25px', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid var(--error)' }}>
                       <AlertTriangle color="var(--error)" size={20} />
                       <span style={{ color: 'var(--error)', fontWeight: '900', fontSize: '0.9rem' }}>BUTUH REVISI</span>
                    </div>
                  ) : (
-                   <div style={{ background: 'var(--banana-light)', padding: '12px 25px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid var(--banana)' }}>
+                   <div style={{ background: 'var(--banana-light)', padding: '12px 25px', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid var(--banana)' }}>
                       <Clock color="var(--banana)" size={20} />
                       <span style={{ color: 'var(--banana)', fontWeight: '900', fontSize: '0.9rem' }}>PENDING REVIEW</span>
                    </div>
@@ -541,12 +574,12 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
               </div>
             </div>
 
-            <div className="grid" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: '2.5rem', marginBottom: '2rem' }}>
+            <div className="grid" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: '2.5rem', marginBottom: '1rem' }}>
                {/* Left Section: Visual Feedback Report Preview */}
-               <div className="card shadow-md" style={{ background: 'white', borderRadius: '40px', padding: '3rem', border: '1.5px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+               <div className="card shadow-md" style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', border: '1.5px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
                   <div style={{ position: 'absolute', inset: 0, opacity: 0.03, pointerEvents: 'none', background: 'radial-gradient(circle at 50% 50%, var(--primary) 0%, transparent 60%)' }}></div>
                   
-                  <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                      <h2 style={{ fontSize: '2.2rem', fontWeight: '950', color: 'var(--text-main)', marginBottom: '8px' }}>Informasi Nilai Gizi</h2>
                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px' }}>
                         <span style={{ fontWeight: '900', fontSize: '1.4rem', color: '#1e293b' }}>Menu MBG</span>
@@ -555,7 +588,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                   </div>
 
                   {/* Tray Visual Section */}
-                  <div style={{ height: '350px', width: '100%', display: 'grid', gridTemplateColumns: '1fr 350px 1fr', gap: '1rem', alignItems: 'center', marginBottom: '2rem' }}>
+                  <div style={{ height: '350px', width: '100%', display: 'grid', gridTemplateColumns: '1fr 350px 1fr', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
                      {/* Annotations Left */}
                      <div>
                         {[{n: 'Tahu Goreng', t: '~30 g'}, {n: 'Nasi Putih', t: '~100 g'}, {n: 'Chicken Wings', t: '~48 g'}].map((b, i) => (
@@ -571,7 +604,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
 
                      {/* Main Tray Image Container */}
                      <div style={{ position: 'relative', width: '100%', height: '300px', display: 'grid', placeItems: 'center' }}>
-                        <div style={{ width: '100%', height: '100%', border: '12px solid #cbd5e1', borderRadius: '40px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 30px 60px -12px rgba(0,0,0,0.25)', position: 'relative' }}>
+                        <div style={{ width: '100%', height: '100%', border: '12px solid #cbd5e1', borderRadius: '16px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 30px 60px -12px rgba(0,0,0,0.25)', position: 'relative' }}>
                            <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=600" alt="Menu Tray" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                      </div>
@@ -590,13 +623,13 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                      </div>
                   </div>
 
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', marginBottom: '3rem', fontWeight: '700' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', marginBottom: '1.5rem', fontWeight: '700' }}>
                      Menu MBG SD GIT Manumuti, Kabupaten Kupang, NTT<br/>
                      <span style={{ fontWeight: '600', opacity: 0.8 }}>Sumber: traksi.go.id</span>
                   </div>
 
                   {/* Bottom Grid: Notes & Table Side-by-side */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 250px', gap: '2rem', alignItems: 'start' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 250px', gap: '1rem', alignItems: 'start' }}>
                      {/* Notes Box */}
                      <div style={{ border: '2.5px solid #ef4444', borderRadius: '25px', padding: '1.5rem', background: 'white', position: 'relative' }}>
                         <p style={{ fontWeight: '950', color: '#ef4444', fontSize: '1.2rem', marginBottom: '12px', marginTop: '-5px' }}>*Notes</p>
@@ -630,8 +663,8 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                </div>
 
                {/* Right Section: Ahli Gizi Input */}
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                  <div className="card shadow-sm" style={{ padding: '2.5rem', borderRadius: '40px', border: '1.5px solid var(--border)', background: 'white' }}>
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div className="card shadow-sm" style={{ padding: '1.5rem', borderRadius: '16px', border: '1.5px solid var(--border)', background: 'white' }}>
                      <h4 style={{ fontWeight: '950', marginBottom: '1.5rem', fontSize: '1.2rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
                        <div style={{ background: 'var(--secondary-light)', width: '40px', height: '40px', borderRadius: '12px', display: 'grid', placeItems: 'center' }}>
                          <MessageCircle size={22} color="var(--secondary)" />
@@ -655,7 +688,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => handleApprove(selectedMenu.id)} 
-                          style={{ width: '100%', padding: '1.4rem', borderRadius: '50px', background: 'var(--primary)', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 15px 35px rgba(16, 185, 129, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
+                          style={{ width: '100%', padding: '1.4rem', borderRadius: '24px', background: 'var(--primary)', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 15px 35px rgba(16, 185, 129, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
                         >
                           <CheckCircle2 size={24} /> Sahkan Menu
                         </motion.button>
@@ -663,14 +696,14 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => handleReject(selectedMenu.id)} 
-                          style={{ width: '100%', padding: '1.4rem', borderRadius: '50px', background: 'white', border: '2.5px solid var(--error)', color: 'var(--error)', fontWeight: '950', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
+                          style={{ width: '100%', padding: '1.4rem', borderRadius: '24px', background: 'white', border: '2.5px solid var(--error)', color: 'var(--error)', fontWeight: '950', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
                         >
                           <AlertTriangle size={24} /> Minta Revisi
                         </motion.button>
                      </div>
                   </div>
 
-                  <div className="card" style={{ padding: '2rem', borderRadius: '35px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
+                  <div className="card" style={{ padding: '1rem', borderRadius: '16px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '15px' }}>
                        <Activity size={24} color="#64748b" />
                        <ShieldCheck size={24} color="#64748b" />
@@ -691,11 +724,11 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
     if (isStandar) return (
       <div style={{ position: 'relative', zIndex: 1 }}>
         <Header title="Standar & Regulasi Gizi" />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button onClick={() => {
             setFormStandard({ title: '', requirement: '', color: 'var(--primary)', desc: '', details: '' });
             setShowModal({ show: true, mode: 'add', index: -1 });
-          }} className="btn-primary" style={{ padding: '1rem 2rem', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', color: 'white', fontWeight: '800' }}>
+          }} className="btn-primary" style={{ padding: '1rem 2rem', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', color: 'white', fontWeight: '800' }}>
             <Plus size={20} /> Tambah Standar
           </button>
         </div>
@@ -710,7 +743,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
             />
           )}
         </AnimatePresence>
-        <div className="card shadow-sm" style={{ padding: '0', borderRadius: '30px', overflow: 'hidden', border: '1.5px solid var(--border)', background: 'white', marginBottom: '5rem', position: 'relative', zIndex: 1, boxShadow: '0 20px 40px rgba(0,0,0,0.02)' }}>
+        <div className="card shadow-sm" style={{ padding: '0', borderRadius: '12px', overflow: 'hidden', border: '1.5px solid var(--border)', background: 'white', marginBottom: '5rem', position: 'relative', zIndex: 1, boxShadow: '0 20px 40px rgba(0,0,0,0.02)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid var(--border)' }}>
@@ -733,7 +766,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                     </div>
                   </td>
                   <td style={{ padding: '1.5rem 2rem' }}>
-                    <span style={{ fontWeight: '950', color: s.color, fontSize: '0.95rem', background: `${s.color}10`, padding: '6px 15px', borderRadius: '50px', border: `1px solid ${s.color}20` }}>
+                    <span style={{ fontWeight: '950', color: s.color, fontSize: '0.95rem', background: `${s.color}10`, padding: '6px 15px', borderRadius: '24px', border: `1px solid ${s.color}20` }}>
                       {s.requirement}
                     </span>
                   </td>
@@ -746,7 +779,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                   <td style={{ padding: '1.5rem 2rem', textAlign: 'center' }}>
                     <button 
                       onClick={() => openEditModal(i)}
-                      style={{ background: 'white', border: '1.5px solid #e2e8f0', padding: '10px 20px', borderRadius: '50px', fontWeight: '800', color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto', fontSize: '0.85rem' }}
+                      style={{ background: 'white', border: '1.5px solid #e2e8f0', padding: '10px 20px', borderRadius: '24px', fontWeight: '800', color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto', fontSize: '0.85rem' }}
                     >
                       <Edit3 size={14} /> Update
                     </button>
@@ -757,7 +790,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
           </table>
         </div>
 
-        <div style={{ marginTop: '5rem', marginBottom: '2.5rem', position: 'relative', zIndex: 1 }}>
+        <div style={{ marginTop: '2rem', marginBottom: '1.5rem', position: 'relative', zIndex: 1 }}>
           <h3 style={{ fontSize: '2.2rem', fontWeight: '950', marginBottom: '1rem', letterSpacing: '-1px', display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-main)' }}>
             <BookOpen size={32} color="var(--primary)" /> Database Referensi Nutrisi (Real-time)
           </h3>
@@ -766,8 +799,8 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
           </p>
         </div>
 
-        <div className="card shadow-sm" style={{ padding: '0', borderRadius: '35px', overflow: 'hidden', border: '1.5px solid #eef2f6', background: 'white', marginBottom: '5rem', position: 'relative', zIndex: 1, boxShadow: '0 25px 60px -15px rgba(0,0,0,0.03)' }}>
-          <div style={{ padding: '1.5rem 2.5rem', background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="card shadow-sm" style={{ padding: '0', borderRadius: '16px', overflow: 'hidden', border: '1.5px solid #eef2f6', background: 'white', marginBottom: '5rem', position: 'relative', zIndex: 1, boxShadow: '0 25px 60px -15px rgba(0,0,0,0.03)' }}>
+          <div style={{ padding: '1rem 1.5rem', background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '8px', height: '8px', background: 'var(--primary)', borderRadius: '50%' }}></div>
               <span style={{ fontWeight: '900', fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px' }}>Database Terverifikasi • 2026 Revision</span>
@@ -792,7 +825,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(NUTRITION_DATABASE).map(([key, items], catIdx) => (
+              {Object.entries(nutritionDb).map(([key, items], catIdx) => (
                 <React.Fragment key={key}>
                   {items.map((item, i) => (
                     <tr key={`${key}-${i}`} style={{ 
@@ -801,7 +834,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                     }}>
                       {i === 0 && (
                         <td rowSpan={items.length} style={{ 
-                          padding: '2.5rem', 
+                          padding: '1.5rem', 
                           verticalAlign: 'middle',
                           textAlign: 'center',
                           background: key === 'buah' ? '#f0fdf4' : key === 'makanan_pokok' ? '#fffaf5' : '#f0f9ff',
@@ -840,7 +873,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
 
     return (
       <div style={{ textAlign: 'center', padding: '10rem 5rem' }}>
-        <div style={{ marginBottom: '2rem', opacity: 0.5 }}>
+        <div style={{ marginBottom: '1rem', opacity: 0.5 }}>
           <LayoutDashboard size={80} color="var(--primary)" />
         </div>
         <h2 style={{ fontSize: '2.2rem', fontWeight: '950', color: 'var(--text-main)', letterSpacing: '-1.5px' }}>Silahkan Pilih Menu di Samping</h2>
@@ -860,7 +893,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
             style={{ 
               position: 'fixed', top: 0, left: '50%', zIndex: 3000, 
               background: showToast.type === 'info' ? 'var(--role-primary)' : showToast.type === 'warning' ? 'var(--carrot)' : 'var(--role-primary)', 
-              color: 'white', padding: '0.9rem 2rem', borderRadius: '50px', 
+              color: 'white', padding: '0.9rem 2rem', borderRadius: '24px', 
               boxShadow: '0 10px 25px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '10px' 
             }}
           >
@@ -876,25 +909,25 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
         <>
           <WelcomeBanner name="Ahli Gizi Jakarta Timur" />
 
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
-            <div className="card dashboard-card-vibrant" style={{ borderRadius: '20px', textAlign: 'center', padding: '2rem' }}>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="card dashboard-card-vibrant" style={{ borderRadius: '8px', textAlign: 'center', padding: '1rem' }}>
               <div style={{ background: 'var(--role-light)', width: '50px', height: '50px', borderRadius: '14px', display: 'grid', placeItems: 'center', margin: '0 auto 1rem' }}><Utensils color="var(--role-primary)" size={24} /></div>
               <h1 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '4px' }}>{menus.filter(m => m.status_validasi === 'pending').length}</h1>
               <p style={{ fontWeight: '600', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Menu Antre Validasi</p>
             </div>
-            <div className="card dashboard-card-vibrant" style={{ borderRadius: '20px', textAlign: 'center', padding: '2rem', borderColor: 'var(--carrot)' }}>
+            <div className="card dashboard-card-vibrant" style={{ borderRadius: '8px', textAlign: 'center', padding: '1rem', borderColor: 'var(--carrot)' }}>
               <div style={{ background: 'var(--carrot-light)', width: '50px', height: '50px', borderRadius: '14px', display: 'grid', placeItems: 'center', margin: '0 auto 1rem' }}><AlertTriangle color="var(--carrot)" size={24} /></div>
               <h1 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '4px', color: 'var(--carrot)' }}>{menus.filter(m => m.status_validasi === 'rejected').length}</h1>
               <p style={{ fontWeight: '600', color: 'var(--carrot)', fontSize: '0.85rem' }}>Revisi Menu Menunggu</p>
             </div>
-            <div className="card dashboard-card-vibrant" style={{ borderRadius: '20px', textAlign: 'center', padding: '2rem' }}>
+            <div className="card dashboard-card-vibrant" style={{ borderRadius: '8px', textAlign: 'center', padding: '1rem' }}>
               <div style={{ background: 'var(--banana-light)', width: '50px', height: '50px', borderRadius: '14px', display: 'grid', placeItems: 'center', margin: '0 auto 1rem' }}><ShieldCheck color="var(--banana)" size={24} /></div>
               <h1 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '4px' }}>{menus.filter(m => m.status_validasi === 'approved').length}</h1>
               <p style={{ fontWeight: '600', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Menu Disetujui</p>
             </div>
           </div>
 
-          <div className="card dashboard-card-vibrant" style={{ borderRadius: '20px', padding: '2.5rem', position: 'relative', overflow: 'hidden' }}>
+          <div className="card dashboard-card-vibrant" style={{ borderRadius: '8px', padding: '1.5rem', position: 'relative', overflow: 'hidden' }}>
             <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '1rem' }}>Pencatatan Gizi ke Ledger</h3>
             <p style={{ color: 'var(--text-muted)', lineHeight: '1.7', marginBottom: '1.5rem', maxWidth: '600px' }}>
               Sistem Blockchain mencatat setiap validasi ke Smart Contract immutable. Data terenkripsi AES-256.

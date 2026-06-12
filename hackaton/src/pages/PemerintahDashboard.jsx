@@ -61,13 +61,13 @@ const Motif = ({ icon: Icon, top, right, bottom, left, color }) => (
 )
 
 const Header = ({ title, subtitle, showAdd = false, onAdd, isVendor, isMapping }) => (
-  <div style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+  <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
     <div>
       <h1 style={{ fontSize: '2.8rem', fontWeight: '950', letterSpacing: '-2px' }}>{title}</h1>
       <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', fontWeight: '600' }}>{subtitle}</p>
     </div>
     {showAdd && (
-      <button onClick={onAdd} className="btn-primary" style={{ padding: '1rem 2rem', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', color: 'white', fontWeight: '800' }}>
+      <button onClick={onAdd} className="btn-primary" style={{ padding: '1rem 2rem', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', color: 'white', fontWeight: '800' }}>
         <Plus size={20} /> Tambah {isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target'}
       </button>
     )}
@@ -89,61 +89,100 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
     if (isVendor) return (
       <>
         <div>
-          <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Nama Vendor</label>
-          <input placeholder="Contoh: PT. Pangan Sejahtera" style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)' }} />
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA VENDOR</label>
+          <input placeholder="Contoh: PT. Pangan Sejahtera" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
         <div>
-          <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Nomor Izin Usaha</label>
-          <input placeholder="B-9988/2026/MBG" style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)' }} />
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NOMOR IZIN USAHA</label>
+          <input placeholder="B-9988/2026/MBG" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
         <div>
-          <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Wilayah Operasional</label>
-          <input placeholder="Contoh: Jakarta Selatan" style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)' }} />
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>WILAYAH OPERASIONAL</label>
+          <input placeholder="Contoh: Jakarta Selatan" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
       </>
     )
     if (isMapping) return (
       <>
         <div>
-          <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Nama Sekolah Baru</label>
-          <input placeholder="Contoh: SDN 05 Menteng" style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)' }} />
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA SEKOLAH BARU</label>
+          <input placeholder="Contoh: SDN 05 Menteng" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
         <div>
-          <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Jumlah Siswa</label>
-          <input type="number" placeholder="450" style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)' }} />
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>JUMLAH SISWA</label>
+          <input type="number" placeholder="450" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
         <div>
-          <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Alamat Lengkap</label>
-          <textarea placeholder="Jl. Merdeka No. 10..." style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)', height: '80px' }} />
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>ALAMAT LENGKAP SEKOLAH</label>
+          <textarea placeholder="Jl. Merdeka No. 10..." style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} />
         </div>
       </>
     )
     return (
       <div>
-        <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px' }}>Input Target Capex/Opex</label>
-        <input placeholder="Masukkan nilai anggaran..." style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)' }} />
+        <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>ANGGARAN TARGET (CAPEX/OPEX)</label>
+        <input placeholder="Masukkan nilai anggaran..." style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
       </div>
     )
   }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-      style={{ overflow: 'hidden', marginBottom: '2rem' }}
+    <div 
+      style={{ 
+        position: 'fixed', 
+        inset: 0, 
+        background: 'rgba(15, 23, 42, 0.4)', 
+        backdropFilter: 'blur(8px)', 
+        zIndex: 9999, 
+        display: 'flex', 
+        justifyContent: 'flex-end' 
+      }}
+      onClick={onClose}
     >
-      <div style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '100%', border: '1.5px solid var(--border)' }}>
-         <h2 style={{ marginBottom: '2.5rem', fontWeight: '950', fontSize: '2rem', letterSpacing: '-1px' }}>Tambah {isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target'}</h2>
-         <div style={{ display: 'grid', gap: '1.5rem' }}>
-            {getFields()}
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-               <button onClick={onClose} style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-main)', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer' }}>Batal</button>
-               <button onClick={handleSave} className="btn-primary" style={{ flex: 1, borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', background: 'var(--primary)', cursor: 'pointer' }}>
-                 {isSaving ? 'Menyimpan...' : 'Simpan Data'}
-               </button>
+      <motion.div 
+        initial={{ x: '100%' }} 
+        animate={{ x: 0 }} 
+        exit={{ x: '100%' }} 
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        style={{ 
+          width: '100%', 
+          maxWidth: '400px', 
+          height: '100%', 
+          background: 'white', 
+          boxShadow: '-10px 0 40px rgba(0,0,0,0.1)', 
+          padding: '1.5rem', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'space-between',
+          overflowY: 'auto'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div>
+          <div className="flex justify-between" style={{ marginBottom: '1.5rem', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ fontWeight: '950', fontSize: '1.8rem', color: '#0f172a', letterSpacing: '-0.5px' }}>Tambah {isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target'}</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600', marginTop: '4px' }}>Input data administrasi ke dalam ekosistem pemerintah.</p>
             </div>
-         </div>
-      </div>
-    </motion.div>
+            <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
+              <X size={20} color="#64748b" />
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {getFields()}
+          </div>
+        </div>
+
+        <button 
+          onClick={handleSave}
+          className="btn-primary" 
+          style={{ width: '100%', padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.1rem', marginTop: '2rem', cursor: 'pointer' }}
+        >
+          {isSaving ? 'Menyimpan ke Ledger...' : 'Simpan Data'}
+        </button>
+      </motion.div>
+    </div>
   )
 }
 
@@ -177,16 +216,24 @@ const PemerintahDashboard = ({ user, onLogout }) => {
   const [alerts, setAlerts] = useState([])
   const [mappingData, setMappingData] = useState([])
   const [sekolahList, setSekolahList] = useState([])
+  const [chartData, setChartData] = useState([
+    { jenjang: 'PAUD', penerima: 1500, kondisi_khusus: 45 },
+    { jenjang: 'SD', penerima: 4200, kondisi_khusus: 120 },
+    { jenjang: 'SMP', penerima: 2800, kondisi_khusus: 85 },
+    { jenjang: 'SMA/SMK', penerima: 2100, kondisi_khusus: 50 },
+    { jenjang: 'SLB', penerima: 800, kondisi_khusus: 8 }
+  ])
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [v, w, a, m, s] = await Promise.all([
+        const [v, w, a, m, s, stats] = await Promise.all([
           api.getVendors(),
           api.getWilayah(),
           api.getAlerts(),
           api.getMapping(),
-          api.getSekolah()
+          api.getSekolah(),
+          api.getPemerintahStats()
         ])
         setActiveVendors(v.filter(x => x.status_verifikasi === 'approved'))
         setRegQueue(v.filter(x => x.status_verifikasi === 'pending'))
@@ -194,6 +241,9 @@ const PemerintahDashboard = ({ user, onLogout }) => {
         setAlerts(a)
         setMappingData(m)
         setSekolahList(s)
+        if (stats && stats.length > 0) {
+          setChartData(stats)
+        }
       } catch (err) { console.error('Failed to fetch:', err) }
     }
     fetchData()
@@ -236,12 +286,12 @@ const PemerintahDashboard = ({ user, onLogout }) => {
             />
           )}
         </AnimatePresence>
-        <div className="card dashboard-card-vibrant" style={{ borderRadius: '32px', padding: '2.5rem' }}>
-          <h3 style={{ marginBottom: '2rem', fontWeight: '950', color: 'var(--primary)' }}>Menunggu Verifikasi (Queue)</h3>
+        <div className="card dashboard-card-vibrant" style={{ borderRadius: '16px', padding: '1.5rem' }}>
+          <h3 style={{ marginBottom: '1rem', fontWeight: '950', color: 'var(--primary)' }}>Menunggu Verifikasi (Queue)</h3>
           {regQueue.length === 0 ? (
-            <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700', background: 'var(--bg)', borderRadius: '20px' }}>Tidak ada antrian pendaftaran vendor baru.</p>
+            <p style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700', background: 'var(--bg)', borderRadius: '8px' }}>Tidak ada antrian pendaftaran vendor baru.</p>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.8rem', marginBottom: '3rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.8rem', marginBottom: '1.5rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '900' }}>
                   <th>NAMA VENDOR</th>
@@ -267,7 +317,7 @@ const PemerintahDashboard = ({ user, onLogout }) => {
             </table>
           )}
 
-          <h3 style={{ marginBottom: '2rem', fontWeight: '950', marginTop: '2rem' }}>Daftar Vendor Aktif</h3>
+          <h3 style={{ marginBottom: '1rem', fontWeight: '950', marginTop: '2rem' }}>Daftar Vendor Aktif</h3>
           <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.8rem' }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '900' }}>
@@ -316,13 +366,13 @@ const PemerintahDashboard = ({ user, onLogout }) => {
             />
           )}
         </AnimatePresence>
-        <div className="grid" style={{ gridTemplateColumns: '1.2fr 1fr', gap: '2rem' }}>
-          <div className="card" style={{ borderRadius: '32px', background: 'white', padding: '2.5rem' }}>
-             <h3 style={{ marginBottom: '2rem', fontWeight: '900' }}>Daftar Mapping Aktif</h3>
+        <div className="grid" style={{ gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }}>
+          <div className="card" style={{ borderRadius: '16px', background: 'white', padding: '1.5rem' }}>
+             <h3 style={{ marginBottom: '1rem', fontWeight: '900' }}>Daftar Mapping Aktif</h3>
              <div style={{ display: 'grid', gap: '1rem' }}>
                {mappingData.map((m, i) => {
                  return (
-                   <div key={i} style={{ padding: '1.5rem', background: 'var(--bg)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                   <div key={i} style={{ padding: '1.5rem', background: 'var(--bg)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                          <div style={{ background: 'white', padding: '10px', borderRadius: '12px' }}><ChefHat color="var(--primary)" size={18} /></div>
                          <div>
@@ -345,20 +395,12 @@ const PemerintahDashboard = ({ user, onLogout }) => {
       </div>
     )
 
-    const chartData = [
-      { jenjang: 'PAUD', penerima: 1500, kondisi_khusus: 45 },
-      { jenjang: 'SD', penerima: 4200, kondisi_khusus: 120 },
-      { jenjang: 'SMP', penerima: 2800, kondisi_khusus: 85 },
-      { jenjang: 'SMA/SMK', penerima: 2100, kondisi_khusus: 50 },
-      { jenjang: 'SLB', penerima: 800, kondisi_khusus: 800 }
-    ]
-
     if (isStatistik) return (
       <div className="grid">
         <Header title="Laporan & Statistik" subtitle="Analisis pertumbuhan dan efektivitas distribusi gizi." />
         <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '2.5rem' }}>
-          <div className="card" style={{ padding: '2.5rem', borderRadius: '40px', background: 'white' }}>
-             <h3 style={{ fontWeight: '900', marginBottom: '2rem' }}>Penerima Manfaat per Jenjang</h3>
+          <div className="card" style={{ padding: '1.5rem', borderRadius: '16px', background: 'white' }}>
+             <h3 style={{ fontWeight: '900', marginBottom: '1rem' }}>Penerima Manfaat per Jenjang</h3>
              <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
                    <CartesianGrid strokeDasharray="3 3" />
@@ -369,8 +411,8 @@ const PemerintahDashboard = ({ user, onLogout }) => {
                 </BarChart>
              </ResponsiveContainer>
           </div>
-          <div className="card" style={{ padding: '2.5rem', borderRadius: '40px', background: 'white' }}>
-             <h3 style={{ fontWeight: '900', marginBottom: '2rem' }}>Audit Gizi (Kondisi Khusus)</h3>
+          <div className="card" style={{ padding: '1.5rem', borderRadius: '16px', background: 'white' }}>
+             <h3 style={{ fontWeight: '900', marginBottom: '1rem' }}>Audit Gizi (Kondisi Khusus)</h3>
              <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={chartData}>
                    <XAxis dataKey="jenjang" />
@@ -387,10 +429,10 @@ const PemerintahDashboard = ({ user, onLogout }) => {
     if (isAlert) return (
       <div className="grid">
         <Header title="Sistem Alert & Log" subtitle="Deteksi dini kendala distribusi dan kualitas di lapangan." />
-        <div className="grid" style={{ gap: '1.5rem' }}>
+        <div className="grid" style={{ gap: '1rem' }}>
           {alerts.map((a, i) => (
-            <div key={i} className="card" style={{ padding: '2rem', borderRadius: '30px', display: 'flex', gap: '25px', alignItems: 'center', background: 'white' }}>
-              <div style={{ background: 'var(--bg)', padding: '20px', borderRadius: '20px' }}><AlertTriangle color="#EF4444" /></div>
+            <div key={i} className="card" style={{ padding: '1rem', borderRadius: '12px', display: 'flex', gap: '25px', alignItems: 'center', background: 'white' }}>
+              <div style={{ background: 'var(--bg)', padding: '20px', borderRadius: '8px' }}><AlertTriangle color="#EF4444" /></div>
               <div style={{ flex: 1 }}>
                 <div className="flex justify-between" style={{ marginBottom: '5px' }}>
                   <h4 style={{ fontWeight: '900', fontSize: '1.2rem' }}>{a.title}</h4>
@@ -406,7 +448,7 @@ const PemerintahDashboard = ({ user, onLogout }) => {
     if (isPeta) return (
       <div className="grid">
         <Header title="Peta Distribusi Real-time" subtitle="Visualisasi sebaran dapur dan sekolah di seluruh Nusantara." />
-        <div className="card" style={{ height: '600px', background: 'var(--bg)', borderRadius: '40px', display: 'grid', placeItems: 'center', position: 'relative' }}>
+        <div className="card" style={{ height: '600px', background: 'var(--bg)', borderRadius: '16px', display: 'grid', placeItems: 'center', position: 'relative' }}>
            <Globe size={100} color="var(--primary)" style={{ opacity: 0.1 }} />
            <p style={{ color: 'var(--text-muted)', fontWeight: '700' }}>Live Map Monitoring (Sabang s/d Merauke)...</p>
         </div>
@@ -417,7 +459,7 @@ const PemerintahDashboard = ({ user, onLogout }) => {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ position: 'relative', zIndex: 1 }}>
         <Header title="Monitoring Gizi Nasional" subtitle="Portal Transparansi Program Makan Bergizi Gratis (MBG)." />
         
-        <div style={{ display: 'flex', gap: '15px', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '15px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
            <div className="badge" style={{ background: '#064E3B', color: '#34D399', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
              <Fingerprint size={16} /> Admin Autentikasi MFA Aktif
            </div>
@@ -449,7 +491,7 @@ const PemerintahDashboard = ({ user, onLogout }) => {
             style={{ 
               position: 'fixed', top: 0, left: '50%', zIndex: 3000, 
               background: 'var(--role-primary)', 
-              color: 'white', padding: '0.9rem 2rem', borderRadius: '50px', 
+              color: 'white', padding: '0.9rem 2rem', borderRadius: '24px', 
               boxShadow: '0 10px 25px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '10px' 
             }}
           >

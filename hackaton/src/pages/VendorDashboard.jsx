@@ -35,12 +35,14 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import api from "../api"
 import DashboardLayout from "../components/DashboardLayout"
+import { AddDapurForm } from "../components/forms/AddDapurForm"
+import { AddMenuForm } from "../components/forms/AddMenuForm"
 
 const Header = ({ title }) => (
   <div className="card dashboard-card-vibrant" style={{ 
-    marginBottom: "3.5rem", 
-    padding: '1.5rem 2.5rem',
-    borderRadius: '35px',
+    marginBottom: '1.5rem', 
+    padding: '1rem 1.5rem',
+    borderRadius: '16px',
     background: 'white',
     border: '1px solid white',
     boxShadow: '0 20px 40px rgba(0,0,0,0.03)',
@@ -65,7 +67,7 @@ const Header = ({ title }) => (
     
     <div style={{ 
       padding: '0.6rem 1.4rem', 
-      borderRadius: '20px', 
+      borderRadius: '8px', 
       display: 'flex', 
       alignItems: 'center', 
       gap: '15px',
@@ -102,9 +104,9 @@ const WelcomeBanner = ({ name }) => (
     animate={{ scale: 1, opacity: 1 }}
     style={{ 
       background: 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)',
-      padding: '3rem',
-      borderRadius: '40px',
-      marginBottom: '3rem',
+      padding: '1.5rem',
+      borderRadius: '16px',
+      marginBottom: '1.5rem',
       position: 'relative',
       overflow: 'hidden',
       color: 'white',
@@ -134,9 +136,9 @@ const WelcomeBanner = ({ name }) => (
 
 const Footer = () => (
   <div className="card dashboard-card-vibrant" style={{ 
-    marginTop: '5rem', 
-    padding: '2rem 3rem', 
-    borderRadius: '35px',
+    marginTop: '2rem', 
+    padding: '1.5rem', 
+    borderRadius: '16px',
     background: 'white',
     border: '1px solid white',
     boxShadow: '0 -10px 40px rgba(0,0,0,0.02)',
@@ -345,7 +347,7 @@ const VisualAuditModal = ({ menu, onClose }) => {
         display: 'grid', 
         placeItems: 'center', 
         backdropFilter: 'blur(15px)',
-        padding: '2rem',
+        padding: '1rem',
         overflowY: 'auto'
       }}
     >
@@ -354,9 +356,9 @@ const VisualAuditModal = ({ menu, onClose }) => {
         animate={{ scale: 1, y: 0 }}
         style={{ 
           background: 'white', 
-          borderRadius: '45px', 
+          borderRadius: '16px', 
           width: '100%', 
-          maxWidth: '900px', 
+          maxWidth: '700px', 
           padding: '4rem', 
           position: 'relative',
           boxShadow: '0 50px 100px rgba(0,0,0,0.5)',
@@ -370,7 +372,7 @@ const VisualAuditModal = ({ menu, onClose }) => {
           <X size={24} color="#64748b" />
         </button>
 
-        <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
            <h2 style={{ fontSize: '2.4rem', fontWeight: '950', color: '#1e293b', marginBottom: '10px', letterSpacing: '-1px' }}>Informasi Nilai Gizi</h2>
            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px' }}>
               <span style={{ fontWeight: '900', fontSize: '1.4rem', color: '#475569' }}>Menu MBG</span>
@@ -379,7 +381,7 @@ const VisualAuditModal = ({ menu, onClose }) => {
         </div>
 
         {/* Tray Visual Section */}
-        <div style={{ position: 'relative', height: '380px', width: '100%', margin: '0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '3rem' }}>
+        <div style={{ position: 'relative', height: '380px', width: '100%', margin: '0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1.5rem' }}>
            {/* Annotations Left */}
            <div style={{ position: 'absolute', left: '0', top: '10%', zIndex: 10 }}>
               {[{n: 'Tahu Goreng', t: '~30 g'}, {n: 'Nasi Putih', t: '~100 g'}, {n: 'Chicken Wings', t: '~48 g'}].map((b, i) => (
@@ -395,7 +397,7 @@ const VisualAuditModal = ({ menu, onClose }) => {
 
            {/* Main Tray Image Container */}
            <div style={{ position: 'relative', width: '380px', height: '320px', display: 'grid', placeItems: 'center' }}>
-              <div style={{ width: '100%', height: '100%', border: '12px solid #cbd5e1', borderRadius: '45px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 40px 80px -15px rgba(0,0,0,0.3)', position: 'relative' }}>
+              <div style={{ width: '100%', height: '100%', border: '12px solid #cbd5e1', borderRadius: '16px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 40px 80px -15px rgba(0,0,0,0.3)', position: 'relative' }}>
                  <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=600" alt="Menu Tray" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
            </div>
@@ -414,7 +416,7 @@ const VisualAuditModal = ({ menu, onClose }) => {
            </div>
         </div>
 
-        <div style={{ fontSize: '0.9rem', color: '#64748b', textAlign: 'center', marginBottom: '3.5rem', fontWeight: '750', lineHeight: '1.6' }}>
+        <div style={{ fontSize: '0.9rem', color: '#64748b', textAlign: 'center', marginBottom: '1.5rem', fontWeight: '750', lineHeight: '1.6' }}>
            Menu MBG SD GIT Manumuti, Kabupaten Kupang, NTT<br/>
            <span style={{ fontWeight: '600', opacity: 0.8 }}>Sumber: traksi.go.id • Verifikasi Audit Ahli Gizi</span>
         </div>
@@ -422,7 +424,7 @@ const VisualAuditModal = ({ menu, onClose }) => {
         {/* Bottom Grid: Notes & Table Side-by-side */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '2.5rem', alignItems: 'start' }}>
            {/* Notes Box */}
-           <div style={{ border: '3px solid #ef4444', borderRadius: '30px', padding: '2rem', background: '#fffafa', position: 'relative' }}>
+           <div style={{ border: '3px solid #ef4444', borderRadius: '12px', padding: '1rem', background: '#fffafa', position: 'relative' }}>
               <div style={{ position: 'absolute', top: '-15px', left: '25px', background: '#ef4444', color: 'white', padding: '4px 15px', borderRadius: '10px', fontWeight: '950', fontSize: '0.8rem' }}>REKOMENDASI AUDIT</div>
               <p style={{ fontWeight: '950', color: '#ef4444', fontSize: '1.3rem', marginBottom: '15px' }}>*Catatan Ahli Gizi</p>
               <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#334155', fontWeight: '800', fontSize: '1rem', lineHeight: '1.8' }}>
@@ -433,7 +435,7 @@ const VisualAuditModal = ({ menu, onClose }) => {
            </div>
 
            {/* Nutrition Table Box */}
-           <div style={{ border: '3px solid #1e293b', borderRadius: '30px', overflow: 'hidden', background: 'white', boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}>
+           <div style={{ border: '3px solid #1e293b', borderRadius: '12px', overflow: 'hidden', background: 'white', boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                  <tbody>
                     {[
@@ -454,16 +456,16 @@ const VisualAuditModal = ({ menu, onClose }) => {
            </div>
         </div>
 
-        <div style={{ marginTop: '3.5rem', display: 'flex', gap: '1.5rem' }}>
+        <div style={{ marginTop: '3.5rem', display: 'flex', gap: '1rem' }}>
            <button 
              onClick={onClose}
-             style={{ flex: 1, padding: '1.2rem', borderRadius: '50px', border: '2px solid #e2e8f0', background: 'white', fontWeight: '900', color: '#64748b', cursor: 'pointer' }}
+             style={{ flex: 1, padding: '1.2rem', borderRadius: '24px', border: '2px solid #e2e8f0', background: 'white', fontWeight: '900', color: '#64748b', cursor: 'pointer' }}
            >
              Tutup Laporan
            </button>
            <button 
              onClick={() => { alert("Menuju halaman edit resep..."); onClose(); }}
-             style={{ flex: 2, padding: '1.2rem', borderRadius: '50px', border: 'none', background: '#dc2626', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: '0 10px 25px rgba(220, 38, 38, 0.2)' }}
+             style={{ flex: 2, padding: '1.2rem', borderRadius: '24px', border: 'none', background: '#dc2626', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: '0 10px 25px rgba(220, 38, 38, 0.2)' }}
            >
              Revisi Sekarang
            </button>
@@ -473,239 +475,6 @@ const VisualAuditModal = ({ menu, onClose }) => {
   )
 }
 
-const AddDapurForm = ({ onClose, onSave }) => {
-  const [formData, setFormData] = useState({
-    lokasi: '',
-    kapasitas: '',
-    alamat: ''
-  })
-
-  const handleSubmit = () => {
-    if (!formData.lokasi || !formData.kapasitas) {
-      alert("Mohon isi nama lokasi dan kapasitas!");
-      return;
-    }
-    
-    onSave({
-      id: Date.now(),
-      lokasi: formData.lokasi,
-      kapasitas_produksi: parseInt(formData.kapasitas),
-      alamat: formData.alamat
-    })
-    
-    alert("🚀 Data Dapur Berhasil Dikirim ke Badan Gizi Nasional untuk Verifikasi!");
-    onClose()
-  }
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-      style={{ overflow: 'hidden', marginBottom: '2rem' }}
-    >
-      <div 
-        style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '100%', border: '1.5px solid var(--border)' }}
-      >
-        <div className="flex justify-between" style={{ marginBottom: '2rem' }}>
-          <h2 style={{ fontWeight: '950', fontSize: '1.8rem' }}>Registrasi Dapur Baru</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
-        </div>
-        <div style={{ display: 'grid', gap: '1.5rem' }}>
-           <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA LOKASI DAPUR</label>
-              <input 
-                type="text" 
-                value={formData.lokasi}
-                onChange={(e) => setFormData({...formData, lokasi: e.target.value})}
-                placeholder="Contoh: Dapur Jakarta Selatan" 
-                style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} 
-              />
-           </div>
-           <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>KAPASITAS PRODUKSI (PORSI/HARI)</label>
-              <input 
-                type="number" 
-                value={formData.kapasitas}
-                onChange={(e) => setFormData({...formData, kapasitas: e.target.value})}
-                placeholder="Contoh: 5000" 
-                style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} 
-              />
-           </div>
-           <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>ALAMAT LENGKAP UNIT</label>
-              <textarea 
-                value={formData.alamat}
-                onChange={(e) => setFormData({...formData, alamat: e.target.value})}
-                placeholder="Masukkan alamat lengkap operasional dapur..." 
-                style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} 
-              />
-           </div>
-           <button 
-             onClick={handleSubmit}
-             className="btn-primary" 
-             style={{ width: '100%', padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '1rem', cursor: 'pointer' }}
-           >
-             Daftarkan Dapur Sekarang
-           </button>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
-const parseTakaran = (t) => {
-  if (!t) return { berat: '', satuan: 'gram' };
-  const str = t.replace('~', '').trim();
-  const num = parseFloat(str);
-  const letters = str.replace(/[0-9.]/g, '').trim().toLowerCase();
-  
-  let satuan = 'gram';
-  if (['kg', 'kilogram'].includes(letters)) satuan = 'kilogram';
-  else if (['l', 'liter'].includes(letters)) satuan = 'liter';
-  else if (['ml', 'mililiter'].includes(letters)) satuan = 'ml';
-  else if (['pcs', 'buah'].includes(letters)) satuan = 'pcs';
-  
-  return { berat: isNaN(num) ? '' : num, satuan };
-}
-
-const AddMenuForm = ({ onClose, onSave, editData }) => {
-  const [formData, setFormData] = useState({
-    nama: editData?.nama_menu || '',
-    tanggal: editData?.date || new Date().toISOString().split('T')[0],
-    bahan: editData?.bahan.map(b => ({ nama: b.nama, ...parseTakaran(b.takaran) })) || [{ nama: '', berat: '', satuan: 'gram' }]
-  })
-
-  const addBahan = () => {
-    setFormData({ ...formData, bahan: [...formData.bahan, { nama: '', berat: '', satuan: 'gram' }] })
-  }
-
-  const updateBahan = (index, field, value) => {
-    const newBahan = [...formData.bahan]
-    newBahan[index][field] = value
-    setFormData({ ...formData, bahan: newBahan })
-  }
-
-  const handleSubmit = () => {
-    if (!formData.nama || formData.bahan.some(b => !b.nama || !b.berat)) {
-      alert("Mohon lengkapi nama menu dan semua rincian bahan!");
-      return;
-    }
-
-    const newEntry = {
-      id: editData?.id || Date.now(),
-      nama_menu: formData.nama,
-      date: formData.tanggal,
-      bahan: formData.bahan.map(b => {
-        let displaySatuan = b.satuan;
-        if (b.satuan === 'gram') displaySatuan = 'g';
-        if (b.satuan === 'kilogram') displaySatuan = 'kg';
-        if (b.satuan === 'liter') displaySatuan = 'L';
-        return { nama: b.nama, takaran: `~${b.berat} ${displaySatuan}` }
-      }),
-      nilai_gizi: editData?.nilai_gizi || { energi: '--- kkal', protein: '-- g' },
-      status_validasi: editData?.status_validasi || 'pending'
-    }
-
-    onSave(newEntry)
-    alert(editData ? "✅ Perubahan Menu Berhasil Disimpan!" : "✅ Menu Berhasil Diajukan ke Ahli Gizi untuk Verifikasi!");
-    onClose()
-  }
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-      style={{ overflow: 'hidden', marginBottom: '2rem' }}
-    >
-      <div 
-        style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '100%', border: '1.5px solid var(--border)' }}
-      >
-        <div className="flex justify-between" style={{ marginBottom: '2.5rem' }}>
-          <div>
-            <h2 style={{ fontWeight: '950', fontSize: '2rem', marginBottom: '5px' }}>Input Menu Baru</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: '600' }}>Silakan masukkan rincian komposisi menu gizi.</p>
-          </div>
-          <button onClick={onClose} style={{ background: '#f8fafc', border: 'none', cursor: 'pointer', width: '45px', height: '45px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}><X size={20} /></button>
-        </div>
-
-        <div style={{ display: 'grid', gap: '2rem' }}>
-          <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem' }}>
-            <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA MENU</label>
-              <input 
-                type="text" 
-                value={formData.nama}
-                onChange={(e) => setFormData({...formData, nama: e.target.value})}
-                placeholder="Misal: Nasi Ayam Madu Sehat" 
-                style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #f1f5f9', fontWeight: '700', fontSize: '1rem' }} 
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>TANGGAL PENYAJIAN</label>
-              <input 
-                type="date" 
-                value={formData.tanggal}
-                onChange={(e) => setFormData({...formData, tanggal: e.target.value})}
-                style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #f1f5f9', fontWeight: '700', fontSize: '1rem' }} 
-              />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex justify-between" style={{ marginBottom: '1rem', alignItems: 'center' }}>
-              <label style={{ fontWeight: '800', fontSize: '0.8rem', color: 'var(--text-muted)' }}>KOMPOSISI BAHAN & BERAT</label>
-              <button 
-                onClick={addBahan}
-                style={{ background: 'var(--primary-light)', color: 'var(--primary)', border: 'none', padding: '6px 15px', borderRadius: '50px', fontWeight: '900', fontSize: '0.75rem', cursor: 'pointer' }}
-              >
-                + Tambah Bahan
-              </button>
-            </div>
-            
-            <div style={{ display: 'grid', gap: '10px', maxHieght: '300px', overflowY: 'auto', paddingRight: '5px' }}>
-              {formData.bahan.map((b, i) => (
-                <div key={i} className="flex gap-2" style={{ gap: '10px' }}>
-                  <input 
-                    type="text" 
-                    placeholder="Nama Bahan (Nasi, Ayam, dll)"
-                    value={b.nama}
-                    onChange={(e) => updateBahan(i, 'nama', e.target.value)}
-                    style={{ flex: 2, padding: '1rem', borderRadius: '12px', border: '2px solid #f8fafc', background: '#f8fafc', fontWeight: '700' }}
-                  />
-                  <input 
-                    type="number" 
-                    step="any"
-                    placeholder="Jumlah"
-                    value={b.berat}
-                    onChange={(e) => updateBahan(i, 'berat', e.target.value)}
-                    style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '2px solid #f8fafc', background: '#f8fafc', fontWeight: '700' }}
-                  />
-                  <select 
-                    value={b.satuan}
-                    onChange={(e) => updateBahan(i, 'satuan', e.target.value)}
-                    style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '2px solid #f8fafc', background: '#f8fafc', fontWeight: '700', cursor: 'pointer' }}
-                  >
-                    <option value="gram">Gram (g)</option>
-                    <option value="kilogram">Kilogram (kg)</option>
-                    <option value="ml">Mililiter (ml)</option>
-                    <option value="liter">Liter (L)</option>
-                    <option value="pcs">Pcs / Buah</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button 
-            onClick={handleSubmit}
-            className="btn-primary" 
-            style={{ width: '100%', padding: '1.4rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '1rem', cursor: 'pointer', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
-          >
-            Selesaikan & Ajukan ke Ahli Gizi
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
 
 const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah }) => {
   const validMenus = menus.filter(m => m.status_validasi !== 'pending')
@@ -730,79 +499,128 @@ const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah }) => {
   }
 
   return (
-    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <div style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '500px', maxWidth: '90%' }}>
-        <div className="flex justify-between" style={{ marginBottom: '1.5rem' }}>
-          <h2 style={{ fontWeight: '950', fontSize: '1.5rem' }}>Buat Tiket Produksi Baru</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
-        </div>
-        
-        <div style={{ display: 'grid', gap: '1.2rem' }}>
-          <div>
-            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DAPUR OPERASIONAL</label>
-            <select 
-              value={formData.id_dapur} 
-              onChange={e => setFormData({...formData, id_dapur: e.target.value})}
-              style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
-            >
-              <option value="" disabled>Pilih Dapur</option>
-              {dapurs.map(d => <option key={d.id_dapur || d.id} value={d.id_dapur || d.id}>{d.lokasi}</option>)}
-            </select>
+    <div 
+      style={{ 
+        position: 'fixed', 
+        inset: 0, 
+        background: 'rgba(15, 23, 42, 0.4)', 
+        backdropFilter: 'blur(8px)', 
+        zIndex: 9999, 
+        display: 'flex', 
+        justifyContent: 'flex-end' 
+      }}
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ x: '100%' }} 
+        animate={{ x: 0 }} 
+        exit={{ x: '100%' }} 
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        style={{ 
+          width: '100%', 
+          maxWidth: '400px', 
+          height: '100%', 
+          background: 'white', 
+          boxShadow: '-10px 0 40px rgba(0,0,0,0.1)', 
+          padding: '1.5rem', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'space-between',
+          overflowY: 'auto'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div>
+          <div className="flex justify-between" style={{ marginBottom: '1.5rem', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ fontWeight: '950', fontSize: '1.8rem', color: '#0f172a', letterSpacing: '-0.5px' }}>Buat Tiket Produksi</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600', marginTop: '4px' }}>Buat tiket antrian produksi baru.</p>
+            </div>
+            <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
+              <X size={20} color="#64748b" />
+            </button>
           </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PILIH MENU (APPROVED)</label>
-            <select 
-              value={formData.id_menu} 
-              onChange={e => setFormData({...formData, id_menu: e.target.value})}
-              style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
-            >
-              <option value="" disabled>Pilih Menu</option>
-              {validMenus.map(m => <option key={m.id_menu} value={m.id_menu}>{m.nama_menu}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>TARGET SEKOLAH (DISTRIBUSI)</label>
-            <select 
-              value={formData.id_sekolah} 
-              onChange={e => setFormData({...formData, id_sekolah: e.target.value})}
-              style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
-            >
-              <option value="" disabled>Pilih Sekolah</option>
-              {sekolah.map(s => <option key={s.id_sekolah} value={s.id_sekolah}>{s.nama_sekolah}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>JUMLAH PORSI</label>
-            <input 
-              type="number" 
-              placeholder="Misal: 500"
-              value={formData.jumlah_porsi}
-              onChange={e => setFormData({...formData, jumlah_porsi: e.target.value})}
-              style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
-            />
+          
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DAPUR OPERASIONAL</label>
+              <select 
+                value={formData.id_dapur} 
+                onChange={e => setFormData({...formData, id_dapur: e.target.value})}
+                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
+              >
+                <option value="" disabled>Pilih Dapur</option>
+                {dapurs.map(d => <option key={d.id_dapur || d.id} value={d.id_dapur || d.id}>{d.lokasi}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PILIH MENU (APPROVED)</label>
+              <select 
+                value={formData.id_menu} 
+                onChange={e => setFormData({...formData, id_menu: e.target.value})}
+                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
+              >
+                <option value="" disabled>Pilih Menu</option>
+                {validMenus.map(m => <option key={m.id_menu} value={m.id_menu}>{m.nama_menu}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>TARGET SEKOLAH (DISTRIBUSI)</label>
+              <select 
+                value={formData.id_sekolah} 
+                onChange={e => setFormData({...formData, id_sekolah: e.target.value})}
+                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
+              >
+                <option value="" disabled>Pilih Sekolah</option>
+                {sekolah.map(s => <option key={s.id_sekolah} value={s.id_sekolah}>{s.nama_sekolah}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>JUMLAH PORSI</label>
+              <input 
+                type="number" 
+                placeholder="Misal: 500"
+                value={formData.jumlah_porsi}
+                onChange={e => setFormData({...formData, jumlah_porsi: e.target.value})}
+                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
+              />
+            </div>
           </div>
         </div>
 
         <button 
           onClick={handleSubmit}
           className="btn-primary" 
-          style={{ width: '100%', padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '2rem', cursor: 'pointer' }}
+          style={{ width: '100%', padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '2rem', cursor: 'pointer' }}
         >
           Terbitkan Tiket
         </button>
-      </div>
-    </motion.div>
+      </motion.div>
+    </div>
   )
 }
 
 const VendorDashboard = ({ user, onLogout }) => {
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const path = location.pathname.replace(/\/$/, '')
+  const isMain = path === '/vendor'
+  const isInformasi = path === '/vendor/informasi'
+  const isMenu = path === '/vendor/menu'
+  const isProduksi = path === '/vendor/produksi'
+  const isDistribusi = path === '/vendor/distribusi'
+  const isStok = path === '/vendor/stok'
   const [showAddForm, setShowAddForm] = useState(false)
   const [showMenuForm, setShowMenuForm] = useState(false)
   const [editingMenu, setEditingMenu] = useState(null)
   const [activeDoc, setActiveDoc] = useState(null)
   const [selectedAuditMenu, setSelectedAuditMenu] = useState(null)
-  const [selectedDapurForStok, setSelectedDapurForStok] = useState(null)
+  const [selectedDapurForStok, setSelectedDapurForStok] = useState(() => localStorage.getItem('selectedDapurForStok') || null)
+  
+  // Stock history and alert states
+  const [stokHistory, setStokHistory] = useState([])
+  const [prodError, setProdError] = useState(null)
   
   // API-driven state
   const [dapurs, setDapurs] = useState([])
@@ -841,10 +659,35 @@ const VendorDashboard = ({ user, onLogout }) => {
   }, [])
 
   useEffect(() => {
+    if (dapurs.length > 0 && !selectedDapurForStok) {
+      const saved = localStorage.getItem('selectedDapurForStok')
+      if (saved && dapurs.some(d => (d.id_dapur || d.id || '').toString() === saved.toString())) {
+        setSelectedDapurForStok(saved)
+      } else {
+        const firstId = dapurs[0].id_dapur || dapurs[0].id
+        setSelectedDapurForStok(firstId.toString())
+        localStorage.setItem('selectedDapurForStok', firstId.toString())
+      }
+    }
+  }, [dapurs, selectedDapurForStok])
+
+  useEffect(() => {
     if (selectedDapurForStok) {
       api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
+      api.getStokHistory(selectedDapurForStok).then(setStokHistory).catch(console.error)
     }
   }, [selectedDapurForStok])
+
+  const [formBahan, setFormBahan] = useState('')
+  useEffect(() => {
+    if (isStok) {
+      const rep = localStorage.getItem('replenishBahan')
+      if (rep) {
+        setFormBahan(rep)
+        localStorage.removeItem('replenishBahan')
+      }
+    }
+  }, [isStok])
 
   const handleAddDapur = async (newDapur) => {
     try {
@@ -903,7 +746,9 @@ const VendorDashboard = ({ user, onLogout }) => {
     try {
       const created = await api.createStok(data)
       setStokData(prev => [...prev, created])
+      api.getStokHistory(selectedDapurForStok).then(setStokHistory).catch(console.error)
       form.reset()
+      if (typeof setFormBahan === 'function') setFormBahan('')
     } catch (err) { console.error(err) }
   }
 
@@ -911,6 +756,7 @@ const VendorDashboard = ({ user, onLogout }) => {
     try {
       await api.updateStok(id_stok, { jumlah: parseFloat(newJumlah) })
       setStokData(prev => prev.map(s => s.id_stok === id_stok ? { ...s, jumlah: parseFloat(newJumlah) } : s))
+      api.getStokHistory(selectedDapurForStok).then(setStokHistory).catch(console.error)
     } catch (err) { console.error(err) }
   }
 
@@ -919,6 +765,7 @@ const VendorDashboard = ({ user, onLogout }) => {
       try {
         await api.deleteStok(id_stok)
         setStokData(prev => prev.filter(s => s.id_stok !== id_stok))
+        api.getStokHistory(selectedDapurForStok).then(setStokHistory).catch(console.error)
       } catch (err) { console.error(err) }
     }
   }
@@ -935,6 +782,7 @@ const VendorDashboard = ({ user, onLogout }) => {
 
   const handleUpdateProduksiStatus = async (id_produksi, status) => {
     try {
+      setProdError(null)
       await api.updateProduksi(id_produksi, { status })
       alert(status === 'persiapan' ? '✅ Status dipindah ke Persiapan. Stok bahan baku telah otomatis dipotong!' : '✅ Status dipindah ke Selesai & Dikirim!')
       api.getProduksi().then(setProduksi).catch(console.error)
@@ -942,19 +790,32 @@ const VendorDashboard = ({ user, onLogout }) => {
         api.getDistribusi().then(setDistribusi).catch(console.error)
       }
       // Refresh stok silently
-      if (selectedDapurForStok) api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
+      if (selectedDapurForStok) {
+        api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
+        api.getStokHistory(selectedDapurForStok).then(setStokHistory).catch(console.error)
+      }
     } catch (err) {
-      alert(`❌ Gagal memproses:\n${err.message}`)
+      const p = produksi.find(item => item.id_produksi === id_produksi)
+      const dapurId = p ? p.id_dapur : selectedDapurForStok
+      
+      let bahanName = ''
+      const matchStok = err.message.match(/Stok\s+([A-Za-z0-9\s\-_]+)\s+(kurang|tidak mencukupi)/i)
+      const matchRegister = err.message.match(/Bahan\s+([A-Za-z0-9\s\-_]+)\s+belum terdaftar/i)
+      if (matchStok) {
+        bahanName = matchStok[1].trim()
+      } else if (matchRegister) {
+        bahanName = matchRegister[1].trim()
+      }
+
+      setProdError({
+        message: err.message,
+        dapurId,
+        bahanName
+      })
     }
   }
 
-  const path = location.pathname.replace(/\/$/, '')
-  const isMain = path === '/vendor'
-  const isInformasi = path === '/vendor/informasi'
-  const isMenu = path === '/vendor/menu'
-  const isProduksi = path === '/vendor/produksi'
-  const isDistribusi = path === '/vendor/distribusi'
-  const isStok = path === '/vendor/stok'
+
   
   const stats = [
     { title: "Dashboard", value: "MBG Centre", icon: <LayoutDashboard />, color: "var(--primary)" },
@@ -970,29 +831,29 @@ const VendorDashboard = ({ user, onLogout }) => {
 
   const renderContent = () => {
     if (isInformasi) return (
-      <div className="grid" style={{ gap: '2rem' }}>
+      <div className="grid" style={{ gap: '1rem' }}>
         <Header title="Informasi & Dokumen Vendor" />
         
         {/* Section: Daftar Dapur */}
         <AnimatePresence>
           {showAddForm && (
-            <AddDapurForm onClose={() => setShowAddForm(false)} onSave={handleAddDapur} />
+            <AddDapurForm isOpen={true} onClose={() => setShowAddForm(false)} onSave={handleAddDapur} />
           )}
         </AnimatePresence>
-        <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
-          <div className="flex justify-between" style={{ marginBottom: '2rem' }}>
+        <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px' }}>
+          <div className="flex justify-between" style={{ marginBottom: '1rem' }}>
             <h3 style={{ fontWeight: '950' }}>Daftar Dapur Terdaftar</h3>
             <button 
               onClick={() => setShowAddForm(true)}
               className="btn-primary" 
-              style={{ padding: '0.8rem 1.5rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+              style={{ padding: '0.8rem 1.5rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
             >
               <Plus size={18} /> Tambah Dapur
             </button>
           </div>
           <div style={{ display: 'grid', gap: '1rem' }}>
             {dapurs.map((d, i) => (
-              <div key={i} style={{ padding: '1.5rem', background: 'var(--bg)', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <div key={i} style={{ padding: '1.5rem', background: 'var(--bg)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                   <div style={{ background: 'white', padding: '12px', borderRadius: '15px' }}><Store color="var(--primary)" size={24} /></div>
                   <div>
@@ -1005,7 +866,7 @@ const VendorDashboard = ({ user, onLogout }) => {
                     )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <div style={{ textAlign: 'right' }}>
                     <span className="badge" style={{ background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: '900', marginBottom: '5px', display: 'inline-block' }}>AKTIF</span>
                     <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--primary)' }}>• Monitoring Live</p>
@@ -1024,41 +885,50 @@ const VendorDashboard = ({ user, onLogout }) => {
         </div>
 
         {/* Section: Dokumen Izin Usaha */}
-        <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
-          <h3 style={{ fontWeight: '950', marginBottom: '2rem' }}>Dokumen & Izin Usaha</h3>
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-            {[
-              { title: 'NIB (Nomor Induk Berusaha)', status: 'Verified', date: '12 Jan 2026', icon: <FileText color="var(--primary)" /> },
-              { title: 'Sertifikat Halal', status: 'Verified', date: '05 Feb 2026', icon: <ShieldCheck color="var(--secondary)" /> },
-              { title: 'Izin Edar P-IRT', status: 'Pending', date: '20 Mar 2026', icon: <Clock color="var(--banana)" /> },
-              { title: 'Sertifikat Higiene Sanitasi', status: 'Verified', date: '10 Feb 2026', icon: <ClipboardCheck color="var(--primary)" /> }
-            ].map((doc, i) => (
-              <div key={i} className="card" style={{ padding: '2rem', borderRadius: '24px', border: '1px solid var(--border)', background: 'white' }}>
-                <div style={{ background: 'var(--bg)', width: '50px', height: '50px', borderRadius: '15px', display: 'grid', placeItems: 'center', marginBottom: '1.5rem' }}>{doc.icon}</div>
-                <h4 style={{ fontWeight: '900', marginBottom: '0.5rem' }}>{doc.title}</h4>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Diunggah: {doc.date}</p>
-                <div className="flex justify-between" style={{ alignItems: 'center' }}>
-                  <span className="badge" style={{ background: doc.status === 'Verified' ? 'var(--primary-light)' : 'var(--banana-light)', color: doc.status === 'Verified' ? 'var(--primary)' : 'var(--banana)', fontWeight: '900' }}>{doc.status}</span>
-                  <button 
-                    onClick={() => setActiveDoc(doc)}
-                    style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: '800', cursor: 'pointer', fontSize: '0.85rem' }}
-                  >
-                    Lihat Detail
-                  </button>
+        <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px' }}>
+          <h3 style={{ fontWeight: '950', marginBottom: '1rem' }}>Dokumen & Izin Usaha</h3>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+            {(dokumen.length > 0 ? dokumen : [
+              { nama_dokumen: 'NIB (Nomor Induk Berusaha)', status: 'valid', created_at: '2026-01-12', jenis: 'izin_usaha' },
+              { nama_dokumen: 'Sertifikat Halal', status: 'valid', created_at: '2026-02-05', jenis: 'sertifikat_halal' },
+              { nama_dokumen: 'Izin Edar P-IRT', status: 'pending', created_at: '2026-03-20', jenis: 'izin_edar' },
+              { nama_dokumen: 'Sertifikat Higiene Sanitasi', status: 'valid', created_at: '2026-02-10', jenis: 'sertifikat_laik_hygiene' }
+            ]).map((doc, i) => {
+              const docIcon = doc.jenis === 'sertifikat_halal' ? <ShieldCheck color="var(--secondary)" /> : 
+                              doc.jenis === 'sertifikat_laik_hygiene' ? <ClipboardCheck color="var(--primary)" /> : 
+                              doc.status === 'pending' ? <Clock color="var(--banana)" /> : <FileText color="var(--primary)" />;
+              const displayStatus = doc.status === 'valid' || doc.status === 'approved' ? 'Verified' : doc.status === 'pending' ? 'Pending' : 'Expired';
+              const displayDate = doc.tanggal_berlaku ? new Date(doc.tanggal_berlaku).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(doc.created_at || '2026-01-01').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+              
+              return (
+                <div key={i} className="card" style={{ padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'white' }}>
+                  <div style={{ background: 'var(--bg)', width: '50px', height: '50px', borderRadius: '15px', display: 'grid', placeItems: 'center', marginBottom: '1.5rem' }}>{docIcon}</div>
+                  <h4 style={{ fontWeight: '900', marginBottom: '0.5rem' }}>{doc.nama_dokumen}</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Diunggah: {displayDate}</p>
+                  <div className="flex justify-between" style={{ alignItems: 'center' }}>
+                    <span className="badge" style={{ background: displayStatus === 'Verified' ? 'var(--primary-light)' : 'var(--banana-light)', color: displayStatus === 'Verified' ? 'var(--primary)' : 'var(--banana)', fontWeight: '900' }}>{displayStatus}</span>
+                    <button 
+                      onClick={() => setActiveDoc({ ...doc, title: doc.nama_dokumen, date: displayDate, status: displayStatus })}
+                      style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: '800', cursor: 'pointer', fontSize: '0.85rem' }}
+                    >
+                      Lihat Detail
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
     )
 
     if (isStok) return (
-      <div className="grid" style={{ gap: '2rem' }}>
+      <div className="grid" style={{ gap: '1.5rem' }}>
         <Header title="Manajemen Stok & Gudang" />
-        <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
-           <div style={{ marginBottom: '2rem' }}>
-             <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px', color: 'var(--text-muted)' }}>Pilih Dapur Operasional</label>
+        
+        <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px' }}>
+           <div style={{ marginBottom: '1.5rem' }}>
+             <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px', color: 'var(--text-muted)' }}>PILIH DAPUR OPERASIONAL</label>
              <select 
                value={selectedDapurForStok || ''} 
                onChange={(e) => setSelectedDapurForStok(e.target.value)}
@@ -1070,46 +940,230 @@ const VendorDashboard = ({ user, onLogout }) => {
            </div>
            
            {selectedDapurForStok ? (
-             <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
-               <div>
-                 <h3 style={{ fontWeight: '950', marginBottom: '1.5rem' }}>Stok Terkini</h3>
-                 <div style={{ display: 'grid', gap: '1rem', maxHeight: '550px', overflowY: 'auto', paddingRight: '10px' }}>
-                   {stokData.length === 0 ? <p style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Stok kosong.</p> : stokData.map((s, i) => (
-                     <div key={i} style={{ padding: '1.5rem', background: 'var(--bg)', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border)' }}>
-                       <div>
-                         <h4 style={{ fontWeight: '900', fontSize: '1.1rem' }}>{s.nama_bahan}</h4>
-                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Update: {new Date(s.last_updated).toLocaleString('id-ID')}</p>
-                       </div>
-                       <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                         <input 
-                           type="number" 
-                           step="any"
-                           defaultValue={s.jumlah}
-                           onBlur={(e) => handleUpdateStok(s.id_stok, e.target.value)}
-                           style={{ width: '80px', padding: '10px', borderRadius: '10px', border: '1.5px solid var(--border)', textAlign: 'center', fontWeight: '800' }}
-                         />
-                         <span style={{ fontWeight: '800', color: 'var(--text-muted)' }}>{s.satuan}</span>
-                         <button onClick={() => handleDeleteStok(s.id_stok)} style={{ background: '#fff5f5', color: '#ff4d4d', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer' }}><Trash2 size={18} /></button>
-                       </div>
-                     </div>
-                   ))}
+             <div style={{ display: 'grid', gap: '1.5rem' }}>
+               
+               {/* Digital Banking Balance / Stats Cards */}
+               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                 <div className="card" style={{ padding: '1.25rem', borderRadius: '14px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                   <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Total Kategori Bahan</p>
+                   <h3 style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--text-main)' }}>{stokData.length} <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)' }}>Item</span></h3>
+                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '4px' }}>Bahan baku aktif terdaftar</p>
+                 </div>
+                 
+                 <div className="card" style={{ 
+                   padding: '1.25rem', 
+                   borderRadius: '14px', 
+                   background: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '#fff5f5' : 'var(--bg)', 
+                   border: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '1px solid #fee2e2' : '1px solid var(--border)' 
+                 }}>
+                   <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Bahan Kritis & Habis</p>
+                   <h3 style={{ fontSize: '1.8rem', fontWeight: '900', color: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '#dc2626' : 'var(--text-main)' }}>
+                     {stokData.filter(s => s.jumlah <= 0 || s.jumlah < 5).length} <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)' }}>Item</span>
+                   </h3>
+                   <p style={{ fontSize: '0.75rem', color: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '#b91c1c' : 'var(--text-muted)', fontWeight: '600', marginTop: '4px' }}>
+                     {stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? 'Segera lakukan replenishment!' : 'Semua stok dalam batas aman'}
+                   </p>
+                 </div>
+
+                 <div className="card" style={{ padding: '1.25rem', borderRadius: '14px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                   <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Total Ledger Mutasi</p>
+                   <h3 style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--text-main)' }}>{stokHistory.length} <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)' }}>Log</span></h3>
+                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '4px' }}>Mutasi stok terverifikasi sistem</p>
                  </div>
                </div>
-               
-               <div style={{ background: '#f8fafc', padding: '2rem', borderRadius: '24px', border: '1.5px dashed var(--border)', height: 'fit-content', position: 'sticky', top: '2rem' }}>
-                 <h4 style={{ fontWeight: '900', marginBottom: '1.5rem' }}>Tambah Item Baru</h4>
-                 <form onSubmit={handleAddStok} style={{ display: 'grid', gap: '1rem' }}>
-                   <input required name="nama_bahan" placeholder="Nama Bahan (Cth: Beras)" style={{ padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)' }} />
-                   <div style={{ display: 'flex', gap: '10px' }}>
-                     <input required type="number" step="0.1" name="jumlah" placeholder="Kuantitas" style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)' }} />
-                     <input required name="satuan" placeholder="Satuan (kg)" style={{ width: '100px', padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)' }} />
+
+               {/* Stock & Replenishment Form Section */}
+               <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+                 <div>
+                   <h3 style={{ fontWeight: '950', marginBottom: '1rem', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                     <Package size={20} color="var(--primary)" />
+                     Stok Terkini
+                   </h3>
+                   <div style={{ display: 'grid', gap: '0.75rem', maxHeight: '450px', overflowY: 'auto', paddingRight: '10px' }}>
+                     {stokData.length === 0 ? (
+                       <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--bg)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
+                         <Archive size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
+                         <p style={{ color: 'var(--text-muted)', fontWeight: '700' }}>Stok kosong.</p>
+                       </div>
+                     ) : stokData.map((s, i) => {
+                       const isCritical = s.jumlah <= 0 || s.jumlah < 5
+                       return (
+                         <div key={i} style={{ 
+                           padding: '1.25rem', 
+                           background: isCritical ? '#fffcfc' : 'var(--bg)', 
+                           borderRadius: '12px', 
+                           display: 'flex', 
+                           justifyContent: 'space-between', 
+                           alignItems: 'center', 
+                           border: isCritical ? '1.5px solid #fca5a5' : '1px solid var(--border)',
+                           boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
+                         }}>
+                           <div>
+                             <h4 style={{ fontWeight: '900', fontSize: '1.05rem', color: isCritical ? '#991b1b' : 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                               {s.nama_bahan}
+                               {isCritical && <span style={{ fontSize: '0.65rem', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '4px', fontWeight: '800' }}>KRITIS</span>}
+                             </h4>
+                             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '2px' }}>Update: {new Date(s.last_updated).toLocaleString('id-ID')}</p>
+                           </div>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                             <input 
+                               type="number" 
+                               step="any"
+                               defaultValue={s.jumlah}
+                               onBlur={(e) => handleUpdateStok(s.id_stok, e.target.value)}
+                               style={{ width: '80px', padding: '10px', borderRadius: '10px', border: '1.5px solid var(--border)', textAlign: 'center', fontWeight: '800' }}
+                             />
+                             <span style={{ fontWeight: '800', color: 'var(--text-muted)', minWidth: '30px' }}>{s.satuan}</span>
+                             <button onClick={() => handleDeleteStok(s.id_stok)} style={{ background: '#fff5f5', color: '#ff4d4d', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                           </div>
+                         </div>
+                       )
+                     })}
                    </div>
-                   <button type="submit" className="btn-primary" style={{ padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', marginTop: '10px', cursor: 'pointer' }}>Tambahkan Item</button>
-                 </form>
+                 </div>
+                 
+                 {/* Replenishment Form Box */}
+                 <div style={{ 
+                   background: '#ffffff', 
+                   padding: '1.5rem', 
+                   borderRadius: '16px', 
+                   border: formBahan ? '2px solid var(--primary)' : '1px solid var(--border)', 
+                   boxShadow: formBahan ? '0 10px 30px rgba(16,185,129,0.08)' : 'var(--shadow)',
+                   position: 'relative'
+                 }}>
+                   {formBahan && (
+                     <span className="badge animate-pulse-glow" style={{ 
+                       position: 'absolute', 
+                       top: '-12px', 
+                       right: '20px', 
+                       background: 'var(--primary)', 
+                       color: 'white', 
+                       fontWeight: '900',
+                       fontSize: '0.65rem',
+                       padding: '4px 12px',
+                       borderRadius: '20px'
+                     }}>
+                       📍 QUICK ACTION REPLENISHMENT
+                     </span>
+                   )}
+                   <h4 style={{ fontWeight: '950', marginBottom: '1rem', fontSize: '1.1rem' }}>Tambah Item Baru</h4>
+                   <form onSubmit={handleAddStok} style={{ display: 'grid', gap: '1rem' }}>
+                     <div>
+                       <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '5px' }}>NAMA BAHAN BAKU</label>
+                       <input 
+                         required 
+                         name="nama_bahan" 
+                         value={formBahan}
+                         onChange={e => setFormBahan(e.target.value)}
+                         placeholder="Nama Bahan (Cth: Beras)" 
+                         style={{ 
+                           width: '100%',
+                           padding: '1rem', 
+                           borderRadius: '12px', 
+                           border: formBahan ? '2px solid var(--primary)' : '1.5px solid var(--border)',
+                           fontWeight: '700',
+                           outline: 'none',
+                           background: formBahan ? 'var(--primary-light)' : 'white'
+                         }} 
+                       />
+                     </div>
+                     <div style={{ display: 'flex', gap: '10px' }}>
+                       <div style={{ flex: 1 }}>
+                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '5px' }}>KUANTITAS</label>
+                         <input required type="number" step="0.01" name="jumlah" placeholder="0.00" style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)', fontWeight: '700' }} />
+                       </div>
+                       <div style={{ width: '110px' }}>
+                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '5px' }}>SATUAN</label>
+                         <input required name="satuan" placeholder="kg / liter" style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)', fontWeight: '700' }} />
+                       </div>
+                     </div>
+                     <button type="submit" className="btn-primary" style={{ padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '900', marginTop: '10px', cursor: 'pointer' }}>Tambahkan Item</button>
+                   </form>
+                 </div>
                </div>
+
+               {/* Digital Banking Statement Ledger */}
+               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
+                 <h3 style={{ fontWeight: '950', marginBottom: '1rem', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                   <Activity size={20} color="var(--primary)" />
+                   Riwayat Transaksi Stok (Ledger)
+                 </h3>
+                 <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                     <thead>
+                       <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)' }}>
+                         <th style={{ padding: '1.25rem' }}>TANGGAL & WAKTU</th>
+                         <th style={{ padding: '1.25rem' }}>BAHAN BAKU</th>
+                         <th style={{ padding: '1.25rem' }}>TIPE MUTASI</th>
+                         <th style={{ padding: '1.25rem', textAlign: 'right' }}>JUMLAH</th>
+                         <th style={{ padding: '1.25rem' }}>TRANSAKSI / KETERANGAN</th>
+                         <th style={{ padding: '1.25rem', textAlign: 'center' }}>MUTASI LOG</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+                       {stokHistory.map((h, idx) => {
+                         const isCredit = h.tipe === 'CREDIT'
+                         const isDebit = h.tipe === 'DEBIT'
+                         return (
+                           <tr key={idx} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.875rem' }}>
+                             <td style={{ padding: '1.25rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                               {new Date(h.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                             </td>
+                             <td style={{ padding: '1.25rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                               {h.nama_bahan}
+                             </td>
+                             <td style={{ padding: '1.25rem' }}>
+                               <span className="badge" style={{ 
+                                 background: h.tipe === 'CREDIT' ? '#dcfce7' : h.tipe === 'DEBIT' ? '#fee2e2' : '#f1f5f9',
+                                 color: h.tipe === 'CREDIT' ? '#15803d' : h.tipe === 'DEBIT' ? '#b91c1c' : '#475569',
+                                 fontWeight: '900',
+                                 fontSize: '0.7rem'
+                               }}>
+                                 {h.tipe}
+                               </span>
+                             </td>
+                             <td style={{ 
+                               padding: '1.25rem', 
+                               textAlign: 'right', 
+                               fontWeight: '900', 
+                               color: h.tipe === 'CREDIT' ? '#16a34a' : h.tipe === 'DEBIT' ? '#dc2626' : 'var(--text-main)' 
+                             }}>
+                               {h.tipe === 'CREDIT' ? '+' : h.tipe === 'DEBIT' ? '-' : ''} {parseFloat(h.jumlah)} {h.satuan}
+                             </td>
+                             <td style={{ padding: '1.25rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                               {h.keterangan}
+                             </td>
+                             <td style={{ padding: '1.25rem', textAlign: 'center' }}>
+                               <span style={{ 
+                                 fontSize: '0.65rem', 
+                                 background: 'var(--primary-light)', 
+                                 color: 'var(--primary)', 
+                                 fontWeight: '800', 
+                                 padding: '4px 10px', 
+                                 borderRadius: '24px', 
+                                 fontFamily: 'monospace' 
+                               }}>
+                                 #LEDGER-{h.id_log}
+                               </span>
+                             </td>
+                           </tr>
+                         )
+                       })}
+                       {stokHistory.length === 0 && (
+                         <tr>
+                           <td colSpan="6" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700' }}>
+                             Belum ada mutasi transaksi stok tercatat.
+                           </td>
+                         </tr>
+                       )}
+                     </tbody>
+                   </table>
+                 </div>
+               </div>
+
              </div>
            ) : (
-             <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
+             <div style={{ textAlign: 'center', padding: '3rem 1.5rem', opacity: 0.5 }}>
                <Archive size={64} style={{ marginBottom: '1rem' }} />
                <p style={{ fontWeight: '700', fontSize: '1.1rem' }}>Pilih dapur terlebih dahulu untuk melihat stok.</p>
              </div>
@@ -1119,37 +1173,100 @@ const VendorDashboard = ({ user, onLogout }) => {
     )
 
     if (isMenu) return (
-      <div className="grid" style={{ gap: '2rem' }}>
+      <div className="grid" style={{ gap: '1.5rem' }}>
         <Header title="Katalog Menu Gizi" />
         <AnimatePresence>
           {showMenuForm && (
             <AddMenuForm
+              isOpen={true}
               onClose={() => { setShowMenuForm(false); setEditingMenu(null); }}
               onSave={handleAddMenu}
               editData={editingMenu}
             />
           )}
         </AnimatePresence>
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
-              <h3 style={{ fontWeight: '950', marginBottom: '2.5rem', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <Clock color="var(--banana)" /> Menu Menunggu Validasi
-              </h3>
+
+        {/* 1. Ajukan Menu Baru (Full Width CTA Banner) */}
+        <div style={{ 
+          padding: '2rem 2.5rem', 
+          borderRadius: '20px', 
+          background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', 
+          color: 'white', 
+          boxShadow: '0 20px 40px -10px rgba(16, 185, 129, 0.4)',
+          position: 'relative',
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          border: '1px solid rgba(255,255,255,0.2)',
+          flexWrap: 'wrap',
+          gap: '1.5rem'
+        }}>
+          {/* Background Decorative Element */}
+          <div style={{ position: 'absolute', top: '-60px', right: '5%', opacity: 0.08, transform: 'rotate(15deg)' }}>
+             <UtensilsCrossed size={300} />
+          </div>
+          
+          <div style={{ position: 'relative', zIndex: 1, maxWidth: '600px' }}>
+            <h3 style={{ fontWeight: '950', fontSize: '2.2rem', marginBottom: '0.8rem', letterSpacing: '-0.5px', color: 'white' }}>Ajukan Menu Baru</h3>
+            <p style={{ fontSize: '1.1rem', lineHeight: '1.6', opacity: 0.9, margin: 0, color: 'white' }}>
+              Wujudkan standar gizi nasional. Ajukan komposisi menu Anda untuk divalidasi oleh Ahli Gizi Pemerintah.
+            </p>
+          </div>
+
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowMenuForm(true)}
+              style={{ 
+                background: 'white', 
+                color: '#064e3b', 
+                border: 'none', 
+                padding: '1.2rem 2.5rem', 
+                borderRadius: '16px', 
+                fontWeight: '950', 
+                fontSize: '1.1rem', 
+                cursor: 'pointer',
+                boxShadow: '0 15px 30px rgba(0,0,0,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}
+            >
+              <Plus size={24} color="#10b981" /> Input Menu Sekarang
+            </motion.button>
+          </div>
+        </div>
+
+        {/* 2. Grid Status (Pending & Revisi) */}
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
+          
+          {/* Pending Section */}
+          <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px', background: 'white' }}>
+            <h3 style={{ fontWeight: '950', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.3rem' }}>
+              <div style={{ background: 'var(--banana-light)', padding: '10px', borderRadius: '12px', display: 'grid', placeItems: 'center' }}>
+                <Clock color="var(--banana)" size={22} />
+              </div>
+              Menunggu Validasi
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {menus.filter(m => m.status_validasi === 'pending').map((m, i) => (
-                <div key={i} className="card" style={{ padding: '1.5rem', borderRadius: '20px', marginBottom: '1rem', border: '1.5px solid var(--border)', background: 'white' }}>
-                   <div className="flex justify-between" style={{ marginBottom: '10px' }}>
-                      <h4 style={{ fontWeight: '900', fontSize: '1.1rem' }}>{m.nama_menu}</h4>
-                      <span className="badge" style={{ background: 'var(--banana-light)', color: 'var(--banana)', fontWeight: '900' }}>PENDING</span>
+                <div key={i} className="card" style={{ padding: '1.5rem', borderRadius: '12px', border: '1.5px solid var(--border)', background: '#f8fafc' }}>
+                   <div className="flex justify-between" style={{ marginBottom: '12px', alignItems: 'flex-start' }}>
+                      <h4 style={{ fontWeight: '950', fontSize: '1.15rem', color: 'var(--text-main)' }}>{m.nama_menu}</h4>
+                      <span className="badge" style={{ background: 'var(--banana-light)', color: 'var(--banana)', fontWeight: '900', padding: '6px 12px', borderRadius: '8px' }}>PENDING</span>
                    </div>
                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '1.5rem' }}>
-                      {m.bahan.slice(0, 3).map((b, bi) => <span key={bi} style={{ fontSize: '0.7rem', background: 'var(--bg)', padding: '4px 10px', borderRadius: '50px', fontWeight: '700' }}>{b.nama}</span>)}
-                      {m.bahan.length > 3 && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>+{m.bahan.length - 3} lainnya</span>}
+                      {m.bahan.slice(0, 4).map((b, bi) => <span key={bi} style={{ fontSize: '0.75rem', background: 'white', border: '1px solid #e2e8f0', padding: '6px 12px', borderRadius: '24px', fontWeight: '800', color: '#64748b' }}>{b.nama}</span>)}
+                      {m.bahan.length > 4 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '700', padding: '6px' }}>+{m.bahan.length - 4} lainnya</span>}
                    </div>
-                   <div className="flex justify-end" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', fontSize: '0.85rem' }}>
+                   <div className="flex justify-end" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
                       <button 
                         onClick={() => { setEditingMenu(m); setShowMenuForm(true); }}
-                        style={{ color: 'var(--primary)', background: 'none', border: 'none', fontWeight: '800', cursor: 'pointer' }}
+                        style={{ color: 'var(--primary)', background: 'var(--primary-light)', padding: '8px 16px', borderRadius: '10px', border: 'none', fontWeight: '900', cursor: 'pointer', transition: '0.2s' }}
+                        onMouseOver={(e)=>e.currentTarget.style.filter='brightness(0.95)'} onMouseOut={(e)=>e.currentTarget.style.filter='none'}
                       >
                         Edit Resep
                       </button>
@@ -1157,27 +1274,39 @@ const VendorDashboard = ({ user, onLogout }) => {
                 </div>
               ))}
               {menus.filter(m => m.status_validasi === 'pending').length === 0 && (
-                <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700', padding: '2rem' }}>Antrian bersih.</p>
+                <div style={{ textAlign: 'center', padding: '2rem 1rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                  <CheckCircle color="#94a3b8" size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+                  <p style={{ color: '#64748b', fontWeight: '700' }}>Antrian bersih, tidak ada menu pending.</p>
+                </div>
               )}
             </div>
+          </div>
 
-            <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px', border: '2px solid #fee2e2' }}>
-              <h3 style={{ fontWeight: '950', marginBottom: '2.5rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <AlertCircle color="#dc2626" /> Menu Butuh Revisi
-              </h3>
+          {/* Revisi Section */}
+          <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px', background: 'white', border: '2px solid #fee2e2' }}>
+            <h3 style={{ fontWeight: '950', marginBottom: '1.5rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.3rem' }}>
+              <div style={{ background: '#fef2f2', padding: '10px', borderRadius: '12px', display: 'grid', placeItems: 'center' }}>
+                <AlertCircle color="#dc2626" size={22} />
+              </div>
+              Butuh Revisi
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {menus.filter(m => m.status_validasi === 'rejected').map((m, i) => (
                 <motion.div 
-                  whileHover={{ scale: 1.02 }}
+                  whileHover={{ scale: 1.01, translateY: -2 }}
                   key={i} 
                   className="card" 
-                  style={{ padding: '1.5rem', borderRadius: '20px', marginBottom: '1rem', border: '2px solid #fecaca', background: '#fffafa', cursor: 'pointer' }}
+                  style={{ padding: '1.5rem', borderRadius: '12px', border: '1.5px solid #fecaca', background: '#fffafa', cursor: 'pointer', boxShadow: '0 4px 6px rgba(220, 38, 38, 0.05)' }}
                   onClick={() => setSelectedAuditMenu(m)}
                 >
-                   <div className="flex justify-between" style={{ marginBottom: '10px' }}>
-                      <h4 style={{ fontWeight: '950', fontSize: '1.2rem', color: '#991b1b' }}>{m.nama_menu}</h4>
-                      <span className="badge" style={{ background: '#fee2e2', color: '#dc2626', fontWeight: '900', border: '1px solid #fecaca' }}>REVISI</span>
+                   <div className="flex justify-between" style={{ marginBottom: '8px', alignItems: 'flex-start' }}>
+                      <h4 style={{ fontWeight: '950', fontSize: '1.15rem', color: '#991b1b' }}>{m.nama_menu}</h4>
+                      <span className="badge" style={{ background: '#fee2e2', color: '#dc2626', fontWeight: '900', padding: '6px 12px', borderRadius: '8px', border: '1px solid #fca5a5' }}>REVISI</span>
                    </div>
-                   <p style={{ fontSize: '0.85rem', color: '#7f1d1d', fontWeight: '700', marginBottom: '1.5rem' }}>Klik untuk melihat catatan audit Ahli Gizi</p>
+                   <p style={{ fontSize: '0.9rem', color: '#7f1d1d', fontWeight: '700', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                     <Search size={14} /> Klik untuk melihat catatan audit Ahli Gizi
+                   </p>
                    <div className="flex justify-between" style={{ borderTop: '1px solid #fecaca', paddingTop: '1rem', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.8rem', color: '#b91c1c', fontWeight: '800' }}>Terdeteksi: {m.date}</span>
                       <button 
@@ -1189,97 +1318,14 @@ const VendorDashboard = ({ user, onLogout }) => {
                 </motion.div>
               ))}
               {menus.filter(m => m.status_validasi === 'rejected').length === 0 && (
-                <div style={{ textAlign: 'center', padding: '2rem' }}>
-                  <CheckCircle2 color="var(--primary)" size={40} style={{ margin: '0 auto 15px', opacity: 0.5 }} />
-                  <p style={{ color: 'var(--text-muted)', fontWeight: '700' }}>Tidak ada menu yang butuh revisi saat ini.</p>
+                <div style={{ textAlign: 'center', padding: '2rem 1rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                  <CheckCircle2 color="#10b981" size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+                  <p style={{ color: '#64748b', fontWeight: '700' }}>Hebat! Tidak ada menu yang butuh revisi saat ini.</p>
                 </div>
               )}
             </div>
           </div>
-          <div style={{ 
-            padding: '3.5rem 3rem', 
-            borderRadius: '40px', 
-            background: 'linear-gradient(145deg, #10b981 0%, #059669 100%)', 
-            color: 'white', 
-            boxShadow: '0 30px 60px -15px rgba(16, 185, 129, 0.3)',
-            position: 'relative',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            border: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            {/* Background Decorative Element */}
-            <div style={{ position: 'absolute', top: '-50px', right: '-50px', opacity: 0.1, transform: 'rotate(15deg)' }}>
-               <UtensilsCrossed size={250} />
-            </div>
-            
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <h3 style={{ fontWeight: '950', fontSize: '2rem', marginBottom: '1rem', letterSpacing: '-0.8px', color: 'white' }}>Ajukan Menu Baru</h3>
-              <p style={{ fontSize: '1.05rem', lineHeight: '1.6', opacity: 0.95, marginBottom: '3rem', color: 'white' }}>
-                Wujudkan standar gizi nasional. Ajukan komposisi menu Anda untuk divalidasi oleh Ahli Gizi Pemerintah.
-              </p>
-              
-              <div style={{ display: 'grid', gap: '1.5rem' }}>
-                 <div style={{ 
-                   background: 'rgba(255,255,255,0.15)', 
-                   backdropFilter: 'blur(10px)',
-                   padding: '1.5rem', 
-                   borderRadius: '24px',
-                   display: 'flex',
-                   gap: '15px',
-                   alignItems: 'center',
-                   border: '1px solid rgba(255,255,255,0.2)'
-                 }}>
-                    <div style={{ background: 'white', color: '#10b981', width: '45px', height: '45px', borderRadius: '15px', display: 'grid', placeItems: 'center', fontWeight: '950', fontSize: '1.2rem', boxShadow: '0 8px 16px rgba(0,0,0,0.1)' }}>1</div>
-                    <div>
-                      <p style={{ fontWeight: '900', fontSize: '1rem', color: 'white' }}>Input Bahan Baku</p>
-                      <p style={{ fontSize: '0.8rem', opacity: 0.9, color: 'white' }}>Masukkan rincian gramasi setiap komponen menu.</p>
-                    </div>
-                 </div>
-                 
-                 <div style={{ 
-                   background: 'rgba(255,255,255,0.15)', 
-                   backdropFilter: 'blur(10px)',
-                   padding: '1.5rem', 
-                   borderRadius: '24px',
-                   display: 'flex',
-                   gap: '15px',
-                   alignItems: 'center',
-                   border: '1px solid rgba(255,255,255,0.2)'
-                 }}>
-                    <div style={{ background: 'white', color: '#10b981', width: '45px', height: '45px', borderRadius: '15px', display: 'grid', placeItems: 'center', fontWeight: '950', fontSize: '1.2rem', boxShadow: '0 8px 16px rgba(0,0,0,0.1)' }}>2</div>
-                    <div>
-                      <p style={{ fontWeight: '900', fontSize: '1rem', color: 'white' }}>Validasi Ahli Gizi</p>
-                      <p style={{ fontSize: '0.8rem', opacity: 0.9, color: 'white' }}>Tim ahli melakukan pengecekan standar kecukupan gizi.</p>
-                    </div>
-                 </div>
-              </div>
-            </div>
 
-            <motion.button 
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setShowMenuForm(true)}
-              style={{ 
-                background: 'white', 
-                color: '#064e3b', 
-                border: 'none', 
-                padding: '1.5rem', 
-                borderRadius: '50px', 
-                fontWeight: '950', 
-                fontSize: '1.15rem', 
-                marginTop: '4rem', 
-                cursor: 'pointer',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-                position: 'relative',
-                zIndex: 1,
-                width: '100%'
-              }}
-            >
-                   Mulai Input Menu Sekarang
-            </motion.button>
-          </div>
         </div>
       </div>
     )
@@ -1294,8 +1340,77 @@ const VendorDashboard = ({ user, onLogout }) => {
       const packVal = 0;
 
       return (
-        <div className="grid" style={{ gap: '2rem' }}>
+        <div className="grid" style={{ gap: '1rem' }}>
           <Header title="Sistem Tiket & Monitoring Produksi" />
+          
+          {prodError && (
+            <div style={{
+              background: '#fef2f2',
+              border: '2px solid #fecaca',
+              borderRadius: '16px',
+              padding: '1.25rem 1.5rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.05)',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <div style={{ background: '#fee2e2', padding: '10px', borderRadius: '12px', display: 'grid', placeItems: 'center' }}>
+                  <AlertCircle color="#dc2626" size={24} />
+                </div>
+                <div>
+                  <h4 style={{ fontWeight: '950', color: '#991b1b', fontSize: '1.1rem' }}>Kegagalan Alokasi Bahan Baku</h4>
+                  <p style={{ color: '#7f1d1d', fontWeight: '700', fontSize: '0.9rem', marginTop: '2px' }}>{prodError.message}</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {prodError.bahanName && (
+                  <button
+                    onClick={() => {
+                      localStorage.setItem('selectedDapurForStok', prodError.dapurId)
+                      localStorage.setItem('replenishBahan', prodError.bahanName)
+                      setSelectedDapurForStok(prodError.dapurId.toString())
+                      setProdError(null)
+                      navigate('/vendor/stok')
+                    }}
+                    style={{
+                      background: '#dc2626',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 20px',
+                      borderRadius: '12px',
+                      fontWeight: '950',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 10px rgba(220,38,38,0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Plus size={16} /> Tambah Stok {prodError.bahanName}
+                  </button>
+                )}
+                <button
+                  onClick={() => setProdError(null)}
+                  style={{
+                    background: 'white',
+                    color: '#64748b',
+                    border: '1.5px solid #e2e8f0',
+                    padding: '10px 15px',
+                    borderRadius: '12px',
+                    fontWeight: '800',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          )}
+
           <AnimatePresence>
             {showTicketForm && (
               <AddTicketForm 
@@ -1307,13 +1422,13 @@ const VendorDashboard = ({ user, onLogout }) => {
               />
             )}
           </AnimatePresence>
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
              {[
                { title: 'Persiapan Bahan', val: `${prepVal}%`, icon: <Package color="var(--primary)" />, color: 'var(--primary)' },
                { title: 'Proses Pemasakan', val: `${cookVal}%`, icon: <UtensilsCrossed color="var(--secondary)" />, color: 'var(--secondary)' },
                { title: 'Packaging', val: `${packVal}%`, icon: <Zap color="var(--banana)" />, color: 'var(--banana)' }
              ].map((p, i) => (
-               <div key={i} className="card dashboard-card-vibrant" style={{ padding: '2rem', borderRadius: '28px' }}>
+               <div key={i} className="card dashboard-card-vibrant" style={{ padding: '1rem', borderRadius: '12px' }}>
                   <div className="flex justify-between" style={{ marginBottom: '1.5rem' }}>
                     <div style={{ background: `${p.color}15`, padding: '12px', borderRadius: '12px' }}>{p.icon}</div>
                     <span style={{ fontWeight: '950', color: p.color, fontSize: '1.2rem' }}>{p.val}</span>
@@ -1325,13 +1440,13 @@ const VendorDashboard = ({ user, onLogout }) => {
                </div>
              ))}
           </div>
-          <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
-            <div className="flex justify-between" style={{ marginBottom: '2rem', alignItems: 'center' }}>
+          <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px' }}>
+            <div className="flex justify-between" style={{ marginBottom: '1rem', alignItems: 'center' }}>
               <h3 style={{ fontWeight: '950' }}>Tiket Antrian Produksi Teraktif</h3>
               <button 
                 onClick={() => setShowTicketForm(true)}
                 className="btn-primary" 
-                style={{ padding: '0.8rem 1.5rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                style={{ padding: '0.8rem 1.5rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 <Plus size={18} /> Buat Tiket Produksi Baru
               </button>
@@ -1367,7 +1482,7 @@ const VendorDashboard = ({ user, onLogout }) => {
                        {p.status === 'pending' && (
                          <button 
                            onClick={() => handleUpdateProduksiStatus(p.id_produksi, 'persiapan')}
-                           style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '50px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16,185,129,0.2)' }}
+                           style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '24px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16,185,129,0.2)' }}
                          >
                            Mulai Proses (Potong Stok)
                          </button>
@@ -1375,7 +1490,7 @@ const VendorDashboard = ({ user, onLogout }) => {
                        {p.status === 'persiapan' && (
                          <button 
                            onClick={() => handleUpdateProduksiStatus(p.id_produksi, 'selesai')}
-                           style={{ background: 'var(--banana)', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '50px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(245,158,11,0.2)' }}
+                           style={{ background: 'var(--banana)', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '24px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(245,158,11,0.2)' }}
                          >
                            Selesai & Serahkan Kurir
                          </button>
@@ -1384,7 +1499,7 @@ const VendorDashboard = ({ user, onLogout }) => {
                    </tr>
                  ))}
                  {produksi.length === 0 && (
-                   <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700' }}>Belum ada tiket produksi.</td></tr>
+                   <tr><td colSpan="5" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700' }}>Belum ada tiket produksi.</td></tr>
                  )}
                </tbody>
             </table>
@@ -1394,11 +1509,11 @@ const VendorDashboard = ({ user, onLogout }) => {
     }
 
     if (isDistribusi) return (
-      <div className="grid" style={{ gap: '2rem' }}>
+      <div className="grid" style={{ gap: '1rem' }}>
         <Header title="Logistik & Pelacakan Armada" />
         
         {/* Hub Command Control */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.7)', padding: '12px 30px', borderRadius: '50px', border: '1px solid white', backdropFilter: 'blur(10px)', marginBottom: '-12px', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.7)', padding: '12px 30px', borderRadius: '24px', border: '1px solid white', backdropFilter: 'blur(10px)', marginBottom: '-12px', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
            <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
              <MapPin color="var(--primary)" size={18} />
              <span style={{ fontWeight: '950', fontSize: '0.85rem', color: 'var(--text-muted)' }}>QUICK JUMP:</span>
@@ -1409,7 +1524,7 @@ const VendorDashboard = ({ user, onLogout }) => {
                    onClick={() => setActiveHub({ name: city, url: `https://maps.google.com/maps?q=${city}&output=embed` })}
                    style={{
                      padding: '8px 18px',
-                     borderRadius: '50px',
+                     borderRadius: '24px',
                      border: activeHub.name === city ? 'none' : '1px solid var(--border)',
                      background: activeHub.name === city ? 'var(--primary)' : 'white',
                      color: activeHub.name === city ? 'white' : 'var(--text-main)',
@@ -1437,7 +1552,7 @@ const VendorDashboard = ({ user, onLogout }) => {
                }}
                style={{
                  padding: '10px 20px 10px 40px',
-                 borderRadius: '30px',
+                 borderRadius: '12px',
                  border: '1px solid var(--border)',
                  background: 'white',
                  fontWeight: '800',
@@ -1450,7 +1565,7 @@ const VendorDashboard = ({ user, onLogout }) => {
            </div>
         </div>
 
-        <div className="card dashboard-card-vibrant" style={{ padding: '0', borderRadius: '40px', overflow: 'hidden', height: '450px', background: '#e5e7eb', border: 'none', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}>
+        <div className="card dashboard-card-vibrant" style={{ padding: '0', borderRadius: '16px', overflow: 'hidden', height: '450px', background: '#e5e7eb', border: 'none', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}>
            <iframe 
              key={activeHub.url}
              title="Distribution Map"
@@ -1483,7 +1598,7 @@ const VendorDashboard = ({ user, onLogout }) => {
              </motion.div>
            ))}
 
-           <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(255,255,255,0.95)', border: '1px solid var(--border)', padding: '15px 25px', borderRadius: '20px', backdropFilter: 'blur(10px)', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+           <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(255,255,255,0.95)', border: '1px solid var(--border)', padding: '15px 25px', borderRadius: '8px', backdropFilter: 'blur(10px)', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ width: '10px', height: '100%', background: 'var(--primary)', borderRadius: '10px' }}></div>
                 <div>
@@ -1494,9 +1609,9 @@ const VendorDashboard = ({ user, onLogout }) => {
            </div>
         </div>
         
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           {distribusi.length === 0 ? (
-            <div className="card dashboard-card-vibrant" style={{ padding: '3rem', gridColumn: 'span 2', textAlign: 'center' }}>
+            <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', gridColumn: 'span 2', textAlign: 'center' }}>
               <p style={{ fontWeight: '800', color: 'var(--text-muted)' }}>Belum ada data distribusi atau pengiriman armada.</p>
             </div>
           ) : (
@@ -1504,7 +1619,7 @@ const VendorDashboard = ({ user, onLogout }) => {
               const isScheduled = d.status === 'DIJADWALKAN';
               const isDelivered = d.status === 'TIBA';
               return (
-                <div key={i} className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px', opacity: isDelivered ? 0.7 : 1 }}>
+                <div key={i} className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px', opacity: isDelivered ? 0.7 : 1 }}>
                    <div className="flex justify-between" style={{ marginBottom: '1.5rem' }}>
                      <p style={{ fontWeight: '950', color: 'var(--primary)', fontSize: '0.9rem' }}>TX KODE: {d.kode_transaksi}</p>
                      <span className="badge" style={{ 
@@ -1516,7 +1631,7 @@ const VendorDashboard = ({ user, onLogout }) => {
                      </span>
                    </div>
                    <h4 style={{ fontSize: '1.4rem', fontWeight: '950', marginBottom: '8px' }}>{d.nama_sekolah}</h4>
-                   <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontWeight: '600' }}>
+                   <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: '600' }}>
                      Menu: {d.nama_menu} ({d.jumlah_porsi} Porsi)
                    </p>
                    <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -1540,7 +1655,7 @@ const VendorDashboard = ({ user, onLogout }) => {
     return (
       <div style={{ textAlign: 'center', padding: '5rem', display: 'grid', placeItems: 'center', flex: 1 }}>
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-          <ShieldCheck size={80} color="var(--border)" style={{ marginBottom: '2rem' }} />
+          <ShieldCheck size={80} color="var(--border)" style={{ marginBottom: '1rem' }} />
           <h2 style={{ fontSize: '2rem', fontWeight: '950', color: 'var(--text-muted)', letterSpacing: '-1px' }}>Silakan Pilih Menu di Sidebar</h2>
           <p style={{ color: 'var(--text-muted)', fontWeight: '600', marginTop: '10px' }}>Pilih kategori untuk memantau data operasional Anda</p>
         </motion.div>
@@ -1554,14 +1669,14 @@ const VendorDashboard = ({ user, onLogout }) => {
         <>
           <WelcomeBanner name="Vendor Jakarta Timur" />
 
-          <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem", marginBottom: "2rem" }}>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: '1rem', marginBottom: '1rem' }}>
             {stats.map((stat, i) => (
               <div
                 key={i}
                 className="card dashboard-card-vibrant"
                 style={{
-                  padding: "2rem",
-                  borderRadius: "20px",
+                  padding: '1rem',
+                  borderRadius: '8px',
                   display: "flex",
                   flexDirection: 'column',
                   gap: "16px",
@@ -1581,8 +1696,8 @@ const VendorDashboard = ({ user, onLogout }) => {
           </div>
 
           <div className="card dashboard-card-vibrant" style={{
-            padding: "2rem",
-            borderRadius: "20px",
+            padding: '1rem',
+            borderRadius: '8px',
           }}>
             <div className="flex justify-between" style={{ marginBottom: "1.5rem" }}>
               <div className="flex" style={{ gap: "15px" }}>
@@ -1597,9 +1712,12 @@ const VendorDashboard = ({ user, onLogout }) => {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {prodList.map((item, i) => {
+              {(distribusi.length > 0 ? distribusi.slice(0, 3) : prodList).map((item, i) => {
+                const schoolName = item.nama_sekolah || item.school;
+                const menuName = item.nama_menu || item.menuName;
+                const statusName = item.status;
                 const allPending = menus.every(m => m.status_validasi === 'pending');
-                const displayStatus = allPending ? "MENUNGGU VALIDASI" : item.status;
+                const displayStatus = allPending ? "MENUNGGU VALIDASI" : statusName;
                 
                 return (
                   <div
@@ -1620,15 +1738,15 @@ const VendorDashboard = ({ user, onLogout }) => {
                         <Truck size={20} />
                       </div>
                       <div>
-                        <h4 style={{ fontSize: "0.95rem", fontWeight: "700", marginBottom: "2px" }}>{item.school}</h4>
-                        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "500" }}>{item.menuName}</p>
+                        <h4 style={{ fontSize: "0.95rem", fontWeight: "700", marginBottom: "2px" }}>{schoolName}</h4>
+                        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "500" }}>{menuName}</p>
                       </div>
                     </div>
                     <span className="badge" style={{
-                      background: displayStatus === "SELESAI" ? "var(--role-primary)" : displayStatus === "MENUNGGU VALIDASI" ? "var(--banana)" : "var(--role-primary)",
+                      background: displayStatus === "SELESAI" || displayStatus === "TIBA" ? "var(--role-primary)" : displayStatus === "MENUNGGU VALIDASI" ? "var(--banana)" : "var(--role-primary)",
                       color: 'white',
                       padding: "6px 14px",
-                      borderRadius: "50px",
+                      borderRadius: '24px',
                       fontWeight: "700",
                       fontSize: "0.7rem"
                     }}>
