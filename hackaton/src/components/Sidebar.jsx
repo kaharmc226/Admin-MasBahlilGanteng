@@ -14,18 +14,35 @@ import {
   BadgeAlert,
   Zap,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 const Sidebar = ({ user, collapsed, mobileOpen, onToggle, onMobileClose }) => {
   const location = useLocation()
+  
+  const [openMenus, setOpenMenus] = React.useState({ 'Manajemen Vendor': true })
+
+  const toggleSubmenu = (title) => {
+    setOpenMenus(prev => ({
+      ...prev,
+      [title]: !prev[title]
+    }))
+  }
 
   const vendorMenu = [
     { title: 'Dashboard', path: '/vendor', icon: <Home size={20}/> },
-    { title: 'Informasi Vendor', path: '/vendor/informasi', icon: <FileText size={20}/> },
-    { title: 'Input Menu', path: '/vendor/menu', icon: <Utensils size={20}/> },
-    { title: 'Manajemen Stok', path: '/vendor/stok', icon: <FileText size={20}/> },
+    {
+      title: 'Manajemen Vendor',
+      icon: <Utensils size={20}/>,
+      children: [
+        { title: 'Dapur Operasional', path: '/vendor/informasi', icon: <FileText size={18}/> },
+        { title: 'Katalog Menu', path: '/vendor/menu', icon: <Utensils size={18}/> },
+        { title: 'Stok & Gudang', path: '/vendor/stok', icon: <FileText size={18}/> },
+      ]
+    },
     { title: 'Status Produksi', path: '/vendor/produksi', icon: <Layout size={20}/> },
     { title: 'Distribusi', path: '/vendor/distribusi', icon: <Truck size={20}/> },
   ]
@@ -64,13 +81,13 @@ const Sidebar = ({ user, collapsed, mobileOpen, onToggle, onMobileClose }) => {
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
       {/* Logo */}
       <div style={{
-        padding: collapsed ? '1.25rem 0.75rem' : '1.25rem 1.5rem',
+        padding: collapsed ? '0 0.75rem' : '0 1.5rem',
         borderBottom: '1px solid var(--border)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: collapsed ? 'center' : 'space-between',
         gap: '10px',
-        minHeight: '64px'
+        height: 'var(--topnav-height)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
@@ -131,6 +148,141 @@ const Sidebar = ({ user, collapsed, mobileOpen, onToggle, onMobileClose }) => {
         </p>
         <ul style={{ listStyle: 'none' }}>
           {currentMenu.map((item, idx) => {
+            if (item.children) {
+              if (collapsed) {
+                // If sidebar is collapsed, flatten out children icons
+                return item.children.map((child, cIdx) => {
+                  const childActive = location.pathname.replace(/\/$/, '') === child.path
+                  return (
+                    <li key={`collapsed-child-${idx}-${cIdx}`} style={{ marginBottom: '2px' }}>
+                      <NavLink
+                        to={child.path}
+                        onClick={onMobileClose}
+                        title={child.title}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '0.85rem',
+                          justifyContent: 'center',
+                          textDecoration: 'none',
+                          color: childActive ? 'white' : 'var(--text-muted)',
+                          background: childActive ? 'var(--role-primary)' : 'transparent',
+                          borderRadius: '12px',
+                          fontWeight: childActive ? '700' : '600',
+                          fontSize: '0.9rem',
+                          transition: 'all 0.15s ease',
+                          position: 'relative',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!childActive) {
+                            e.currentTarget.style.background = 'var(--role-light)'
+                            e.currentTarget.style.color = 'var(--role-primary)'
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!childActive) {
+                            e.currentTarget.style.background = 'transparent'
+                            e.currentTarget.style.color = 'var(--text-muted)'
+                          }
+                        }}
+                      >
+                        <span style={{ flexShrink: 0, display: 'flex' }}>{child.icon}</span>
+                      </NavLink>
+                    </li>
+                  )
+                })
+              }
+
+              const isSubMenuOpen = !!openMenus[item.title]
+              const hasActiveChild = item.children.some(child => location.pathname.replace(/\/$/, '') === child.path)
+
+              return (
+                <li key={idx} style={{ marginBottom: '4px' }}>
+                  <div
+                    onClick={() => toggleSubmenu(item.title)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.75rem 1rem',
+                      cursor: 'pointer',
+                      color: hasActiveChild ? 'var(--role-primary)' : 'var(--text-muted)',
+                      borderRadius: '12px',
+                      fontWeight: '700',
+                      fontSize: '0.9rem',
+                      transition: 'all 0.15s ease',
+                      background: hasActiveChild ? 'var(--role-light)' : 'transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!hasActiveChild) {
+                        e.currentTarget.style.background = 'var(--role-light)'
+                        e.currentTarget.style.color = 'var(--role-primary)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!hasActiveChild) {
+                        e.currentTarget.style.background = 'transparent'
+                        e.currentTarget.style.color = 'var(--text-muted)'
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ flexShrink: 0, display: 'flex' }}>{item.icon}</span>
+                      <span className="nav-label">{item.title}</span>
+                    </div>
+                    <span className="nav-label" style={{ display: 'flex', opacity: collapsed ? 0 : 1 }}>
+                      {isSubMenuOpen ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                    </span>
+                  </div>
+
+                  {isSubMenuOpen && (
+                    <ul style={{ listStyle: 'none', paddingLeft: '1.25rem', marginTop: '4px' }}>
+                      {item.children.map((child, cIdx) => {
+                        const childActive = location.pathname.replace(/\/$/, '') === child.path
+                        return (
+                          <li key={cIdx} style={{ marginBottom: '2px' }}>
+                            <NavLink
+                              to={child.path}
+                              onClick={onMobileClose}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '0.6rem 1rem',
+                                textDecoration: 'none',
+                                color: childActive ? 'white' : 'var(--text-muted)',
+                                background: childActive ? 'var(--role-primary)' : 'transparent',
+                                borderRadius: '10px',
+                                fontWeight: childActive ? '700' : '600',
+                                fontSize: '0.85rem',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!childActive) {
+                                  e.currentTarget.style.background = 'var(--role-light)'
+                                  e.currentTarget.style.color = 'var(--role-primary)'
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!childActive) {
+                                  e.currentTarget.style.background = 'transparent'
+                                  e.currentTarget.style.color = 'var(--text-muted)'
+                                }
+                              }}
+                            >
+                              <span style={{ flexShrink: 0, display: 'flex' }}>{child.icon}</span>
+                              <span className="nav-label">{child.title}</span>
+                            </NavLink>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </li>
+              )
+            }
+
             const isActive = location.pathname.replace(/\/$/, '') === item.path
 
             return (
