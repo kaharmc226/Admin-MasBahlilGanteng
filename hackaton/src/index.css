@@ -1,5 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap');
 
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
 :root {
   /* === Brand Colors (Landing/Login) === */
   --primary: #10b981;
@@ -177,7 +180,6 @@ h1, h2, h3, h4, h5, h6 {
   padding-top: var(--topnav-height);
   min-height: 100vh;
   position: relative;
-  z-index: 1;
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
