@@ -41,6 +41,12 @@ const api = {
   updateDapur: (id, data) => request(`/dapur/${id}`, { method: 'PUT', body: data }),
   deleteDapur: (id) => request(`/dapur/${id}`, { method: 'DELETE' }),
 
+  // Stok Dapur
+  getStok: (idDapur) => request(`/stok/${idDapur}`),
+  createStok: (data) => request('/stok', { method: 'POST', body: data }),
+  updateStok: (id, data) => request(`/stok/${id}`, { method: 'PUT', body: data }),
+  deleteStok: (id) => request(`/stok/${id}`, { method: 'DELETE' }),
+
   // Mapping
   getMapping: () => request('/mapping'),
   createMapping: (data) => request('/mapping', { method: 'POST', body: data }),

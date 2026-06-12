@@ -29,7 +29,8 @@ import {
   Search,
   ArrowLeft,
   Trash2,
-  Apple
+  Apple,
+  Archive
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import api from "../api"
@@ -551,15 +552,30 @@ const AddDapurForm = ({ onClose, onSave }) => {
   )
 }
 
+const parseTakaran = (t) => {
+  if (!t) return { berat: '', satuan: 'gram' };
+  const str = t.replace('~', '').trim();
+  const num = parseFloat(str);
+  const letters = str.replace(/[0-9.]/g, '').trim().toLowerCase();
+  
+  let satuan = 'gram';
+  if (['kg', 'kilogram'].includes(letters)) satuan = 'kilogram';
+  else if (['l', 'liter'].includes(letters)) satuan = 'liter';
+  else if (['ml', 'mililiter'].includes(letters)) satuan = 'ml';
+  else if (['pcs', 'buah'].includes(letters)) satuan = 'pcs';
+  
+  return { berat: isNaN(num) ? '' : num, satuan };
+}
+
 const AddMenuForm = ({ onClose, onSave, editData }) => {
   const [formData, setFormData] = useState({
     nama: editData?.nama_menu || '',
     tanggal: editData?.date || new Date().toISOString().split('T')[0],
-    bahan: editData?.bahan.map(b => ({ nama: b.nama, berat: b.takaran.replace('~', '').replace(' g', '') })) || [{ nama: '', berat: '' }]
+    bahan: editData?.bahan.map(b => ({ nama: b.nama, ...parseTakaran(b.takaran) })) || [{ nama: '', berat: '', satuan: 'gram' }]
   })
 
   const addBahan = () => {
-    setFormData({ ...formData, bahan: [...formData.bahan, { nama: '', berat: '' }] })
+    setFormData({ ...formData, bahan: [...formData.bahan, { nama: '', berat: '', satuan: 'gram' }] })
   }
 
   const updateBahan = (index, field, value) => {
@@ -578,7 +594,13 @@ const AddMenuForm = ({ onClose, onSave, editData }) => {
       id: editData?.id || Date.now(),
       nama_menu: formData.nama,
       date: formData.tanggal,
-      bahan: formData.bahan.map(b => ({ nama: b.nama, takaran: `~${b.berat} g` })),
+      bahan: formData.bahan.map(b => {
+        let displaySatuan = b.satuan;
+        if (b.satuan === 'gram') displaySatuan = 'g';
+        if (b.satuan === 'kilogram') displaySatuan = 'kg';
+        if (b.satuan === 'liter') displaySatuan = 'L';
+        return { nama: b.nama, takaran: `~${b.berat} ${displaySatuan}` }
+      }),
       nilai_gizi: editData?.nilai_gizi || { energi: '--- kkal', protein: '-- g' },
       status_validasi: editData?.status_validasi || 'pending'
     }
@@ -649,12 +671,24 @@ const AddMenuForm = ({ onClose, onSave, editData }) => {
                     style={{ flex: 2, padding: '1rem', borderRadius: '12px', border: '2px solid #f8fafc', background: '#f8fafc', fontWeight: '700' }}
                   />
                   <input 
-                    type="text" 
-                    placeholder="Berat (Gram)"
+                    type="number" 
+                    step="any"
+                    placeholder="Jumlah"
                     value={b.berat}
                     onChange={(e) => updateBahan(i, 'berat', e.target.value)}
                     style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '2px solid #f8fafc', background: '#f8fafc', fontWeight: '700' }}
                   />
+                  <select 
+                    value={b.satuan}
+                    onChange={(e) => updateBahan(i, 'satuan', e.target.value)}
+                    style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '2px solid #f8fafc', background: '#f8fafc', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    <option value="gram">Gram (g)</option>
+                    <option value="kilogram">Kilogram (kg)</option>
+                    <option value="ml">Mililiter (ml)</option>
+                    <option value="liter">Liter (L)</option>
+                    <option value="pcs">Pcs / Buah</option>
+                  </select>
                 </div>
               ))}
             </div>
@@ -673,6 +707,94 @@ const AddMenuForm = ({ onClose, onSave, editData }) => {
   )
 }
 
+const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah }) => {
+  const validMenus = menus.filter(m => m.status_validasi !== 'pending')
+  const [formData, setFormData] = useState({
+    id_dapur: dapurs[0]?.id_dapur || dapurs[0]?.id || '',
+    id_menu: validMenus[0]?.id_menu || '',
+    id_sekolah: sekolah[0]?.id_sekolah || '',
+    jumlah_porsi: ''
+  })
+
+  const handleSubmit = () => {
+    if (!formData.id_dapur || !formData.id_menu || !formData.id_sekolah || !formData.jumlah_porsi) {
+      alert("Lengkapi semua data tiket produksi.")
+      return
+    }
+    onSave({
+      ...formData,
+      jumlah_porsi: parseInt(formData.jumlah_porsi)
+    })
+    alert("✅ Tiket Produksi berhasil dibuat dan masuk antrian Pending!")
+    onClose()
+  }
+
+  return (
+    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ background: 'white', padding: '2.5rem', borderRadius: '32px', width: '500px', maxWidth: '90%' }}>
+        <div className="flex justify-between" style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ fontWeight: '950', fontSize: '1.5rem' }}>Buat Tiket Produksi Baru</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+        </div>
+        
+        <div style={{ display: 'grid', gap: '1.2rem' }}>
+          <div>
+            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DAPUR OPERASIONAL</label>
+            <select 
+              value={formData.id_dapur} 
+              onChange={e => setFormData({...formData, id_dapur: e.target.value})}
+              style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
+            >
+              <option value="" disabled>Pilih Dapur</option>
+              {dapurs.map(d => <option key={d.id_dapur || d.id} value={d.id_dapur || d.id}>{d.lokasi}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PILIH MENU (APPROVED)</label>
+            <select 
+              value={formData.id_menu} 
+              onChange={e => setFormData({...formData, id_menu: e.target.value})}
+              style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
+            >
+              <option value="" disabled>Pilih Menu</option>
+              {validMenus.map(m => <option key={m.id_menu} value={m.id_menu}>{m.nama_menu}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>TARGET SEKOLAH (DISTRIBUSI)</label>
+            <select 
+              value={formData.id_sekolah} 
+              onChange={e => setFormData({...formData, id_sekolah: e.target.value})}
+              style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
+            >
+              <option value="" disabled>Pilih Sekolah</option>
+              {sekolah.map(s => <option key={s.id_sekolah} value={s.id_sekolah}>{s.nama_sekolah}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>JUMLAH PORSI</label>
+            <input 
+              type="number" 
+              placeholder="Misal: 500"
+              value={formData.jumlah_porsi}
+              onChange={e => setFormData({...formData, jumlah_porsi: e.target.value})}
+              style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
+            />
+          </div>
+        </div>
+
+        <button 
+          onClick={handleSubmit}
+          className="btn-primary" 
+          style={{ width: '100%', padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '2rem', cursor: 'pointer' }}
+        >
+          Terbitkan Tiket
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
 const VendorDashboard = ({ user, onLogout }) => {
   const location = useLocation()
   const [showAddForm, setShowAddForm] = useState(false)
@@ -680,6 +802,7 @@ const VendorDashboard = ({ user, onLogout }) => {
   const [editingMenu, setEditingMenu] = useState(null)
   const [activeDoc, setActiveDoc] = useState(null)
   const [selectedAuditMenu, setSelectedAuditMenu] = useState(null)
+  const [selectedDapurForStok, setSelectedDapurForStok] = useState(null)
   
   // API-driven state
   const [dapurs, setDapurs] = useState([])
@@ -687,23 +810,27 @@ const VendorDashboard = ({ user, onLogout }) => {
   const [dokumen, setDokumen] = useState([])
   const [produksi, setProduksi] = useState([])
   const [distribusi, setDistribusi] = useState([])
+  const [stokData, setStokData] = useState([])
+  const [sekolah, setSekolah] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [d, m, dok, prod, dist] = await Promise.all([
+        const [d, m, dok, prod, dist, sek] = await Promise.all([
           api.getDapur(),
           api.getMenus(),
           api.getDokumen(1),
           api.getProduksi(),
-          api.getDistribusi()
+          api.getDistribusi(),
+          api.getSekolah()
         ])
         setDapurs(d)
         setMenus(m)
         setDokumen(dok)
         setProduksi(prod)
         setDistribusi(dist)
+        setSekolah(sek)
       } catch (err) {
         console.error('Failed to fetch data:', err)
       } finally {
@@ -712,6 +839,12 @@ const VendorDashboard = ({ user, onLogout }) => {
     }
     fetchData()
   }, [])
+
+  useEffect(() => {
+    if (selectedDapurForStok) {
+      api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
+    }
+  }, [selectedDapurForStok])
 
   const handleAddDapur = async (newDapur) => {
     try {
@@ -743,28 +876,85 @@ const VendorDashboard = ({ user, onLogout }) => {
           nilai_gizi: newMenu.nilai_gizi,
           tanggal: newMenu.date || newMenu.tanggal
         })
-        setMenus(prev => prev.map(m => (m.id_menu || m.id) === (newMenu.id || newMenu.id_menu) ? { ...m, ...newMenu } : m))
       } else {
-        const created = await api.createMenu({
+        await api.createMenu({
           id_vendor: 1,
           nama_menu: newMenu.nama_menu,
           bahan: newMenu.bahan,
           nilai_gizi: newMenu.nilai_gizi || {},
           tanggal: newMenu.date || newMenu.tanggal || new Date().toISOString().split('T')[0]
         })
-        setMenus(prev => [...prev, created])
       }
+      // Re-fetch menus directly from DB to sync everything including default DB values
+      api.getMenus().then(setMenus).catch(console.error)
       setEditingMenu(null)
     } catch (err) { console.error(err) }
   }
 
+  const handleAddStok = async (e) => {
+    e.preventDefault()
+    const form = e.target
+    const data = {
+      id_dapur: selectedDapurForStok,
+      nama_bahan: form.nama_bahan.value,
+      jumlah: parseFloat(form.jumlah.value),
+      satuan: form.satuan.value
+    }
+    try {
+      const created = await api.createStok(data)
+      setStokData(prev => [...prev, created])
+      form.reset()
+    } catch (err) { console.error(err) }
+  }
+
+  const handleUpdateStok = async (id_stok, newJumlah) => {
+    try {
+      await api.updateStok(id_stok, { jumlah: parseFloat(newJumlah) })
+      setStokData(prev => prev.map(s => s.id_stok === id_stok ? { ...s, jumlah: parseFloat(newJumlah) } : s))
+    } catch (err) { console.error(err) }
+  }
+
+  const handleDeleteStok = async (id_stok) => {
+    if (confirm("Hapus item stok ini?")) {
+      try {
+        await api.deleteStok(id_stok)
+        setStokData(prev => prev.filter(s => s.id_stok !== id_stok))
+      } catch (err) { console.error(err) }
+    }
+  }
+
+  const [showTicketForm, setShowTicketForm] = useState(false)
+
+  const handleCreateProduksiTicket = async (data) => {
+    try {
+      await api.createProduksi({ ...data, status: 'pending' })
+      api.getProduksi().then(setProduksi).catch(console.error)
+      api.getDistribusi().then(setDistribusi).catch(console.error)
+    } catch (err) { alert(`❌ Gagal membuat tiket:\n${err.message}`) }
+  }
+
+  const handleUpdateProduksiStatus = async (id_produksi, status) => {
+    try {
+      await api.updateProduksi(id_produksi, { status })
+      alert(status === 'persiapan' ? '✅ Status dipindah ke Persiapan. Stok bahan baku telah otomatis dipotong!' : '✅ Status dipindah ke Selesai & Dikirim!')
+      api.getProduksi().then(setProduksi).catch(console.error)
+      if (status === 'selesai') {
+        api.getDistribusi().then(setDistribusi).catch(console.error)
+      }
+      // Refresh stok silently
+      if (selectedDapurForStok) api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
+    } catch (err) {
+      alert(`❌ Gagal memproses:\n${err.message}`)
+    }
+  }
+
   const path = location.pathname.replace(/\/$/, '')
   const isMain = path === '/vendor'
-  const isDoc = path === '/vendor/dokumen'
-  const isDapur = path === '/vendor/dapur'
+  const isInformasi = path === '/vendor/informasi'
   const isMenu = path === '/vendor/menu'
   const isProduksi = path === '/vendor/produksi'
   const isDistribusi = path === '/vendor/distribusi'
+  const isStok = path === '/vendor/stok'
   
   const stats = [
     { title: "Dashboard", value: "MBG Centre", icon: <LayoutDashboard />, color: "var(--primary)" },
@@ -779,38 +969,11 @@ const VendorDashboard = ({ user, onLogout }) => {
   ]
 
   const renderContent = () => {
-    if (isDoc) return (
+    if (isInformasi) return (
       <div className="grid" style={{ gap: '2rem' }}>
-        <Header title="Dokumen & Izin Usaha" />
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-          {[
-            { title: 'NIB (Nomor Induk Berusaha)', status: 'Verified', date: '12 Jan 2026', icon: <FileText color="var(--primary)" /> },
-            { title: 'Sertifikat Halal', status: 'Verified', date: '05 Feb 2026', icon: <ShieldCheck color="var(--secondary)" /> },
-            { title: 'Izin Edar P-IRT', status: 'Pending', date: '20 Mar 2026', icon: <Clock color="var(--banana)" /> },
-            { title: 'Sertifikat Higiene Sanitasi', status: 'Verified', date: '10 Feb 2026', icon: <ClipboardCheck color="var(--primary)" /> }
-          ].map((doc, i) => (
-            <div key={i} className="card dashboard-card-vibrant" style={{ padding: '2rem', borderRadius: '24px' }}>
-              <div style={{ background: 'var(--bg)', width: '50px', height: '50px', borderRadius: '15px', display: 'grid', placeItems: 'center', marginBottom: '1.5rem' }}>{doc.icon}</div>
-              <h4 style={{ fontWeight: '900', marginBottom: '0.5rem' }}>{doc.title}</h4>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Diunggah: {doc.date}</p>
-              <div className="flex justify-between" style={{ alignItems: 'center' }}>
-                <span className="badge" style={{ background: doc.status === 'Verified' ? 'var(--primary-light)' : 'var(--banana-light)', color: doc.status === 'Verified' ? 'var(--primary)' : 'var(--banana)', fontWeight: '900' }}>{doc.status}</span>
-                <button 
-                  onClick={() => setActiveDoc(doc)}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: '800', cursor: 'pointer', fontSize: '0.85rem' }}
-                >
-                  Lihat Detail
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-
-    if (isDapur) return (
-      <div className="grid" style={{ gap: '2rem' }}>
-        <Header title="Manajemen Dapur Satuan" />
+        <Header title="Informasi & Dokumen Vendor" />
+        
+        {/* Section: Daftar Dapur */}
         <AnimatePresence>
           {showAddForm && (
             <AddDapurForm onClose={() => setShowAddForm(false)} onSave={handleAddDapur} />
@@ -858,6 +1021,99 @@ const VendorDashboard = ({ user, onLogout }) => {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Section: Dokumen Izin Usaha */}
+        <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
+          <h3 style={{ fontWeight: '950', marginBottom: '2rem' }}>Dokumen & Izin Usaha</h3>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            {[
+              { title: 'NIB (Nomor Induk Berusaha)', status: 'Verified', date: '12 Jan 2026', icon: <FileText color="var(--primary)" /> },
+              { title: 'Sertifikat Halal', status: 'Verified', date: '05 Feb 2026', icon: <ShieldCheck color="var(--secondary)" /> },
+              { title: 'Izin Edar P-IRT', status: 'Pending', date: '20 Mar 2026', icon: <Clock color="var(--banana)" /> },
+              { title: 'Sertifikat Higiene Sanitasi', status: 'Verified', date: '10 Feb 2026', icon: <ClipboardCheck color="var(--primary)" /> }
+            ].map((doc, i) => (
+              <div key={i} className="card" style={{ padding: '2rem', borderRadius: '24px', border: '1px solid var(--border)', background: 'white' }}>
+                <div style={{ background: 'var(--bg)', width: '50px', height: '50px', borderRadius: '15px', display: 'grid', placeItems: 'center', marginBottom: '1.5rem' }}>{doc.icon}</div>
+                <h4 style={{ fontWeight: '900', marginBottom: '0.5rem' }}>{doc.title}</h4>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Diunggah: {doc.date}</p>
+                <div className="flex justify-between" style={{ alignItems: 'center' }}>
+                  <span className="badge" style={{ background: doc.status === 'Verified' ? 'var(--primary-light)' : 'var(--banana-light)', color: doc.status === 'Verified' ? 'var(--primary)' : 'var(--banana)', fontWeight: '900' }}>{doc.status}</span>
+                  <button 
+                    onClick={() => setActiveDoc(doc)}
+                    style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: '800', cursor: 'pointer', fontSize: '0.85rem' }}
+                  >
+                    Lihat Detail
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+
+    if (isStok) return (
+      <div className="grid" style={{ gap: '2rem' }}>
+        <Header title="Manajemen Stok & Gudang" />
+        <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
+           <div style={{ marginBottom: '2rem' }}>
+             <label style={{ display: 'block', fontWeight: '800', marginBottom: '8px', color: 'var(--text-muted)' }}>Pilih Dapur Operasional</label>
+             <select 
+               value={selectedDapurForStok || ''} 
+               onChange={(e) => setSelectedDapurForStok(e.target.value)}
+               style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid var(--border)', fontWeight: '700', fontSize: '1.1rem' }}
+             >
+               <option value="" disabled>-- Pilih Dapur --</option>
+               {dapurs.map(d => <option key={d.id_dapur || d.id} value={d.id_dapur || d.id}>Dapur {d.lokasi}</option>)}
+             </select>
+           </div>
+           
+           {selectedDapurForStok ? (
+             <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
+               <div>
+                 <h3 style={{ fontWeight: '950', marginBottom: '1.5rem' }}>Stok Terkini</h3>
+                 <div style={{ display: 'grid', gap: '1rem', maxHeight: '550px', overflowY: 'auto', paddingRight: '10px' }}>
+                   {stokData.length === 0 ? <p style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Stok kosong.</p> : stokData.map((s, i) => (
+                     <div key={i} style={{ padding: '1.5rem', background: 'var(--bg)', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border)' }}>
+                       <div>
+                         <h4 style={{ fontWeight: '900', fontSize: '1.1rem' }}>{s.nama_bahan}</h4>
+                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Update: {new Date(s.last_updated).toLocaleString('id-ID')}</p>
+                       </div>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                         <input 
+                           type="number" 
+                           step="any"
+                           defaultValue={s.jumlah}
+                           onBlur={(e) => handleUpdateStok(s.id_stok, e.target.value)}
+                           style={{ width: '80px', padding: '10px', borderRadius: '10px', border: '1.5px solid var(--border)', textAlign: 'center', fontWeight: '800' }}
+                         />
+                         <span style={{ fontWeight: '800', color: 'var(--text-muted)' }}>{s.satuan}</span>
+                         <button onClick={() => handleDeleteStok(s.id_stok)} style={{ background: '#fff5f5', color: '#ff4d4d', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+               
+               <div style={{ background: '#f8fafc', padding: '2rem', borderRadius: '24px', border: '1.5px dashed var(--border)', height: 'fit-content', position: 'sticky', top: '2rem' }}>
+                 <h4 style={{ fontWeight: '900', marginBottom: '1.5rem' }}>Tambah Item Baru</h4>
+                 <form onSubmit={handleAddStok} style={{ display: 'grid', gap: '1rem' }}>
+                   <input required name="nama_bahan" placeholder="Nama Bahan (Cth: Beras)" style={{ padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)' }} />
+                   <div style={{ display: 'flex', gap: '10px' }}>
+                     <input required type="number" step="0.1" name="jumlah" placeholder="Kuantitas" style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)' }} />
+                     <input required name="satuan" placeholder="Satuan (kg)" style={{ width: '100px', padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)' }} />
+                   </div>
+                   <button type="submit" className="btn-primary" style={{ padding: '1.2rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '900', marginTop: '10px', cursor: 'pointer' }}>Tambahkan Item</button>
+                 </form>
+               </div>
+             </div>
+           ) : (
+             <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
+               <Archive size={64} style={{ marginBottom: '1rem' }} />
+               <p style={{ fontWeight: '700', fontSize: '1.1rem' }}>Pilih dapur terlebih dahulu untuk melihat stok.</p>
+             </div>
+           )}
         </div>
       </div>
     )
@@ -1029,16 +1285,28 @@ const VendorDashboard = ({ user, onLogout }) => {
     )
 
     if (isProduksi) {
-      const validatedMenus = menus.filter(m => m.status_validasi !== 'pending');
-      const hasMenus = menus.length > 0;
+      const activeProduksi = produksi.filter(p => p.status !== 'selesai')
+      const totalTickets = activeProduksi.length || 1
+      const prepCount = activeProduksi.filter(p => p.status === 'persiapan').length
       
-      const prepVal = hasMenus ? (validatedMenus.length > 0 ? Math.min(100, 40 + (validatedMenus.length * 15)) : 20) : 0;
-      const cookVal = validatedMenus.length > 0 ? Math.min(100, 10 + (validatedMenus.length * 20)) : 0;
-      const packVal = validatedMenus.length > 0 ? Math.min(100, 5 + (validatedMenus.length * 15)) : 0;
+      const prepVal = Math.min(100, Math.round((prepCount / totalTickets) * 100));
+      const cookVal = prepCount > 0 ? 50 : 0;
+      const packVal = 0;
 
       return (
         <div className="grid" style={{ gap: '2rem' }}>
-          <Header title="Monitoring Produksi Real-time" />
+          <Header title="Sistem Tiket & Monitoring Produksi" />
+          <AnimatePresence>
+            {showTicketForm && (
+              <AddTicketForm 
+                onClose={() => setShowTicketForm(false)} 
+                onSave={handleCreateProduksiTicket} 
+                dapurs={dapurs} 
+                menus={menus} 
+                sekolah={sekolah} 
+              />
+            )}
+          </AnimatePresence>
           <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
              {[
                { title: 'Persiapan Bahan', val: `${prepVal}%`, icon: <Package color="var(--primary)" />, color: 'var(--primary)' },
@@ -1058,35 +1326,66 @@ const VendorDashboard = ({ user, onLogout }) => {
              ))}
           </div>
           <div className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
-            <h3 style={{ fontWeight: '950', marginBottom: '2rem' }}>Antrian Produksi Dapur Jak-Tim</h3>
+            <div className="flex justify-between" style={{ marginBottom: '2rem', alignItems: 'center' }}>
+              <h3 style={{ fontWeight: '950' }}>Tiket Antrian Produksi Teraktif</h3>
+              <button 
+                onClick={() => setShowTicketForm(true)}
+                className="btn-primary" 
+                style={{ padding: '0.8rem 1.5rem', borderRadius: '50px', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Plus size={18} /> Buat Tiket Produksi Baru
+              </button>
+            </div>
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.8rem' }}>
                <thead>
                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: '900' }}>
-                   <th>MENU</th>
-                   <th>TARGET SEKOLAH</th>
-                   <th>ESTIMASI SELESAI</th>
+                   <th>TICKET ID</th>
+                   <th>MENU & PORSI</th>
+                   <th>DAPUR & TARGET</th>
                    <th>STATUS</th>
+                   <th>AKSI (TICKET STAGE)</th>
                  </tr>
                </thead>
                <tbody>
-                 {menus.map((m, i) => (
-                   <tr key={i} style={{ background: 'var(--bg)' }}>
-                     <td style={{ padding: '1.5rem', fontWeight: '900', borderRadius: '15px 0 0 15px' }}>{m.nama_menu}</td>
-                     <td style={{ padding: '1.5rem', fontWeight: '700' }}>SDN 06 Baru</td> 
-                     <td style={{ padding: '1.5rem', fontWeight: '700', color: m.status_validasi === 'pending' ? 'var(--text-muted)' : 'var(--text-main)' }}>
-                       {m.status_validasi === 'pending' ? 'Menunggu Validasi' : '10:30 WIB'}
+                 {produksi.map((p, i) => (
+                   <tr key={i} style={{ background: 'var(--bg)', opacity: p.status === 'selesai' ? 0.6 : 1 }}>
+                     <td style={{ padding: '1.5rem', fontWeight: '900', borderRadius: '15px 0 0 15px', color: 'var(--primary)' }}>#PRD-{p.id_produksi}</td>
+                     <td style={{ padding: '1.5rem' }}>
+                       <p style={{ fontWeight: '900', margin: 0 }}>{p.nama_menu}</p>
+                       <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700', margin: 0 }}>{p.jumlah_porsi} Porsi</p>
+                     </td>
+                     <td style={{ padding: '1.5rem' }}>
+                       <p style={{ fontWeight: '800', margin: 0, fontSize: '0.9rem' }}>{p.dapur_lokasi}</p>
+                       <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700', margin: 0 }}>➡ {p.target_sekolah || 'Tidak ditentukan'}</p>
+                     </td>
+                     <td style={{ padding: '1.5rem' }}>
+                       {p.status === 'pending' && <span className="badge" style={{ background: 'var(--banana-light)', color: 'var(--banana)', fontWeight: '900' }}>PENDING</span>}
+                       {p.status === 'persiapan' && <span className="badge" style={{ background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: '900' }}>PROSES MASAK</span>}
+                       {p.status === 'selesai' && <span className="badge" style={{ background: '#e2e8f0', color: '#64748b', fontWeight: '900' }}>SELESAI KELUAR</span>}
                      </td>
                      <td style={{ padding: '1.5rem', borderRadius: '0 15px 15px 0' }}>
-                       <span className="badge" style={{ 
-                         background: m.status_validasi === 'pending' ? 'var(--banana-light)' : 'var(--primary-light)', 
-                         color: m.status_validasi === 'pending' ? 'var(--banana)' : 'var(--primary)', 
-                         fontWeight: '900' 
-                       }}>
-                         {m.status_validasi === 'pending' ? 'MENUNGGU VALIDASI' : 'SIAP PRODUKSI'}
-                       </span>
+                       {p.status === 'pending' && (
+                         <button 
+                           onClick={() => handleUpdateProduksiStatus(p.id_produksi, 'persiapan')}
+                           style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '50px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16,185,129,0.2)' }}
+                         >
+                           Mulai Proses (Potong Stok)
+                         </button>
+                       )}
+                       {p.status === 'persiapan' && (
+                         <button 
+                           onClick={() => handleUpdateProduksiStatus(p.id_produksi, 'selesai')}
+                           style={{ background: 'var(--banana)', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '50px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(245,158,11,0.2)' }}
+                         >
+                           Selesai & Serahkan Kurir
+                         </button>
+                       )}
                      </td>
                    </tr>
                  ))}
+                 {produksi.length === 0 && (
+                   <tr><td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700' }}>Belum ada tiket produksi.</td></tr>
+                 )}
                </tbody>
             </table>
           </div>
@@ -1165,7 +1464,7 @@ const VendorDashboard = ({ user, onLogout }) => {
 
            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at center, transparent 40%, rgba(6, 78, 59, 0.05) 100%)' }}></div>
            
-           {menus.filter(m => m.status_validasi !== 'pending').map((_, i) => (
+           {distribusi.filter(d => d.status !== 'TIBA').map((d, i) => (
              <motion.div 
                key={i}
                initial={{ x: 100 + (i * 50), y: 150 + (i * 30) }}
@@ -1177,7 +1476,7 @@ const VendorDashboard = ({ user, onLogout }) => {
                style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
              >
                 <div style={{ background: 'var(--primary)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: '900', marginBottom: '4px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', border: '2px solid white' }}>
-                  ARMADA #{String(i + 1).padStart(2, '0')}
+                  {d.kode_transaksi}
                 </div>
                 <div style={{ width: '12px', height: '12px', background: 'var(--primary)', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 15px var(--primary)' }}></div>
                 <div style={{ width: '30px', height: '30px', position: 'absolute', background: 'var(--primary)', opacity: 0.2, borderRadius: '50%', animation: 'pulse 2s infinite', top: '21px' }}></div>
@@ -1196,37 +1495,38 @@ const VendorDashboard = ({ user, onLogout }) => {
         </div>
         
         <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-          {menus.length === 0 ? (
+          {distribusi.length === 0 ? (
             <div className="card dashboard-card-vibrant" style={{ padding: '3rem', gridColumn: 'span 2', textAlign: 'center' }}>
-              <p style={{ fontWeight: '800', color: 'var(--text-muted)' }}>Belum ada data pengiriman. Silakan input menu terlebih dahulu.</p>
+              <p style={{ fontWeight: '800', color: 'var(--text-muted)' }}>Belum ada data distribusi atau pengiriman armada.</p>
             </div>
           ) : (
-            menus.map((m, i) => {
-              const isPending = m.status_validasi === 'pending';
+            distribusi.map((d, i) => {
+              const isScheduled = d.status === 'DIJADWALKAN';
+              const isDelivered = d.status === 'TIBA';
               return (
-                <div key={i} className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px' }}>
+                <div key={i} className="card dashboard-card-vibrant" style={{ padding: '2.5rem', borderRadius: '32px', opacity: isDelivered ? 0.7 : 1 }}>
                    <div className="flex justify-between" style={{ marginBottom: '1.5rem' }}>
-                     <p style={{ fontWeight: '950', color: 'var(--primary)', fontSize: '0.9rem' }}>ARMADA #{String(i + 1).padStart(2, '0')}</p>
+                     <p style={{ fontWeight: '950', color: 'var(--primary)', fontSize: '0.9rem' }}>TX KODE: {d.kode_transaksi}</p>
                      <span className="badge" style={{ 
-                       background: isPending ? 'var(--banana-light)' : 'var(--primary-light)', 
-                       color: isPending ? 'var(--banana)' : 'var(--primary)', 
+                       background: isScheduled ? 'var(--banana-light)' : (isDelivered ? '#e2e8f0' : 'var(--primary-light)'), 
+                       color: isScheduled ? 'var(--banana)' : (isDelivered ? '#64748b' : 'var(--primary)'), 
                        fontWeight: '900' 
                      }}>
-                       {isPending ? 'MENUNGGU VALIDASI' : 'DALAM PERJALANAN'}
+                       {d.status}
                      </span>
                    </div>
-                   <h4 style={{ fontSize: '1.4rem', fontWeight: '950', marginBottom: '8px' }}>Tujuan: SDN 06 Baru</h4>
+                   <h4 style={{ fontSize: '1.4rem', fontWeight: '950', marginBottom: '8px' }}>{d.nama_sekolah}</h4>
                    <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontWeight: '600' }}>
-                     Driver: {isPending ? 'Belum Ditugaskan' : (i % 2 === 0 ? 'Andi Rahmadi' : 'Budi Santoso')}
+                     Menu: {d.nama_menu} ({d.jumlah_porsi} Porsi)
                    </p>
                    <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                      <div style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '15px', textAlign: 'center' }}>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800' }}>ETA</p>
-                        <p style={{ fontWeight: '950', fontSize: '1.1rem' }}>{isPending ? '--:--' : (10 + i) + ':45'}</p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800' }}>WAKTU KIRIM</p>
+                        <p style={{ fontWeight: '950', fontSize: '1.1rem' }}>{d.waktu_kirim ? new Date(d.waktu_kirim).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
                      </div>
                      <div style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '15px', textAlign: 'center' }}>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800' }}>JARAK</p>
-                        <p style={{ fontWeight: '950', fontSize: '1.1rem' }}>{isPending ? '0 km' : (2.5 + i * 1.2).toFixed(1) + ' km'}</p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800' }}>LEDGER HASH</p>
+                        <p style={{ fontWeight: '950', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.blockchain_hash ? d.blockchain_hash.substring(0, 10) + '...' : 'PENDING'}</p>
                      </div>
                    </div>
                 </div>

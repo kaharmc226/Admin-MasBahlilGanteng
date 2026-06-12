@@ -53,6 +53,7 @@ const Header = ({ title, subtitle, showAdd = false, onAdd, isFeedback }) => (
   </div>
 )
 
+const AddFormModal = ({ onClose, isFeedback }) => {
   const [rating, setRating] = useState(4);
   
   const getFields = () => {

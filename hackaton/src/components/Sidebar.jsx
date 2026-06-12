@@ -23,9 +23,9 @@ const Sidebar = ({ user, collapsed, mobileOpen, onToggle, onMobileClose }) => {
 
   const vendorMenu = [
     { title: 'Dashboard', path: '/vendor', icon: <Home size={20}/> },
-    { title: 'Dokumen Vendor', path: '/vendor/dokumen', icon: <FileText size={20}/> },
-    { title: 'Registrasi Dapur', path: '/vendor/dapur', icon: <ChefHat size={20}/> },
+    { title: 'Informasi Vendor', path: '/vendor/informasi', icon: <FileText size={20}/> },
     { title: 'Input Menu', path: '/vendor/menu', icon: <Utensils size={20}/> },
+    { title: 'Manajemen Stok', path: '/vendor/stok', icon: <FileText size={20}/> },
     { title: 'Status Produksi', path: '/vendor/produksi', icon: <Layout size={20}/> },
     { title: 'Distribusi', path: '/vendor/distribusi', icon: <Truck size={20}/> },
   ]
