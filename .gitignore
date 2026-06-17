@@ -3,14 +3,11 @@ node_modules
 dist
 .env
 *.log
-**/__pycache__
-**/venv
+backend_ai/__pycache__
+backend_ai/venv
 .vscode
 .gemini
 .agent
 brain
 artifacts
 .system_generated
-hackaton/node_modules
-hackaton/dist
-hackaton/.env
