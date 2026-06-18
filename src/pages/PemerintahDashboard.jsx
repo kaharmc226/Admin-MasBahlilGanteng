@@ -76,12 +76,20 @@ const Header = ({ title, subtitle, showAdd = false, onAdd, isVendor, isMapping }
 
 const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
   const [isSaving, setIsSaving] = useState(false)
+  const [fields, setFields] = useState({
+    nama_vendor: '',
+    region: '',
+    izin_usaha: '',
+    nama_sekolah: '',
+    jumlah_siswa: '',
+    alamat: ''
+  })
 
   const handleSave = () => {
     setIsSaving(true)
     setTimeout(() => {
       setIsSaving(false)
-      onSave(isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target')
+      onSave(isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target', fields)
     }, 1200)
   }
 
@@ -90,15 +98,15 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
       <>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA VENDOR</label>
-          <input placeholder="Contoh: PT. Pangan Sejahtera" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+          <input required value={fields.nama_vendor} onChange={(e) => setFields({ ...fields, nama_vendor: e.target.value })} placeholder="Contoh: PT. Pangan Sejahtera" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NOMOR IZIN USAHA</label>
-          <input placeholder="B-9988/2026/MBG" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+          <input required value={fields.izin_usaha} onChange={(e) => setFields({ ...fields, izin_usaha: e.target.value })} placeholder="B-9988/2026/MBG" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>WILAYAH OPERASIONAL</label>
-          <input placeholder="Contoh: Jakarta Selatan" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+          <input required value={fields.region} onChange={(e) => setFields({ ...fields, region: e.target.value })} placeholder="Contoh: Jakarta Selatan" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
       </>
     )
@@ -106,15 +114,15 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
       <>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA SEKOLAH BARU</label>
-          <input placeholder="Contoh: SDN 05 Menteng" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+          <input required value={fields.nama_sekolah} onChange={(e) => setFields({ ...fields, nama_sekolah: e.target.value })} placeholder="Contoh: SDN 05 Menteng" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>JUMLAH SISWA</label>
-          <input type="number" placeholder="450" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+          <input required type="number" value={fields.jumlah_siswa} onChange={(e) => setFields({ ...fields, jumlah_siswa: e.target.value })} placeholder="450" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>ALAMAT LENGKAP SEKOLAH</label>
-          <textarea placeholder="Jl. Merdeka No. 10..." style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} />
+          <textarea required value={fields.alamat} onChange={(e) => setFields({ ...fields, alamat: e.target.value })} placeholder="Jl. Merdeka No. 10..." style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} />
         </div>
       </>
     )
@@ -196,9 +204,42 @@ const PemerintahDashboard = ({ user, onLogout }) => {
     setTimeout(() => setShowToast({ show: false, message: '' }), 3000)
   }
 
-  const handleModalSave = (type) => {
-    setShowAddForm(false)
-    triggerToast(`Data ${type} baru berhasil ditambahkan!`)
+  const handleModalSave = async (type, data) => {
+    try {
+      if (type === 'Vendor') {
+        const created = await api.createVendor({
+          nama_vendor: data.nama_vendor,
+          izin_usaha: data.izin_usaha,
+          region: data.region,
+          status_verifikasi: 'approved',
+          date_pendaftaran: new Date().toISOString().split('T')[0]
+        })
+        setActiveVendors(prev => [created, ...prev])
+      } else if (type === 'Sekolah') {
+        const createdSekolah = await api.createSekolah({
+          nama_sekolah: data.nama_sekolah,
+          jumlah_siswa: parseInt(data.jumlah_siswa) || 0,
+          alamat: data.alamat,
+          jenjang: 'SD',
+          alergi_count: 0,
+          intoleran_count: 0
+        })
+        setSekolahList(prev => [...prev, createdSekolah])
+        
+        // Map the new school to the first dapur
+        await api.createMapping({
+          id_dapur: 1,
+          id_sekolah: createdSekolah.id_sekolah
+        })
+        const m = await api.getMapping()
+        setMappingData(m)
+      }
+      setShowAddForm(false)
+      triggerToast(`Data ${type} baru berhasil ditambahkan!`)
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menyimpan data: ' + err.message)
+    }
   }
 
   const path = location.pathname.replace(/\/$/, '')
@@ -376,13 +417,13 @@ const PemerintahDashboard = ({ user, onLogout }) => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                          <div style={{ background: 'white', padding: '10px', borderRadius: '12px' }}><ChefHat color="var(--primary)" size={18} /></div>
                          <div>
-                            <p style={{ fontWeight: '800' }}>Dapur Vendor</p>
+                            <p style={{ fontWeight: '800' }}>Dapur {m.dapur_lokasi || 'Vendor'}</p>
                          </div>
                       </div>
                       <Link2 color="var(--text-muted)" />
                       <div style={{ display: 'flex', alignItems: 'center', gap: '15px', textAlign: 'right' }}>
                          <div>
-                            <p style={{ fontWeight: '800' }}>Sekolah</p>
+                            <p style={{ fontWeight: '800' }}>{m.nama_sekolah || 'Sekolah'}</p>
                          </div>
                          <div style={{ background: 'white', padding: '10px', borderRadius: '12px' }}><Users color="var(--carrot)" size={18} /></div>
                       </div>
@@ -435,9 +476,9 @@ const PemerintahDashboard = ({ user, onLogout }) => {
               <div style={{ background: 'var(--bg)', padding: '20px', borderRadius: '8px' }}><AlertTriangle color="#EF4444" /></div>
               <div style={{ flex: 1 }}>
                 <div className="flex justify-between" style={{ marginBottom: '5px' }}>
-                  <h4 style={{ fontWeight: '900', fontSize: '1.2rem' }}>{a.title}</h4>
+                  <h4 style={{ fontWeight: '900', fontSize: '1.2rem' }}>{a.judul}</h4>
                 </div>
-                <p style={{ color: 'var(--text-muted)', fontWeight: '500' }}>{a.detail}</p>
+                <p style={{ color: 'var(--text-muted)', fontWeight: '500' }}>{a.deskripsi}</p>
               </div>
             </div>
           ))}

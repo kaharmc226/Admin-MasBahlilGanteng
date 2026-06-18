@@ -679,15 +679,40 @@ const VendorDashboard = ({ user, onLogout }) => {
   }, [selectedDapurForStok])
 
   const [formBahan, setFormBahan] = useState('')
+  const [formSatuan, setFormSatuan] = useState('kg')
+  const [showSuggestions, setShowSuggestions] = useState(false)
   useEffect(() => {
     if (isStok) {
       const rep = localStorage.getItem('replenishBahan')
       if (rep) {
         setFormBahan(rep)
         localStorage.removeItem('replenishBahan')
+        const existing = stokData.find(s => s.nama_bahan.toLowerCase() === rep.toLowerCase())
+        if (existing) {
+          setFormSatuan(existing.satuan)
+        }
       }
     }
-  }, [isStok])
+  }, [isStok, stokData])
+
+  const handleBahanChange = (val) => {
+    setFormBahan(val)
+    const lowerVal = val.toLowerCase()
+    const literKeywords = ['minyak', 'air', 'kecap', 'susu', 'kaldu', 'jus', 'sirup', 'santan', 'saus', 'cuka']
+    const kgKeywords = ['beras', 'daging', 'ayam', 'ikan', 'tahu', 'tempe', 'wortel', 'cabai', 'cabe', 'bawang', 'garam', 'gula', 'tepung', 'kentang', 'sayur', 'kol', 'bayam', 'kangkung', 'tomat', 'terigu', 'maizena', 'merica', 'ketumbar', 'bumbu']
+    const butirKeywords = ['telur', 'telur ayam', 'telur puyuh', 'telur bebek']
+    const packKeywords = ['masako', 'royco', 'penyedap', 'ragi', 'mentega', 'keju']
+
+    if (literKeywords.some(kw => lowerVal.includes(kw))) {
+      setFormSatuan('liter')
+    } else if (kgKeywords.some(kw => lowerVal.includes(kw))) {
+      setFormSatuan('kg')
+    } else if (butirKeywords.some(kw => lowerVal.includes(kw))) {
+      setFormSatuan('butir')
+    } else if (packKeywords.some(kw => lowerVal.includes(kw))) {
+      setFormSatuan('pack')
+    }
+  }
 
   const handleAddDapur = async (newDapur) => {
     try {
@@ -739,16 +764,17 @@ const VendorDashboard = ({ user, onLogout }) => {
     const form = e.target
     const data = {
       id_dapur: selectedDapurForStok,
-      nama_bahan: form.nama_bahan.value,
+      nama_bahan: formBahan,
       jumlah: parseFloat(form.jumlah.value),
-      satuan: form.satuan.value
+      satuan: formSatuan
     }
     try {
       const created = await api.createStok(data)
-      setStokData(prev => [...prev, created])
+      api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
       api.getStokHistory(selectedDapurForStok).then(setStokHistory).catch(console.error)
       form.reset()
-      if (typeof setFormBahan === 'function') setFormBahan('')
+      setFormBahan('')
+      setFormSatuan('kg')
     } catch (err) { console.error(err) }
   }
 
@@ -1048,37 +1074,130 @@ const VendorDashboard = ({ user, onLogout }) => {
                    )}
                    <h4 style={{ fontWeight: '950', marginBottom: '1rem', fontSize: '1.1rem' }}>Tambah Item Baru</h4>
                    <form onSubmit={handleAddStok} style={{ display: 'grid', gap: '1rem' }}>
-                     <div>
-                       <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '5px' }}>NAMA BAHAN BAKU</label>
-                       <input 
-                         required 
-                         name="nama_bahan" 
-                         value={formBahan}
-                         onChange={e => setFormBahan(e.target.value)}
-                         placeholder="Nama Bahan (Cth: Beras)" 
-                         style={{ 
-                           width: '100%',
-                           padding: '1rem', 
-                           borderRadius: '12px', 
-                           border: formBahan ? '2px solid var(--primary)' : '1.5px solid var(--border)',
-                           fontWeight: '700',
-                           outline: 'none',
-                           background: formBahan ? 'var(--primary-light)' : 'white'
-                         }} 
-                       />
-                     </div>
-                     <div style={{ display: 'flex', gap: '10px' }}>
-                       <div style={{ flex: 1 }}>
-                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '5px' }}>KUANTITAS</label>
-                         <input required type="number" step="0.01" name="jumlah" placeholder="0.00" style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)', fontWeight: '700' }} />
-                       </div>
-                       <div style={{ width: '110px' }}>
-                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '5px' }}>SATUAN</label>
-                         <input required name="satuan" placeholder="kg / liter" style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)', fontWeight: '700' }} />
-                       </div>
-                     </div>
-                     <button type="submit" className="btn-primary" style={{ padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '900', marginTop: '10px', cursor: 'pointer' }}>Tambahkan Item</button>
-                   </form>
+                      <div style={{ position: 'relative' }}>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '5px' }}>NAMA BAHAN BAKU</label>
+                        <input 
+                          required 
+                          name="nama_bahan" 
+                          value={formBahan}
+                          onChange={e => handleBahanChange(e.target.value)}
+                          onFocus={() => setShowSuggestions(true)}
+                          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                          placeholder="Nama Bahan (Cth: Beras)" 
+                          style={{ 
+                            width: '100%',
+                            padding: '1rem', 
+                            borderRadius: '12px', 
+                            border: formBahan ? '2px solid var(--primary)' : '1.5px solid var(--border)',
+                            fontWeight: '700',
+                            outline: 'none',
+                            background: formBahan ? 'var(--primary-light)' : 'white'
+                          }} 
+                        />
+                        {(() => {
+                          const suggestions = formBahan.trim() ? stokData.filter(s => 
+                            s.nama_bahan.toLowerCase().includes(formBahan.toLowerCase()) &&
+                            s.nama_bahan.toLowerCase() !== formBahan.toLowerCase()
+                          ).slice(0, 3) : [];
+                          const existingItem = stokData.find(s => s.nama_bahan.toLowerCase() === formBahan.trim().toLowerCase());
+
+                          return (
+                            <>
+                              {showSuggestions && suggestions.length > 0 && (
+                                <div style={{ 
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  right: 0,
+                                  marginTop: '5px', 
+                                  background: '#ffffff', 
+                                  border: '1.5px solid var(--border)', 
+                                  borderRadius: '12px', 
+                                  padding: '8px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '4px',
+                                  zIndex: 100,
+                                  boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+                                }}>
+                                  <p style={{ fontSize: '0.65rem', fontWeight: '800', color: 'var(--text-muted)', paddingLeft: '8px', marginBottom: '2px' }}>BAHAN SERUPA DITEMUKAN:</p>
+                                  {suggestions.map((s, idx) => (
+                                    <div 
+                                      key={idx} 
+                                      onClick={() => {
+                                        setFormBahan(s.nama_bahan);
+                                        setFormSatuan(s.satuan);
+                                      }}
+                                      style={{ 
+                                        padding: '8px 12px', 
+                                        borderRadius: '8px', 
+                                        background: 'var(--bg)', 
+                                        border: '1px solid #e2e8f0',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                      }}
+                                    >
+                                      <span style={{ fontWeight: '750', fontSize: '0.85rem' }}>{s.nama_bahan}</span>
+                                      <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '800', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: '4px' }}>autofill ({s.satuan})</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {existingItem && (
+                                <div style={{ 
+                                  marginTop: '8px', 
+                                  background: 'var(--primary-light)', 
+                                  border: '1.5px solid var(--primary)', 
+                                  borderRadius: '10px', 
+                                  padding: '8px 12px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '750',
+                                  color: 'var(--primary)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}>
+                                  <CheckCircle2 size={16} /> Bahan ini sudah terdaftar. Input baru akan ditambahkan ke stok {existingItem.nama_bahan} saat ini.
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '5px' }}>KUANTITAS</label>
+                          <input required type="number" step="0.01" name="jumlah" placeholder="0.00" style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1.5px solid var(--border)', fontWeight: '700' }} />
+                        </div>
+                        <div style={{ width: '120px' }}>
+                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '5px' }}>SATUAN</label>
+                          <select 
+                            value={formSatuan} 
+                            onChange={e => setFormSatuan(e.target.value)}
+                            style={{ 
+                              width: '100%', 
+                              padding: '1rem', 
+                              borderRadius: '12px', 
+                              border: '1.5px solid var(--border)', 
+                              fontWeight: '750',
+                              background: 'white',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="kg">kg (Kilo)</option>
+                            <option value="liter">liter (Ltr)</option>
+                            <option value="pcs">pcs (Biji)</option>
+                            <option value="pack">pack (Bks)</option>
+                            <option value="butir">butir</option>
+                            <option value="ikat">ikat</option>
+                            <option value="gram">gram</option>
+                          </select>
+                        </div>
+                      </div>
+                      <button type="submit" className="btn-primary" style={{ padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '900', marginTop: '10px', cursor: 'pointer' }}>Tambahkan Item</button>
+                    </form>
                  </div>
                </div>
 

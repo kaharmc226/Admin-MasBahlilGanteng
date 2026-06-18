@@ -159,7 +159,7 @@ CREATE TABLE produksi (
   id_produksi INT PRIMARY KEY AUTO_INCREMENT,
   id_dapur INT NOT NULL,
   id_menu INT NOT NULL,
-  status ENUM('persiapan','memasak','siap_kirim','selesai') DEFAULT 'persiapan',
+  status ENUM('pending','persiapan','memasak','siap_kirim','selesai') DEFAULT 'pending',
   jumlah_porsi INT NOT NULL DEFAULT 0,
   waktu_mulai DATETIME NULL,
   waktu_selesai DATETIME NULL,

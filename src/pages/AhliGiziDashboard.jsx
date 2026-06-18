@@ -687,7 +687,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                         <motion.button 
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
-                          onClick={() => handleApprove(selectedMenu.id)} 
+                          onClick={() => handleApprove(selectedMenu.id_menu)} 
                           style={{ width: '100%', padding: '1.4rem', borderRadius: '24px', background: 'var(--primary)', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 15px 35px rgba(16, 185, 129, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
                         >
                           <CheckCircle2 size={24} /> Sahkan Menu
@@ -695,7 +695,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                         <motion.button 
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
-                          onClick={() => handleReject(selectedMenu.id)} 
+                          onClick={() => handleReject(selectedMenu.id_menu)} 
                           style={{ width: '100%', padding: '1.4rem', borderRadius: '24px', background: 'white', border: '2.5px solid var(--error)', color: 'var(--error)', fontWeight: '950', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
                         >
                           <AlertTriangle size={24} /> Minta Revisi

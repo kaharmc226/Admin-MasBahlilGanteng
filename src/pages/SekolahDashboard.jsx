@@ -53,12 +53,47 @@ const Header = ({ title, subtitle, showAdd = false, onAdd, isFeedback }) => (
   </div>
 )
 
-const AddFormModal = ({ onClose, isFeedback }) => {
+const AddFormModal = ({ onClose, isFeedback, activeDelivery, user }) => {
   const [rating, setRating] = useState(4);
+  const [fields, setFields] = useState({
+    nama_siswa: '',
+    komentar: '',
+    judul: '',
+    urgency: 'Sedang',
+    deskripsi: ''
+  })
+  const [isSaving, setIsSaving] = useState(false)
   
-  const handleActionSubmit = () => {
-    alert(isFeedback ? "✅ Feedback berhasil dikirim ke Ahli Gizi Pusat!" : "⚠️ Kendala berhasil dilaporkan ke Vendor & Pemerintah!");
-    onClose();
+  const handleActionSubmit = async (e) => {
+    e.preventDefault()
+    setIsSaving(true)
+    try {
+      if (isFeedback) {
+        await api.createFeedback({
+          id_sekolah: activeDelivery.id_sekolah || 1,
+          id_user: user.id_user || 4,
+          id_menu: activeDelivery.id_menu || 1,
+          rating: rating,
+          komentar: `[${fields.nama_siswa || 'Anonim'}] ${fields.komentar || 'Tidak ada catatan.'}`,
+          kategori: 'kualitas'
+        })
+        alert("✅ Feedback berhasil dikirim ke Ahli Gizi Pusat!")
+      } else {
+        await api.createAlert({
+          judul: fields.judul || 'Kendala Sekolah',
+          deskripsi: fields.deskripsi || 'Tidak ada deskripsi.',
+          severity: fields.urgency === 'Tinggi (Segera)' ? 'warning' : (fields.urgency === 'Sedang' ? 'info' : 'info'),
+          wilayah: 'Jakarta Timur'
+        })
+        alert("⚠️ Kendala berhasil dilaporkan ke Vendor & Pemerintah!")
+      }
+      onClose();
+    } catch (err) {
+      console.error(err)
+      alert('Gagal mengirim data: ' + err.message)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -111,7 +146,7 @@ const AddFormModal = ({ onClose, isFeedback }) => {
               <>
                 <div>
                   <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA SISWA / KELAS</label>
-                  <input placeholder="Contoh: Budi - Kelas 4A" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+                  <input required value={fields.nama_siswa} onChange={(e) => setFields({ ...fields, nama_siswa: e.target.value })} placeholder="Contoh: Budi - Kelas 4A" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>RATING CITA RASA (1-5)</label>
@@ -121,18 +156,18 @@ const AddFormModal = ({ onClose, isFeedback }) => {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PESAN / CATATAN RASA</label>
-                  <textarea placeholder="Makanannya enak sekali dan porsinya pas!" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} />
+                  <textarea required value={fields.komentar} onChange={(e) => setFields({ ...fields, komentar: e.target.value })} placeholder="Makanannya enak sekali dan porsinya pas!" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} />
                 </div>
               </>
             ) : (
               <>
                 <div>
                   <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>JUDUL KENDALA</label>
-                  <input placeholder="Contoh: Keterlambatan Pengiriman" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+                  <input required value={fields.judul} onChange={(e) => setFields({ ...fields, judul: e.target.value })} placeholder="Contoh: Keterlambatan Pengiriman" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>TINGKAT URGENSI</label>
-                  <select style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', background: 'white' }}>
+                  <select value={fields.urgency} onChange={(e) => setFields({ ...fields, urgency: e.target.value })} style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', background: 'white' }}>
                     <option>Rendah</option>
                     <option>Sedang</option>
                     <option>Tinggi (Segera)</option>
@@ -140,7 +175,7 @@ const AddFormModal = ({ onClose, isFeedback }) => {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DESKRIPSI DETAIL KENDALA</label>
-                  <textarea placeholder="Jelaskan detail kendala secara rinci agar segera direspon..." style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} />
+                  <textarea required value={fields.deskripsi} onChange={(e) => setFields({ ...fields, deskripsi: e.target.value })} placeholder="Jelaskan detail kendala secara rinci agar segera direspon..." style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} />
                 </div>
               </>
             )}
@@ -150,9 +185,10 @@ const AddFormModal = ({ onClose, isFeedback }) => {
         <button 
           onClick={handleActionSubmit}
           className="btn-primary" 
-          style={{ width: '100%', padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '2rem', cursor: 'pointer' }}
+          disabled={isSaving}
+          style={{ width: '100%', padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '2rem', cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}
         >
-          Kirim Laporan
+          {isSaving ? 'Mengirim Laporan...' : 'Kirim Laporan'}
         </button>
       </motion.div>
     </div>
@@ -184,13 +220,19 @@ const SekolahDashboard = ({ user, onLogout }) => {
   }, [])
 
   const activeDelivery = distribusi[0] ? {
+    id_distribusi: distribusi[0].id_distribusi,
+    id_sekolah: distribusi[0].id_sekolah,
+    id_menu: distribusi[0].id_menu,
     id: distribusi[0].kode_transaksi,
     vendor: 'Dapur Sehat Nusantara',
     status: distribusi[0].status,
     time: distribusi[0].waktu_kirim ? new Date(distribusi[0].waktu_kirim).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : '-',
     menuName: distribusi[0].nama_menu || 'Menu Hari Ini',
-    progress: distribusi[0].status === 'SELESAI' ? 100 : 50
+    progress: (distribusi[0].status === 'SELESAI' || distribusi[0].status === 'TIBA') ? 100 : 50
   } : {
+    id_distribusi: null,
+    id_sekolah: null,
+    id_menu: null,
     id: 'TX-0000',
     vendor: 'Menunggu Vendor...',
     status: 'Sistem Standby',
@@ -199,12 +241,52 @@ const SekolahDashboard = ({ user, onLogout }) => {
     progress: 0
   }
 
+  const handleConfirmArrival = async () => {
+    if (!activeDelivery.id_distribusi) {
+      alert('Tidak ada distribusi aktif saat ini.')
+      return
+    }
+    try {
+      await api.createKonfirmasi({
+        id_distribusi: activeDelivery.id_distribusi,
+        id_user: user.id_user || 4,
+        kondisi_makanan: 'baik',
+        jumlah_diterima: 404,
+        catatan: 'Diterima sesuai jadwal'
+      })
+      
+      setDistribusi(prev => prev.map(d => d.id_distribusi === activeDelivery.id_distribusi ? { ...d, status: 'SELESAI' } : d))
+      alert("✅ Konfirmasi Berhasil! Data dikunci ke Ledger Nasional.")
+    } catch (err) {
+      console.error(err)
+      alert('Gagal konfirmasi: ' + err.message)
+    }
+  }
+
+  const handleQuickFeedback = async () => {
+    try {
+      await api.createFeedback({
+        id_sekolah: activeDelivery.id_sekolah || 1,
+        id_user: user.id_user || 4,
+        id_menu: activeDelivery.id_menu || 1,
+        rating: feedbackRating,
+        komentar: 'Penilaian cepat dari halaman utama',
+        kategori: 'kualitas'
+      })
+      alert("✅ Rating siswa dan feedback telah masuk log blockchain gizi nasional.")
+      setShowAddForm(true)
+    } catch (err) {
+      console.error(err)
+      alert('Gagal mengirim feedback cepat: ' + err.message)
+    }
+  }
+
   const renderContent = () => {
     if (isKonfirmasi) return (
       <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '1rem', position: 'relative', zIndex: 1, width: '100%' }}>
         <div style={{ gridColumn: '1 / -1' }}>
           <AnimatePresence>
-            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} />}
+            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} activeDelivery={activeDelivery} user={user} />}
           </AnimatePresence>
         </div>
         <div className="card dashboard-card-vibrant" style={{ padding: '3.5rem', borderRadius: '16px' }}>
@@ -223,7 +305,7 @@ const SekolahDashboard = ({ user, onLogout }) => {
           </div>
           
           <div style={{ display: 'flex', gap: '1rem' }}>
-             <button onClick={() => alert("✅ Konfirmasi Berhasil! Data dikunci ke Ledger Nasional.")} className="btn-primary" style={{ flex: 1.5, padding: '1.5rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.2rem', cursor: 'pointer' }}>Konfirmasi Sesuai</button>
+             <button onClick={handleConfirmArrival} className="btn-primary" style={{ flex: 1.5, padding: '1.5rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.2rem', cursor: 'pointer' }}>Konfirmasi Sesuai</button>
              <button onClick={() => setShowAddForm(true)} className="btn-outline" style={{ flex: 1, padding: '1.5rem', borderRadius: '12px', color: 'var(--error)', borderColor: 'var(--error)', fontWeight: '900', cursor: 'pointer' }}>Lapor Selisih</button>
           </div>
         </div>
@@ -266,7 +348,7 @@ const SekolahDashboard = ({ user, onLogout }) => {
     if (isFeedback) return (
       <div className="grid" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
         <AnimatePresence>
-          {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={true} />}
+          {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={true} activeDelivery={activeDelivery} user={user} />}
         </AnimatePresence>
         <div className="card" style={{ padding: '4.5rem', borderRadius: '16px', maxWidth: '850px', margin: '0 auto', boxShadow: '0 40px 80px rgba(0,0,0,0.05)' }}>
           <h2 style={{ fontSize: '3rem', fontWeight: '950', marginBottom: '1rem', letterSpacing: '-2px' }}>Suara Siswa</h2>
@@ -284,7 +366,7 @@ const SekolahDashboard = ({ user, onLogout }) => {
              <textarea placeholder="Contoh: Sayurnya sangat segar, anak-anak suka!" style={{ width: '100%', height: '180px', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', background: 'var(--bg)', outline: 'none', fontSize: '1.1rem', fontWeight: '500', transition: 'border-color 0.2s' }} onFocus={(e) => e.target.style.borderColor = 'var(--primary)'} onBlur={(e) => e.target.style.borderColor = 'var(--border)'} />
           </div>
           
-          <button onClick={() => {alert("✅ Rating siswa dan feedback telah masuk log blockchain gizi nasional."); setShowAddForm(true);}} className="btn-primary" style={{ width: '100%', borderRadius: '60px', padding: '1.5rem', fontSize: '1.2rem', fontWeight: '900', background: 'linear-gradient(to right, var(--primary), var(--secondary))', border: 'none', color: 'white', boxShadow: '0 15px 30px rgba(16, 185, 129, 0.2)', cursor: 'pointer' }}>Kirim Penilaian Cepat & Tulis Laporan Detail</button>
+          <button onClick={handleQuickFeedback} className="btn-primary" style={{ width: '100%', borderRadius: '60px', padding: '1.5rem', fontSize: '1.2rem', fontWeight: '900', background: 'linear-gradient(to right, var(--primary), var(--secondary))', border: 'none', color: 'white', boxShadow: '0 15px 30px rgba(16, 185, 129, 0.2)', cursor: 'pointer' }}>Kirim Penilaian Cepat & Tulis Laporan Detail</button>
         </div>
       </div>
     )
@@ -300,7 +382,7 @@ const SekolahDashboard = ({ user, onLogout }) => {
       {isMain ? (
         <>
           <AnimatePresence>
-            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} />}
+            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} activeDelivery={activeDelivery} user={user} />}
           </AnimatePresence>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div>

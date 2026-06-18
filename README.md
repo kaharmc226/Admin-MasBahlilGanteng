@@ -54,7 +54,22 @@ npm install
 
 ### Menjalankan Aplikasi
 
-Anda perlu menjalankan server frontend dan backend secara bersamaan.
+Anda dapat menggunakan skrip otomatisasi baru untuk memeriksa database, menginisialisasi tabel (jika belum ada), dan menjalankan frontend & backend secara bersamaan:
+
+```bash
+npm start
+```
+
+*Jika Anda ingin melakukan reset ulang database (menghapus dan membuat ulang data dari awal), jalankan:*
+```bash
+npm start -- --reset
+```
+
+---
+
+#### Menjalankan Secara Manual (Opsional)
+
+Jika Anda ingin menjalankan server frontend dan backend secara terpisah di terminal yang berbeda:
 
 **1. Jalankan Server API Backend:**
 ```bash

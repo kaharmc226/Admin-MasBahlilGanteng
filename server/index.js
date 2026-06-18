@@ -17,8 +17,13 @@ pool.query(`
   )
 `).then(() => {
   console.log('✅ Table dapur_stok_history is ready.')
+  return pool.query(`
+    ALTER TABLE produksi MODIFY COLUMN status ENUM('pending','persiapan','memasak','siap_kirim','selesai') DEFAULT 'pending'
+  `)
+}).then(() => {
+  console.log('✅ Table produksi status column updated to include pending.')
 }).catch(err => {
-  console.error('❌ Failed to run auto-migration for dapur_stok_history:', err.message)
+  console.error('❌ Failed to run auto-migrations:', err.message)
 })
 
 const app = express()
@@ -444,7 +449,7 @@ app.put('/api/produksi/:id', async (req, res) => {
 app.get('/api/distribusi', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT d.*, s.nama_sekolah, m.nama_menu
+      SELECT d.*, s.nama_sekolah, m.nama_menu, p.id_menu
       FROM distribusi d
       JOIN sekolah s ON d.id_sekolah = s.id_sekolah
       JOIN produksi p ON d.id_produksi = p.id_produksi
