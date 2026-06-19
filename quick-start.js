@@ -41,29 +41,112 @@ const dbConfig = {
 };
 
 const forceReset = process.argv.includes('--reset') || process.argv.includes('--force');
+let spawnedMysqlProcess = null;
 
-async function checkAndInitDatabase() {
-  console.log(`🔍 Connecting to MySQL server at \x1b[36m${dbConfig.host}:${dbConfig.port}\x1b[0m (user: ${dbConfig.user})...`);
+// Helpers to locate MySQL binaries in standard Windows locations
+function findLaragonMysql() {
+  const baseDir = 'C:\\laragon\\bin\\mysql';
+  if (!fs.existsSync(baseDir)) return null;
   
-  const connectionConfig = {
-    host: dbConfig.host,
-    port: dbConfig.port,
-    user: dbConfig.user,
-    password: dbConfig.password,
-    multipleStatements: true,
-  };
-
-  let connection;
   try {
-    connection = await mysql.createConnection(connectionConfig);
+    const files = fs.readdirSync(baseDir);
+    for (const file of files) {
+      const fullPath = path.join(baseDir, file);
+      if (fs.statSync(fullPath).isDirectory()) {
+        const mysqldPath = path.join(fullPath, 'bin', 'mysqld.exe');
+        const myIniPath = path.join(fullPath, 'my.ini');
+        if (fs.existsSync(mysqldPath) && fs.existsSync(myIniPath)) {
+          return { mysqldPath, myIniPath };
+        }
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+function findXamppMysql() {
+  const mysqldPath = 'C:\\xampp\\mysql\\bin\\mysqld.exe';
+  const myIniPath = 'C:\\xampp\\mysql\\bin\\my.ini';
+  if (fs.existsSync(mysqldPath) && fs.existsSync(myIniPath)) {
+    return { mysqldPath, myIniPath };
+  }
+  return null;
+}
+
+async function verifyAndConnectDb(config) {
+  return await mysql.createConnection({
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password,
+    multipleStatements: true,
+  });
+}
+
+async function ensureMysqlRunning() {
+  console.log(`🔍 Checking MySQL connection at \x1b[36m${dbConfig.host}:${dbConfig.port}\x1b[0m (user: ${dbConfig.user})...`);
+  
+  // Try connecting first
+  try {
+    const connection = await verifyAndConnectDb(dbConfig);
+    console.log(`💾 MySQL server is already running. \x1b[32m[OK]\x1b[0m`);
+    return connection;
   } catch (err) {
-    console.error('\n\x1b[31m❌ Could not connect to the MySQL database server.\x1b[0m');
-    console.error(`   Error details: ${err.message}`);
-    console.error('\n\x1b[33m💡 Help: Make sure your local MySQL/MariaDB server (Laragon, XAMPP, or native service) is running.\x1b[0m');
-    console.error(`   Also verify credentials in: \x1b[34mserver/db.js\x1b[0m\n`);
+    // Connection failed, let's try starting it automatically
+  }
+
+  // Locate local MySQL installation (Laragon or XAMPP)
+  const mysqlInfo = findLaragonMysql() || findXamppMysql();
+  if (!mysqlInfo) {
+    console.error('\n\x1b[31m❌ MySQL is offline and we could not find a local Laragon or XAMPP MySQL installation to start.\x1b[0m');
+    console.error(`   Error details: Connection refused at ${dbConfig.host}:${dbConfig.port}`);
+    console.error('\n\x1b[33m💡 Help: Please start your database server manually and run again.\x1b[0m\n');
     process.exit(1);
   }
 
+  console.log(`\n\x1b[33m⚠️ MySQL is not running. Attempting to start local MySQL server automatically...\x1b[0m`);
+  console.log(`   Binary: \x1b[34m${mysqlInfo.mysqldPath}\x1b[0m`);
+  console.log(`   Config: \x1b[34m${mysqlInfo.myIniPath}\x1b[0m\n`);
+
+  try {
+    // Spawn MySQL process directly (no shell, so it's a child we can kill directly)
+    spawnedMysqlProcess = spawn(mysqlInfo.mysqldPath, [`--defaults-file=${mysqlInfo.myIniPath}`], {
+      shell: false,
+      stdio: 'ignore'
+    });
+  } catch (spawnErr) {
+    console.error('\x1b[31m❌ Failed to spawn MySQL process:\x1b[0m', spawnErr.message);
+    process.exit(1);
+  }
+
+  // Poll connection until MySQL finishes starting up
+  const maxRetries = 12;
+  const retryIntervalMs = 1500;
+  for (let i = 1; i <= maxRetries; i++) {
+    process.stdout.write(`⏳ Waiting for MySQL to start... (Attempt ${i}/${maxRetries})\r`);
+    
+    // Check if the process exited prematurely
+    if (spawnedMysqlProcess.exitCode !== null) {
+      console.error(`\n\x1b[31m❌ MySQL server failed to start. Process exited with code ${spawnedMysqlProcess.exitCode}.\x1b[0m`);
+      process.exit(1);
+    }
+
+    try {
+      const connection = await verifyAndConnectDb(dbConfig);
+      console.log(`\n\x1b[32m✅ MySQL server started successfully and connection established!\x1b[0m`);
+      return connection;
+    } catch (err) {
+      // Ignore connection error and wait for next retry
+    }
+    await new Promise(resolve => setTimeout(resolve, retryIntervalMs));
+  }
+
+  console.error(`\n\x1b[31m❌ MySQL server started but connection timed out after ${maxRetries * retryIntervalMs / 1000} seconds.\x1b[0m`);
+  if (spawnedMysqlProcess) spawnedMysqlProcess.kill();
+  process.exit(1);
+}
+
+async function checkAndInitDatabase(connection) {
   try {
     let dbExists = false;
     let tablesExist = false;
@@ -90,11 +173,8 @@ async function checkAndInitDatabase() {
     }
   } catch (err) {
     console.error('\x1b[31m❌ Error during database check or initialization:\x1b[0m', err.message);
+    if (spawnedMysqlProcess) spawnedMysqlProcess.kill();
     process.exit(1);
-  } finally {
-    if (connection) {
-      await connection.end();
-    }
   }
 }
 
@@ -139,6 +219,10 @@ function startServices() {
     console.log('\n\x1b[33m🛑 Stopping all services...\x1b[0m');
     backend.kill();
     frontend.kill();
+    if (spawnedMysqlProcess) {
+      console.log('🛑 Stopping automatically started MySQL server...');
+      spawnedMysqlProcess.kill();
+    }
     process.exit(0);
   };
 
@@ -148,12 +232,14 @@ function startServices() {
   backend.on('close', (code) => {
     console.log(`\x1b[31m❌ Backend process exited with code ${code}\x1b[0m`);
     frontend.kill();
+    if (spawnedMysqlProcess) spawnedMysqlProcess.kill();
     process.exit(code);
   });
 
   frontend.on('close', (code) => {
     console.log(`\x1b[31m❌ Frontend process exited with code ${code}\x1b[0m`);
     backend.kill();
+    if (spawnedMysqlProcess) spawnedMysqlProcess.kill();
     process.exit(code);
   });
 }
@@ -186,6 +272,8 @@ function streamLogs(childProcess, prefix, colorCode) {
 
 // Run the script
 (async () => {
-  await checkAndInitDatabase();
+  const connection = await ensureMysqlRunning();
+  await checkAndInitDatabase(connection);
+  if (connection) await connection.end();
   startServices();
 })();
