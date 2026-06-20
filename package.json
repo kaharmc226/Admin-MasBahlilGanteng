@@ -7,6 +7,7 @@
     "dev": "vite",
     "server": "node server/index.js",
     "start": "node quick-start.js",
+    "seed:demo": "node scripts/seed-demo.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

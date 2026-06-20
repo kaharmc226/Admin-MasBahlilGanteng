@@ -2,143 +2,188 @@
 
 [![React](https://img.shields.io/badge/React-18.2.0-blue.svg)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.2.2-646CFF.svg)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.0-38B2AC.svg)](https://tailwindcss.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.3-38B2AC.svg)](https://tailwindcss.com/)
 [![Express](https://img.shields.io/badge/Express-5.2.1-lightgrey.svg)](https://expressjs.com/)
 [![MySQL](https://img.shields.io/badge/MySQL-Database-4479A1.svg)](https://www.mysql.com/)
 
-**TRAKSI** adalah platform pelacakan dan transparansi gizi makanan yang dirancang untuk mendukung program Makanan Bergizi Gratis (MBG) di Indonesia. Sistem ini menyediakan ekosistem terpadu untuk empat peran utama:
+TRAKSI adalah platform pelacakan dan transparansi distribusi makanan bergizi untuk mendukung program MBG. Aplikasi ini menghubungkan empat peran utama dalam satu alur kerja:
 
-1. 🧑‍🍳 **Vendor**: Produsen makanan dan dapur umum yang mengelola stok dan produksi.
-2. 👩‍⚕️ **Ahli Gizi**: Ahli gizi yang memastikan kualitas makanan dan standar gizi terpenuhi.
-3. 🏫 **Sekolah**: Pihak sekolah yang menerima dan mendistribusikan makanan kepada siswa.
-4. 🏛️ **Pemerintah**: Pejabat pemerintah yang mengawasi pelaksanaan program di seluruh negeri.
+1. **Vendor**: mengelola dapur, stok bahan, menu, produksi, dan dokumen vendor.
+2. **Ahli Gizi**: memvalidasi menu, memantau standar gizi, dan menjaga referensi nutrisi.
+3. **Sekolah**: menerima distribusi, mengonfirmasi kedatangan, dan memberi feedback.
+4. **Pemerintah**: memantau vendor, sekolah, alert operasional, dan cakupan distribusi.
 
----
+## Fitur Utama
 
-## 🎯 Fitur Utama
+- Dashboard berbasis peran untuk Vendor, Ahli Gizi, Sekolah, dan Pemerintah.
+- Alur operasional dari stok bahan -> produksi -> distribusi -> konfirmasi sekolah -> feedback.
+- Integrasi frontend React dengan backend Express dan database MySQL.
+- Seeder demo terpisah untuk menyiapkan data presentasi tanpa harus reset manual lewat SQL.
+- Quick start lokal untuk menjalankan frontend dan backend sekaligus.
 
-*   **Dashboard Berbasis Peran:** Antarmuka khusus untuk Vendor, Ahli Gizi, Sekolah, dan Pemerintah.
-*   **Pelacakan Produksi:** Alur kerja (workflow) end-to-end dari pemotongan stok bahan baku hingga pengiriman makanan.
-*   **UI/UX Modern:** Desain yang bersih dan responsif, didukung oleh Tailwind CSS v4, Framer Motion, dan Lucide React.
-*   **Visualisasi Data:** Grafik interaktif menggunakan Recharts dan Chart.js.
-*   **Tata Letak Responsif:** Berjalan dengan optimal di perangkat desktop maupun seluler.
+## Tech Stack
 
----
+- Frontend: React, Vite, React Router
+- Styling: Tailwind CSS v4, clsx, tailwind-merge
+- Visual: Framer Motion, Lucide React, Recharts, Chart.js
+- Backend: Node.js, Express
+- Database: MySQL (`mysql2`)
 
-## 🚀 Mulai Cepat
+## Struktur Proyek
 
-Untuk menjalankan TRAKSI secara lokal di komputer Anda, ikuti langkah-langkah berikut:
+```text
+.
+|-- database/               # SQL schema dan data demo
+|-- public/                 # Aset statis
+|-- scripts/                # Script utilitas terminal
+|-- server/                 # Backend Express + koneksi MySQL
+|-- src/                    # Frontend React
+|   |-- api.js              # API client
+|   |-- components/         # Komponen UI reusable
+|   |-- pages/              # Halaman dashboard per role
+|   `-- App.jsx             # Routing aplikasi
+|-- quick-start.js          # Menjalankan setup DB + frontend + backend
+`-- package.json
+```
 
-### Prasyarat
+## Prasyarat
 
-*   **Node.js** (direkomendasikan versi 18+)
-*   Database **MySQL** (melalui Laragon, XAMPP, atau instalasi native)
+- Node.js 18 atau lebih baru
+- MySQL lokal
+- Windows + Laragon/XAMPP direkomendasikan untuk setup tercepat
 
-### Konfigurasi Database Lokal
+## Konfigurasi Database
 
-1. Buat database MySQL baru dengan nama `traksi_db`.
-2. Impor skema dan data awal (seed data) yang disediakan dari file `database/traksi_db.sql`.
-3. Backend akan membaca koneksi MySQL lokal dengan konfigurasi:
-   *   Host: `localhost`
-   *   Port: `3306`
-   *   User: `root`
-   *   Password: *(kosong)*
+Secara default backend membaca konfigurasi berikut dari [server/db.js](C:/Users/Administrator/Documents/GitHub/Admin-MasBahlilGanteng/server/db.js:1):
 
-### Instalasi
+- Host: `localhost`
+- Port: `3306`
+- User: `root`
+- Password: kosong
+- Database: `traksi_db`
 
-Clone repositori ini dan instal semua dependensi:
+Jika Anda ingin memakai kredensial lain, ubah file `server/db.js` terlebih dahulu.
+
+## Instalasi
 
 ```bash
 npm install
 ```
 
-### Menjalankan Aplikasi
+## Menjalankan Aplikasi
 
-Anda dapat menggunakan skrip otomatisasi baru untuk memeriksa database, menginisialisasi tabel (jika belum ada), dan menjalankan frontend & backend secara bersamaan:
+### Opsi 1: Quick Start
 
 ```bash
 npm start
 ```
 
-*Jika Anda ingin melakukan reset ulang database (menghapus dan membuat ulang data dari awal), jalankan:*
+Perintah ini akan:
+
+- memeriksa koneksi MySQL,
+- membuat atau menginisialisasi `traksi_db` bila database kosong,
+- mengimpor SQL dasar dari `database/traksi_db.sql`,
+- mengimpor data tambahan dari `database/dummy_data_extension.sql` bila tersedia,
+- menjalankan backend dan frontend secara bersamaan.
+
+Untuk reset penuh:
+
 ```bash
 npm start -- --reset
 ```
 
----
+### Opsi 2: Jalankan Manual
 
-#### Menjalankan Secara Manual (Opsional)
+Backend:
 
-Jika Anda ingin menjalankan server frontend dan backend secara terpisah di terminal yang berbeda:
-
-**1. Jalankan Server API Backend:**
 ```bash
 npm run server
 ```
-*API akan berjalan di `http://localhost:3001`*
 
-**2. Jalankan Server Dev Frontend (di terminal baru):**
+Frontend:
+
 ```bash
 npm run dev
 ```
-*Aplikasi web akan berjalan di `http://localhost:5173`*
 
----
+Default URL:
 
-## 🔐 Akun Pengujian (Testing)
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:3001`
 
-Gunakan kredensial berikut untuk mencoba masuk ke dashboard dari masing-masing peran:
+## Seeder Demo
 
-| Peran (Role) | Email | Password |
-| :--- | :--- | :--- |
-| **Vendor** | `v.jaktim@traksi.id` | `vendor123` |
-| **Pemerintah** | `gov.dki@traksi.id` | `gov123` |
-| **Ahli Gizi** | `nutri.jaktim@traksi.id` | `nutri123` |
-| **Sekolah** | `sdn06@sekolah.traksi.id` | `sekolah123` |
+Seeder demo sekarang bisa dijalankan terpisah dari `npm start`.
 
----
-
-## 🛠️ Tech Stack
-
-*   **Ekosistem Frontend:** React (Vite), React Router v6
-*   **Styling & UI:** Tailwind CSS v4.0, clsx, tailwind-merge
-*   **Animasi & Ikon:** Framer Motion, Lucide React
-*   **Grafik (Charts):** Recharts, react-chartjs-2
-*   **Backend:** Node.js, Express.js (v5)
-*   **Database:** MySQL (via klien `mysql2`)
-
----
-
-## 📂 Struktur Proyek
-
-```text
-.
-├── database/        # Dump database MySQL dan skema tabel
-├── public/          # Aset statis
-├── server/          # API backend berbasis Express.js
-│   └── index.js     # Entry point utama untuk backend
-├── src/             # Kode sumber (source code) React frontend
-│   ├── api.js       # Klien API untuk frontend
-│   ├── components/  # Komponen UI & tata letak yang dapat digunakan ulang
-│   ├── pages/       # Halaman dashboard berbasis peran
-│   └── App.jsx      # Routing utama aplikasi
-├── package.json     # Metadata proyek dan dependensi
-└── tailwind.config.js # Konfigurasi Tailwind CSS
+```bash
+npm run seed:demo
 ```
 
----
+Perintah ini akan memeriksa kondisi database lalu:
 
-## 🚧 Status Pengembangan
+- meminta pilihan jika data sudah ada,
+- menawarkan mode `merge`, `overwrite`, atau `cancel`,
+- menyiapkan data demo yang cocok untuk presentasi.
 
-### Telah Selesai
-*   Refactoring UI/UX dengan standar spasi (spacing) dan tata letak yang rapi.
-*   Integrasi dengan Tailwind CSS v4.
-*   Tata letak dashboard berbasis peran dengan sidebar yang dapat dilipat dan peralihan konteks antar peran.
-*   Komponen inti UI yang dapat digunakan ulang (`Button`, `Card`, `Input`, `Modal`, `Table`).
-*   Fitur Dashboard Vendor (Manajemen Stok Bahan Baku, Tiket Produksi).
-*   Integrasi MySQL dengan endpoint API backend (CRUD lengkap).
+Contoh:
 
-### Tahap Selanjutnya (Upcoming)
-*   Mengganti penggunaan data *mock* di frontend dengan pemanggilan API backend secara real (`src/api.js`).
-*   Mengintegrasikan autentikasi otentik pada `Login.jsx` untuk menggantikan pencocokan data statis (hardcoded).
-*   Penyederhanaan UI sepenuhnya pada formulir (form) untuk Ahli Gizi, Sekolah, dan Pemerintah (dengan panel *slide-in*).
+```bash
+npm run seed:demo -- --merge
+npm run seed:demo -- --overwrite
+npm run seed:demo -- --overwrite --yes
+```
+
+Penjelasan mode:
+
+- `--merge`: menambahkan data demo yang belum ada dan menyegarkan record demo utama.
+- `--overwrite`: membuat ulang database dari SQL bawaan proyek.
+- `--yes`: melewati prompt konfirmasi.
+
+Catatan:
+
+- `npm start` cocok untuk bootstrap cepat.
+- `npm run seed:demo` cocok saat Anda ingin menyiapkan ulang data demo sebelum sidang tanpa menebak kondisi database saat ini.
+- `npm run server` saja tidak melakukan bootstrap database.
+
+## Akun Demo
+
+| Role | Email | Password |
+| :--- | :--- | :--- |
+| Vendor | `v.jaktim@traksi.id` | `vendor123` |
+| Pemerintah | `gov.dki@traksi.id` | `gov123` |
+| Ahli Gizi | `nutri.jaktim@traksi.id` | `nutri123` |
+| Sekolah | `sdn06@sekolah.traksi.id` | `sekolah123` |
+
+## Alur Demo yang Disarankan
+
+Untuk presentasi finals, alur ini paling aman dan mudah dijelaskan:
+
+1. Login sebagai **Vendor** lalu tunjukkan stok, dapur, menu, dan tiket produksi.
+2. Login sebagai **Ahli Gizi** lalu validasi menu dan lihat standar gizi.
+3. Login sebagai **Sekolah** lalu tunjukkan distribusi aktif, konfirmasi kedatangan, dan feedback.
+4. Login sebagai **Pemerintah** lalu buka audit vendor, alert, dan pemetaan distribusi.
+
+## Status Implementasi
+
+Yang sudah berjalan dengan baik untuk demo:
+
+- Dashboard empat role sudah terhubung ke backend.
+- Vendor bisa bekerja dengan dapur, menu, produksi, distribusi terkait, dan dokumen vendor.
+- Ahli Gizi bisa memvalidasi menu, membuat standar gizi, dan mengunduh data nutrisi.
+- Sekolah memakai data distribusi yang terkait dengan user sekolah yang login.
+- Pemerintah bisa memonitor vendor, melihat dokumen, memproses alert, dan melihat mapping dapur-sekolah.
+- Produksi backend memakai transaksi database agar stok tidak terpotong parsial saat validasi gagal.
+
+Keterbatasan yang masih wajar untuk proyek finals:
+
+- Autentikasi masih sederhana dan belum dirancang sebagai sistem produksi.
+- Upload file, kamera, dan fitur komunikasi masih bersifat demo-level.
+- Beberapa area masih mengutamakan alur presentasi dan konsistensi data, bukan hardening produksi.
+
+## Build
+
+```bash
+npm run build
+```
+
+Jika build berhasil, frontend siap dipakai untuk preview atau presentasi lokal.
