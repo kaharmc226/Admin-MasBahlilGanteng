@@ -224,8 +224,41 @@ const Motif = ({ icon: Icon, top, right, bottom, left, color }) => (
   </div>
 )
 
+const getDocumentAsset = (title = '') => {
+  if (title.includes('NIB')) return '/nib_mockup.png'
+  if (title.includes('Halal')) return '/halal_mockup.png'
+  if (title.includes('P-IRT')) return '/pirt_mockup.png'
+  return '/higiene_mockup.png'
+}
+
 const PdfModal = ({ doc, onClose }) => {
   if (!doc) return null;
+  const assetPath = getDocumentAsset(doc.title)
+
+  const handleDownload = () => {
+    const link = document.createElement('a')
+    link.href = assetPath
+    link.download = `${(doc.title || 'dokumen').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank', 'width=1000,height=800')
+    if (!printWindow) return
+    printWindow.document.write(`
+      <html>
+        <head><title>${doc.title}</title></head>
+        <body style="margin:0;display:flex;justify-content:center;align-items:flex-start;background:#111;">
+          <img src="${assetPath}" style="max-width:100%;height:auto;" />
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
 
   return (
     <motion.div 
@@ -331,7 +364,7 @@ const PdfModal = ({ doc, onClose }) => {
   )
 }
 
-const VisualAuditModal = ({ menu, onClose }) => {
+const VisualAuditModal = ({ menu, onClose, onRevise }) => {
   if (!menu) return null;
 
   return (
@@ -464,7 +497,7 @@ const VisualAuditModal = ({ menu, onClose }) => {
              Tutup Laporan
            </button>
            <button 
-             onClick={() => { alert("Menuju halaman edit resep..."); onClose(); }}
+             onClick={() => { onRevise(menu); onClose(); }}
              style={{ flex: 2, padding: '1.2rem', borderRadius: '24px', border: 'none', background: '#dc2626', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: '0 10px 25px rgba(220, 38, 38, 0.2)' }}
            >
              Revisi Sekarang
@@ -477,13 +510,28 @@ const VisualAuditModal = ({ menu, onClose }) => {
 
 
 const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah }) => {
-  const validMenus = menus.filter(m => m.status_validasi !== 'pending')
+  const validMenus = menus.filter(m => m.status_validasi === 'approved')
   const [formData, setFormData] = useState({
     id_dapur: dapurs[0]?.id_dapur || dapurs[0]?.id || '',
     id_menu: validMenus[0]?.id_menu || '',
     id_sekolah: sekolah[0]?.id_sekolah || '',
     jumlah_porsi: ''
   })
+  const availableSekolah = sekolah.filter((s) => {
+    if (!formData.id_dapur) return false
+    return (s.id_dapur || '').toString() === formData.id_dapur.toString()
+  })
+
+  useEffect(() => {
+    if (availableSekolah.length === 0) {
+      setFormData((prev) => ({ ...prev, id_sekolah: '' }))
+      return
+    }
+    const stillValid = availableSekolah.some((s) => s.id_sekolah.toString() === (formData.id_sekolah || '').toString())
+    if (!stillValid) {
+      setFormData((prev) => ({ ...prev, id_sekolah: availableSekolah[0].id_sekolah }))
+    }
+  }, [formData.id_dapur, availableSekolah, formData.id_sekolah])
 
   const handleSubmit = () => {
     if (!formData.id_dapur || !formData.id_menu || !formData.id_sekolah || !formData.jumlah_porsi) {
@@ -572,7 +620,7 @@ const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah }) => {
                 style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
               >
                 <option value="" disabled>Pilih Sekolah</option>
-                {sekolah.map(s => <option key={s.id_sekolah} value={s.id_sekolah}>{s.nama_sekolah}</option>)}
+                {availableSekolah.map(s => <option key={s.id_sekolah} value={s.id_sekolah}>{s.nama_sekolah}</option>)}
               </select>
             </div>
             <div>
@@ -617,10 +665,13 @@ const VendorDashboard = ({ user, onLogout }) => {
   const [activeDoc, setActiveDoc] = useState(null)
   const [selectedAuditMenu, setSelectedAuditMenu] = useState(null)
   const [selectedDapurForStok, setSelectedDapurForStok] = useState(() => localStorage.getItem('selectedDapurForStok') || null)
+  const [currentVendor, setCurrentVendor] = useState(null)
   
   // Stock history and alert states
   const [stokHistory, setStokHistory] = useState([])
   const [prodError, setProdError] = useState(null)
+  const [statusFilter, setStatusFilter] = useState(null) // 'persiapan' | 'memasak' | 'siap_kirim' | null
+  const [stokFilter, setStokFilter] = useState(null) // 'all' | 'kritis' | 'ledger' | null
   
   // API-driven state
   const [dapurs, setDapurs] = useState([])
@@ -630,33 +681,63 @@ const VendorDashboard = ({ user, onLogout }) => {
   const [distribusi, setDistribusi] = useState([])
   const [stokData, setStokData] = useState([])
   const [sekolah, setSekolah] = useState([])
+  const [mappingData, setMappingData] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [d, m, dok, prod, dist, sek] = await Promise.all([
+        const [vendor, d, m, prod, dist, sek, mappings] = await Promise.all([
+          api.getVendorByUser(user.id_user),
           api.getDapur(),
           api.getMenus(),
-          api.getDokumen(1),
           api.getProduksi(),
           api.getDistribusi(),
-          api.getSekolah()
+          api.getSekolah(),
+          api.getMapping()
         ])
-        setDapurs(d)
-        setMenus(m)
+        const vendorDapurs = d.filter(item => item.id_vendor === vendor.id_vendor)
+        const vendorDapurIds = new Set(vendorDapurs.map(item => item.id_dapur))
+        const vendorMenus = m.filter(item => item.id_vendor === vendor.id_vendor)
+        const vendorProduksi = prod.filter(item => vendorDapurIds.has(item.id_dapur))
+        const vendorProduksiIds = new Set(vendorProduksi.map(item => item.id_produksi))
+        const vendorDistribusi = dist.filter(item => vendorProduksiIds.has(item.id_produksi))
+        const vendorMappings = mappings.filter(item => vendorDapurIds.has(item.id_dapur))
+        const mappedSekolahIds = new Set(vendorMappings.map(item => item.id_sekolah))
+        const vendorSekolah = sek
+          .filter(item => mappedSekolahIds.has(item.id_sekolah))
+          .map(item => {
+            const mapping = vendorMappings.find((entry) => entry.id_sekolah === item.id_sekolah)
+            return { ...item, id_dapur: mapping?.id_dapur ?? null }
+          })
+        const dok = await api.getDokumen(vendor.id_vendor)
+
+        setCurrentVendor(vendor)
+        setDapurs(vendorDapurs)
+        setMenus(vendorMenus)
         setDokumen(dok)
-        setProduksi(prod)
-        setDistribusi(dist)
-        setSekolah(sek)
+        setProduksi(vendorProduksi)
+        setDistribusi(vendorDistribusi)
+        setSekolah(vendorSekolah)
+        setMappingData(vendorMappings)
       } catch (err) {
         console.error('Failed to fetch data:', err)
+        setCurrentVendor(null)
+        setDapurs([])
+        setMenus([])
+        setDokumen([])
+        setProduksi([])
+        setDistribusi([])
+        setSekolah([])
+        setMappingData([])
       } finally {
         setLoading(false)
       }
     }
-    fetchData()
-  }, [])
+    if (user?.id_user) {
+      fetchData()
+    }
+  }, [user?.id_user])
 
   useEffect(() => {
     if (dapurs.length > 0 && !selectedDapurForStok) {
@@ -716,7 +797,8 @@ const VendorDashboard = ({ user, onLogout }) => {
 
   const handleAddDapur = async (newDapur) => {
     try {
-      const created = await api.createDapur({ id_vendor: 1, lokasi: newDapur.lokasi, kapasitas_produksi: newDapur.kapasitas_produksi || newDapur.kapasitas_production })
+      if (!currentVendor) throw new Error('Vendor tidak ditemukan untuk user yang sedang login.')
+      const created = await api.createDapur({ id_vendor: currentVendor.id_vendor, lokasi: newDapur.lokasi, kapasitas_produksi: newDapur.kapasitas_produksi || newDapur.kapasitas_production })
       setDapurs(prev => [...prev, { ...created, id: created.id_dapur }])
     } catch (err) { console.error(err) }
   }
@@ -745,16 +827,18 @@ const VendorDashboard = ({ user, onLogout }) => {
           tanggal: newMenu.date || newMenu.tanggal
         })
       } else {
+        if (!currentVendor) throw new Error('Vendor tidak ditemukan untuk user yang sedang login.')
         await api.createMenu({
-          id_vendor: 1,
+          id_vendor: currentVendor.id_vendor,
           nama_menu: newMenu.nama_menu,
           bahan: newMenu.bahan,
           nilai_gizi: newMenu.nilai_gizi || {},
           tanggal: newMenu.date || newMenu.tanggal || new Date().toISOString().split('T')[0]
         })
       }
-      // Re-fetch menus directly from DB to sync everything including default DB values
-      api.getMenus().then(setMenus).catch(console.error)
+      api.getMenus().then(allMenus => {
+        setMenus(allMenus.filter(item => item.id_vendor === currentVendor?.id_vendor))
+      }).catch(console.error)
       setEditingMenu(null)
     } catch (err) { console.error(err) }
   }
@@ -801,8 +885,15 @@ const VendorDashboard = ({ user, onLogout }) => {
   const handleCreateProduksiTicket = async (data) => {
     try {
       await api.createProduksi({ ...data, status: 'pending' })
-      api.getProduksi().then(setProduksi).catch(console.error)
-      api.getDistribusi().then(setDistribusi).catch(console.error)
+      const dapurIds = new Set(dapurs.map(item => item.id_dapur || item.id))
+      api.getProduksi().then(rows => {
+        const filteredProduksi = rows.filter(item => dapurIds.has(item.id_dapur))
+        setProduksi(filteredProduksi)
+        const produksiIds = new Set(filteredProduksi.map(item => item.id_produksi))
+        api.getDistribusi().then(distRows => {
+          setDistribusi(distRows.filter(item => produksiIds.has(item.id_produksi)))
+        }).catch(console.error)
+      }).catch(console.error)
     } catch (err) { alert(`❌ Gagal membuat tiket:\n${err.message}`) }
   }
 
@@ -811,10 +902,17 @@ const VendorDashboard = ({ user, onLogout }) => {
       setProdError(null)
       await api.updateProduksi(id_produksi, { status })
       alert(status === 'persiapan' ? '✅ Status dipindah ke Persiapan. Stok bahan baku telah otomatis dipotong!' : '✅ Status dipindah ke Selesai & Dikirim!')
-      api.getProduksi().then(setProduksi).catch(console.error)
-      if (status === 'selesai') {
-        api.getDistribusi().then(setDistribusi).catch(console.error)
-      }
+      const dapurIds = new Set(dapurs.map(item => item.id_dapur || item.id))
+      api.getProduksi().then(rows => {
+        const filteredProduksi = rows.filter(item => dapurIds.has(item.id_dapur))
+        setProduksi(filteredProduksi)
+        const produksiIds = new Set(filteredProduksi.map(item => item.id_produksi))
+        if (status === 'selesai') {
+          api.getDistribusi().then(distRows => {
+            setDistribusi(distRows.filter(item => produksiIds.has(item.id_produksi)))
+          }).catch(console.error)
+        }
+      }).catch(console.error)
       // Refresh stok silently
       if (selectedDapurForStok) {
         api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
@@ -839,6 +937,12 @@ const VendorDashboard = ({ user, onLogout }) => {
         bahanName
       })
     }
+  }
+
+  const handleReviseMenu = (menu) => {
+    setEditingMenu(menu)
+    setShowMenuForm(true)
+    navigate('/vendor/menu')
   }
 
 
@@ -968,35 +1072,97 @@ const VendorDashboard = ({ user, onLogout }) => {
            {selectedDapurForStok ? (
              <div style={{ display: 'grid', gap: '1.5rem' }}>
                
-               {/* Digital Banking Balance / Stats Cards */}
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                 <div className="card" style={{ padding: '1.25rem', borderRadius: '14px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                   <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Total Kategori Bahan</p>
-                   <h3 style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--text-main)' }}>{stokData.length} <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)' }}>Item</span></h3>
-                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '4px' }}>Bahan baku aktif terdaftar</p>
-                 </div>
-                 
-                 <div className="card" style={{ 
-                   padding: '1.25rem', 
-                   borderRadius: '14px', 
-                   background: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '#fff5f5' : 'var(--bg)', 
-                   border: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '1px solid #fee2e2' : '1px solid var(--border)' 
-                 }}>
-                   <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Bahan Kritis & Habis</p>
-                   <h3 style={{ fontSize: '1.8rem', fontWeight: '900', color: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '#dc2626' : 'var(--text-main)' }}>
-                     {stokData.filter(s => s.jumlah <= 0 || s.jumlah < 5).length} <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)' }}>Item</span>
-                   </h3>
-                   <p style={{ fontSize: '0.75rem', color: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '#b91c1c' : 'var(--text-muted)', fontWeight: '600', marginTop: '4px' }}>
-                     {stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? 'Segera lakukan replenishment!' : 'Semua stok dalam batas aman'}
-                   </p>
-                 </div>
-
-                 <div className="card" style={{ padding: '1.25rem', borderRadius: '14px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                   <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Total Ledger Mutasi</p>
-                   <h3 style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--text-main)' }}>{stokHistory.length} <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)' }}>Log</span></h3>
-                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '4px' }}>Mutasi stok terverifikasi sistem</p>
-                 </div>
-               </div>
+                  {[
+                    {
+                      status: 'all',
+                      title: 'Total Kategori Bahan',
+                      val: stokData.length,
+                      unit: 'Item',
+                      desc: 'Bahan baku aktif terdaftar',
+                      icon: <Archive color="var(--primary)" />,
+                      color: 'var(--primary)',
+                      bgDefault: 'var(--bg)'
+                    },
+                    {
+                      status: 'kritis',
+                      title: 'Bahan Kritis & Habis',
+                      val: stokData.filter(s => s.jumlah <= 0 || s.jumlah < 5).length,
+                      unit: 'Item',
+                      desc: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? 'Segera lakukan replenishment!' : 'Semua stok dalam batas aman',
+                      icon: <AlertCircle color="#dc2626" />,
+                      color: '#dc2626',
+                      bgDefault: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '#fff5f5' : 'var(--bg)',
+                      borderDefault: stokData.some(s => s.jumlah <= 0 || s.jumlah < 5) ? '1px solid #fee2e2' : '1px solid var(--border)'
+                    },
+                    {
+                      status: 'ledger',
+                      title: 'Total Ledger Mutasi',
+                      val: stokHistory.length,
+                      unit: 'Log',
+                      desc: 'Mutasi stok terverifikasi sistem',
+                      icon: <Activity color="#3b82f6" />,
+                      color: '#3b82f6',
+                      bgDefault: 'var(--bg)'
+                    }
+                  ].map((card, idx) => {
+                    const isActive = stokFilter === card.status;
+                    return (
+                      <div
+                        key={idx}
+                        className="card dashboard-card-vibrant"
+                        style={{
+                          padding: '1.25rem',
+                          borderRadius: '16px',
+                          cursor: 'pointer',
+                          background: isActive ? 'white' : card.bgDefault,
+                          border: isActive ? `3px solid ${card.color}` : (card.borderDefault || '1.5px solid transparent'),
+                          boxShadow: isActive ? `0 10px 25px ${card.color}25` : 'none',
+                          transform: isActive ? 'scale(1.02)' : 'none',
+                          transition: 'all 0.25s ease',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between'
+                        }}
+                        onClick={() => {
+                          if (stokFilter === card.status) {
+                            setStokFilter(null);
+                          } else {
+                            setStokFilter(card.status);
+                            if (card.status === 'ledger') {
+                              const ledgerEl = document.getElementById('ledger-section');
+                              if (ledgerEl) {
+                                ledgerEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }
+                            }
+                          }
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <div style={{ background: `${card.color}15`, padding: '8px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {card.icon}
+                          </div>
+                          {isActive && (
+                            <span style={{ fontSize: '0.65rem', color: card.color, background: `${card.color}15`, padding: '2px 8px', borderRadius: '12px', fontWeight: '900' }}>
+                              Fokus Aktif
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
+                            {card.title}
+                          </p>
+                          <h3 style={{ fontSize: '1.8rem', fontWeight: '900', color: isActive ? card.color : 'var(--text-main)' }}>
+                            {card.val} <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)' }}>{card.unit}</span>
+                          </h3>
+                          <p style={{ fontSize: '0.75rem', color: (card.status === 'kritis' && stokData.some(s => s.jumlah <= 0 || s.jumlah < 5)) ? '#b91c1c' : 'var(--text-muted)', fontWeight: '600', marginTop: '4px' }}>
+                            {card.desc}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
                {/* Stock & Replenishment Form Section */}
                <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
@@ -1006,45 +1172,60 @@ const VendorDashboard = ({ user, onLogout }) => {
                      Stok Terkini
                    </h3>
                    <div style={{ display: 'grid', gap: '0.75rem', maxHeight: '450px', overflowY: 'auto', paddingRight: '10px' }}>
-                     {stokData.length === 0 ? (
-                       <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--bg)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
-                         <Archive size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-                         <p style={{ color: 'var(--text-muted)', fontWeight: '700' }}>Stok kosong.</p>
-                       </div>
-                     ) : stokData.map((s, i) => {
-                       const isCritical = s.jumlah <= 0 || s.jumlah < 5
-                       return (
-                         <div key={i} style={{ 
-                           padding: '1.25rem', 
-                           background: isCritical ? '#fffcfc' : 'var(--bg)', 
-                           borderRadius: '12px', 
-                           display: 'flex', 
-                           justifyContent: 'space-between', 
-                           alignItems: 'center', 
-                           border: isCritical ? '1.5px solid #fca5a5' : '1px solid var(--border)',
-                           boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
-                         }}>
-                           <div>
-                             <h4 style={{ fontWeight: '900', fontSize: '1.05rem', color: isCritical ? '#991b1b' : 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                               {s.nama_bahan}
-                               {isCritical && <span style={{ fontSize: '0.65rem', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '4px', fontWeight: '800' }}>KRITIS</span>}
-                             </h4>
-                             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '2px' }}>Update: {new Date(s.last_updated).toLocaleString('id-ID')}</p>
+                     {(() => {
+                       const displayedStok = stokData.filter(s => {
+                         if (stokFilter === 'kritis') {
+                           return s.jumlah <= 0 || s.jumlah < 5;
+                         }
+                         return true;
+                       });
+                       
+                       if (displayedStok.length === 0) {
+                         return (
+                           <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--bg)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
+                             <Archive size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
+                             <p style={{ color: 'var(--text-muted)', fontWeight: '700' }}>
+                               {stokFilter === 'kritis' ? 'Tidak ada bahan dalam kondisi kritis.' : 'Stok kosong.'}
+                             </p>
                            </div>
-                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                             <input 
-                               type="number" 
-                               step="any"
-                               defaultValue={s.jumlah}
-                               onBlur={(e) => handleUpdateStok(s.id_stok, e.target.value)}
-                               style={{ width: '80px', padding: '10px', borderRadius: '10px', border: '1.5px solid var(--border)', textAlign: 'center', fontWeight: '800' }}
-                             />
-                             <span style={{ fontWeight: '800', color: 'var(--text-muted)', minWidth: '30px' }}>{s.satuan}</span>
-                             <button onClick={() => handleDeleteStok(s.id_stok)} style={{ background: '#fff5f5', color: '#ff4d4d', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                         );
+                       }
+                       
+                       return displayedStok.map((s, i) => {
+                         const isCritical = s.jumlah <= 0 || s.jumlah < 5;
+                         return (
+                           <div key={i} style={{ 
+                             padding: '1.25rem', 
+                             background: isCritical ? '#fffcfc' : 'var(--bg)', 
+                             borderRadius: '12px', 
+                             display: 'flex', 
+                             justifyContent: 'space-between', 
+                             alignItems: 'center', 
+                             border: isCritical ? '1.5px solid #fca5a5' : '1px solid var(--border)',
+                             boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
+                           }}>
+                             <div>
+                               <h4 style={{ fontWeight: '900', fontSize: '1.05rem', color: isCritical ? '#991b1b' : 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                 {s.nama_bahan}
+                                 {isCritical && <span style={{ fontSize: '0.65rem', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '4px', fontWeight: '800' }}>KRITIS</span>}
+                               </h4>
+                               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '2px' }}>Update: {new Date(s.last_updated).toLocaleString('id-ID')}</p>
+                             </div>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                               <input 
+                                 type="number" 
+                                 step="any"
+                                 defaultValue={s.jumlah}
+                                 onBlur={(e) => handleUpdateStok(s.id_stok, e.target.value)}
+                                 style={{ width: '80px', padding: '10px', borderRadius: '10px', border: '1.5px solid var(--border)', textAlign: 'center', fontWeight: '800' }}
+                               />
+                               <span style={{ fontWeight: '800', color: 'var(--text-muted)', minWidth: '30px' }}>{s.satuan}</span>
+                               <button onClick={() => handleDeleteStok(s.id_stok)} style={{ background: '#fff5f5', color: '#ff4d4d', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                             </div>
                            </div>
-                         </div>
-                       )
-                     })}
+                         );
+                       });
+                     })()}
                    </div>
                  </div>
                  
@@ -1202,12 +1383,19 @@ const VendorDashboard = ({ user, onLogout }) => {
                </div>
 
                {/* Digital Banking Statement Ledger */}
-               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
+               <div id="ledger-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
                  <h3 style={{ fontWeight: '950', marginBottom: '1rem', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                   <Activity size={20} color="var(--primary)" />
+                   <Activity size={20} color="#3b82f6" />
                    Riwayat Transaksi Stok (Ledger)
                  </h3>
-                 <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+                 <div style={{ 
+                   background: 'white', 
+                   border: stokFilter === 'ledger' ? '3px solid #3b82f6' : '1px solid var(--border)', 
+                   borderRadius: '16px', 
+                   overflow: 'hidden', 
+                   boxShadow: stokFilter === 'ledger' ? '0 10px 30px rgba(59, 130, 246, 0.15)' : '0 4px 20px rgba(0,0,0,0.02)',
+                   transition: 'all 0.3s ease'
+                 }}>
                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                      <thead>
                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)' }}>
@@ -1543,21 +1731,60 @@ const VendorDashboard = ({ user, onLogout }) => {
           </AnimatePresence>
           <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
              {[
-               { title: 'Persiapan Bahan', val: `${prepVal}%`, icon: <Package color="var(--primary)" />, color: 'var(--primary)' },
-               { title: 'Proses Pemasakan', val: `${cookVal}%`, icon: <UtensilsCrossed color="var(--secondary)" />, color: 'var(--secondary)' },
-               { title: 'Packaging', val: `${packVal}%`, icon: <Zap color="var(--banana)" />, color: 'var(--banana)' }
-             ].map((p, i) => (
-               <div key={i} className="card dashboard-card-vibrant" style={{ padding: '1rem', borderRadius: '12px' }}>
-                  <div className="flex justify-between" style={{ marginBottom: '1.5rem' }}>
-                    <div style={{ background: `${p.color}15`, padding: '12px', borderRadius: '12px' }}>{p.icon}</div>
-                    <span style={{ fontWeight: '950', color: p.color, fontSize: '1.2rem' }}>{p.val}</span>
-                  </div>
-                  <h4 style={{ fontWeight: '900', marginBottom: '15px' }}>{p.title}</h4>
-                  <div style={{ height: '8px', background: 'var(--bg)', borderRadius: '10px', overflow: 'hidden' }}>
-                    <div style={{ width: p.val, height: '100%', background: p.color, transition: 'width 1s ease-in-out' }} />
-                  </div>
-               </div>
-             ))}
+               { title: 'Persiapan Bahan', val: `${prepVal}%`, count: activeProduksi.filter(x => x.status === 'persiapan' || x.status === 'pending').length, status: 'persiapan', icon: <Package color="var(--primary)" />, color: 'var(--primary)' },
+               { title: 'Proses Pemasakan', val: `${cookVal}%`, count: activeProduksi.filter(x => x.status === 'memasak').length, status: 'memasak', icon: <UtensilsCrossed color="var(--secondary)" />, color: 'var(--secondary)' },
+               { title: 'Packaging', val: `${packVal}%`, count: activeProduksi.filter(x => x.status === 'siap_kirim').length, status: 'siap_kirim', icon: <Zap color="var(--banana)" />, color: 'var(--banana)' }
+             ].map((p, i) => {
+               const isActive = statusFilter === p.status;
+               return (
+                 <div 
+                   key={i} 
+                   className="card dashboard-card-vibrant" 
+                   style={{ 
+                     padding: '1.25rem', 
+                     borderRadius: '16px',
+                     cursor: 'pointer',
+                     border: isActive ? `3px solid ${p.color}` : '1.5px solid transparent',
+                     boxShadow: isActive ? `0 10px 25px ${p.color}25` : 'none',
+                     transform: isActive ? 'scale(1.02)' : 'none',
+                     transition: 'all 0.25s ease',
+                     display: 'flex',
+                     flexDirection: 'column',
+                     justifyContent: 'space-between'
+                   }}
+                   onClick={() => {
+                     if (statusFilter === p.status) {
+                       setStatusFilter(null);
+                     } else {
+                       setStatusFilter(p.status);
+                     }
+                   }}
+                 >
+                   <div>
+                     <div className="flex justify-between" style={{ marginBottom: '1.2rem', alignItems: 'center' }}>
+                       <div style={{ background: `${p.color}15`, padding: '12px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                         {p.icon}
+                       </div>
+                       <span style={{ fontWeight: '950', color: p.color, fontSize: '1.2rem' }}>{p.val}</span>
+                     </div>
+                     <h4 style={{ fontWeight: '900', marginBottom: '12px' }}>{p.title}</h4>
+                     <div style={{ height: '8px', background: 'var(--bg)', borderRadius: '10px', overflow: 'hidden' }}>
+                       <div style={{ width: p.val, height: '100%', background: p.color, transition: 'width 1s ease-in-out' }} />
+                     </div>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', alignItems: 'center' }}>
+                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '800' }}>
+                       {p.count} Tiket Aktif
+                     </span>
+                     {isActive && (
+                       <span style={{ fontSize: '0.7rem', color: p.color, background: `${p.color}15`, padding: '2px 8px', borderRadius: '12px', fontWeight: '900' }}>
+                         Fokus Aktif
+                       </span>
+                     )}
+                   </div>
+                 </div>
+               );
+             })}
           </div>
           <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px' }}>
             <div className="flex justify-between" style={{ marginBottom: '1rem', alignItems: 'center' }}>
@@ -1581,7 +1808,15 @@ const VendorDashboard = ({ user, onLogout }) => {
                  </tr>
                </thead>
                <tbody>
-                 {produksi.map((p, i) => (
+                  {produksi
+                    .filter(p => {
+                      if (!statusFilter) return true;
+                      if (statusFilter === 'persiapan') {
+                        return p.status === 'persiapan' || p.status === 'pending';
+                      }
+                      return p.status === statusFilter;
+                    })
+                    .map((p, i) => (
                    <tr key={i} style={{ background: 'var(--bg)', opacity: p.status === 'selesai' ? 0.6 : 1 }}>
                      <td style={{ padding: '1.5rem', fontWeight: '900', borderRadius: '15px 0 0 15px', color: 'var(--primary)' }}>#PRD-{p.id_produksi}</td>
                      <td style={{ padding: '1.5rem' }}>
@@ -1883,7 +2118,7 @@ const VendorDashboard = ({ user, onLogout }) => {
         {activeDoc && (
           <PdfModal doc={activeDoc} onClose={() => setActiveDoc(null)} />
         )}
-        {selectedAuditMenu && <VisualAuditModal menu={selectedAuditMenu} onClose={() => setSelectedAuditMenu(null)} />}
+        {selectedAuditMenu && <VisualAuditModal menu={selectedAuditMenu} onClose={() => setSelectedAuditMenu(null)} onRevise={handleReviseMenu} />}
       </AnimatePresence>
     </DashboardLayout>
   )

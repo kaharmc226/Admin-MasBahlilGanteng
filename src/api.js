@@ -24,6 +24,7 @@ const api = {
   // Sekolah
   getSekolah: () => request('/sekolah'),
   getSekolahById: (id) => request(`/sekolah/${id}`),
+  getSekolahByUser: (userId) => request(`/sekolah/by-user/${userId}`),
   createSekolah: (data) => request('/sekolah', { method: 'POST', body: data }),
   updateSekolah: (id, data) => request(`/sekolah/${id}`, { method: 'PUT', body: data }),
   deleteSekolah: (id) => request(`/sekolah/${id}`, { method: 'DELETE' }),
@@ -31,6 +32,7 @@ const api = {
   // Vendors
   getVendors: () => request('/vendors'),
   getVendorById: (id) => request(`/vendors/${id}`),
+  getVendorByUser: (userId) => request(`/vendors/by-user/${userId}`),
   createVendor: (data) => request('/vendors', { method: 'POST', body: data }),
   updateVendor: (id, data) => request(`/vendors/${id}`, { method: 'PUT', body: data }),
   deleteVendor: (id) => request(`/vendors/${id}`, { method: 'DELETE' }),

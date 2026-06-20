@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { 
   School, 
   Utensils, 
@@ -70,9 +70,9 @@ const AddFormModal = ({ onClose, isFeedback, activeDelivery, user }) => {
     try {
       if (isFeedback) {
         await api.createFeedback({
-          id_sekolah: activeDelivery.id_sekolah || 1,
-          id_user: user.id_user || 4,
-          id_menu: activeDelivery.id_menu || 1,
+          id_sekolah: activeDelivery.id_sekolah,
+          id_user: user.id_user,
+          id_menu: activeDelivery.id_menu || null,
           rating: rating,
           komentar: `[${fields.nama_siswa || 'Anonim'}] ${fields.komentar || 'Tidak ada catatan.'}`,
           kategori: 'kualitas'
@@ -197,8 +197,10 @@ const AddFormModal = ({ onClose, isFeedback, activeDelivery, user }) => {
 
 const SekolahDashboard = ({ user, onLogout }) => {
   const location = useLocation()
+  const navigate = useNavigate()
   const [showAddForm, setShowAddForm] = useState(false)
   const [feedbackRating, setFeedbackRating] = useState(4)
+  const [quickFeedbackNote, setQuickFeedbackNote] = useState('')
   
   const path = location.pathname.replace(/\/$/, '')
   const isMain = path === '/sekolah'
@@ -207,22 +209,29 @@ const SekolahDashboard = ({ user, onLogout }) => {
 
   const [distribusi, setDistribusi] = useState([])
   const [feedback, setFeedback] = useState([])
+  const [schoolProfile, setSchoolProfile] = useState(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dist, fb] = await Promise.all([api.getDistribusi(), api.getFeedback()])
-        setDistribusi(dist)
+        const [dist, fb, matchedSchool] = await Promise.all([api.getDistribusi(), api.getFeedback(), api.getSekolahByUser(user.id_user)])
+        setSchoolProfile(matchedSchool)
+        setDistribusi(matchedSchool ? dist.filter((item) => item.id_sekolah === matchedSchool.id_sekolah) : [])
         setFeedback(fb)
-      } catch (err) { console.error('Failed to fetch:', err) }
+      } catch (err) {
+        console.error('Failed to fetch:', err)
+        setSchoolProfile(null)
+        setDistribusi([])
+      }
     }
     fetchData()
-  }, [])
+  }, [user?.id_user])
 
   const activeDelivery = distribusi[0] ? {
     id_distribusi: distribusi[0].id_distribusi,
     id_sekolah: distribusi[0].id_sekolah,
     id_menu: distribusi[0].id_menu,
+    jumlah_porsi: distribusi[0].jumlah_porsi,
     id: distribusi[0].kode_transaksi,
     vendor: 'Dapur Sehat Nusantara',
     status: distribusi[0].status,
@@ -249,9 +258,9 @@ const SekolahDashboard = ({ user, onLogout }) => {
     try {
       await api.createKonfirmasi({
         id_distribusi: activeDelivery.id_distribusi,
-        id_user: user.id_user || 4,
+        id_user: user.id_user,
         kondisi_makanan: 'baik',
-        jumlah_diterima: 404,
+        jumlah_diterima: schoolProfile?.jumlah_siswa || activeDelivery.jumlah_porsi || 0,
         catatan: 'Diterima sesuai jadwal'
       })
       
@@ -266,14 +275,15 @@ const SekolahDashboard = ({ user, onLogout }) => {
   const handleQuickFeedback = async () => {
     try {
       await api.createFeedback({
-        id_sekolah: activeDelivery.id_sekolah || 1,
-        id_user: user.id_user || 4,
-        id_menu: activeDelivery.id_menu || 1,
+        id_sekolah: activeDelivery.id_sekolah,
+        id_user: user.id_user,
+        id_menu: activeDelivery.id_menu || null,
         rating: feedbackRating,
-        komentar: 'Penilaian cepat dari halaman utama',
+        komentar: quickFeedbackNote.trim() || 'Penilaian cepat dari halaman utama',
         kategori: 'kualitas'
       })
       alert("✅ Rating siswa dan feedback telah masuk log blockchain gizi nasional.")
+      setQuickFeedbackNote('')
       setShowAddForm(true)
     } catch (err) {
       console.error(err)
@@ -340,7 +350,7 @@ const SekolahDashboard = ({ user, onLogout }) => {
           <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px', background: 'var(--carrot)', color: 'white', border: 'none' }}>
              <h4 style={{ fontWeight: '950', marginBottom: '1rem', fontSize: '1.3rem' }}>Bantuan Logistik</h4>
              <p style={{ fontSize: '0.9rem', opacity: 0.9, lineHeight: '1.6', fontWeight: '600' }}>Jika armada pengiriman terlambat lebih dari 30 menit dari estimasi, segera hubungi satgas wilayah.</p>
-             <button style={{ width: '100%', marginTop: '1.5rem', padding: '1rem', borderRadius: '15px', background: 'white', color: 'var(--carrot)', border: 'none', fontWeight: '900' }}>Hubungi Satgas</button>
+             <button onClick={() => setShowAddForm(true)} style={{ width: '100%', marginTop: '1.5rem', padding: '1rem', borderRadius: '15px', background: 'white', color: 'var(--carrot)', border: 'none', fontWeight: '900', cursor: 'pointer' }}>Hubungi Satgas</button>
           </div>
         </div>
       </div>
@@ -363,7 +373,7 @@ const SekolahDashboard = ({ user, onLogout }) => {
           
           <div style={{ marginBottom: '4rem' }}>
              <p style={{ fontWeight: '950', marginBottom: '1.5rem', fontSize: '1.3rem' }}>Catatan Tambahan dari Sekolah</p>
-             <textarea placeholder="Contoh: Sayurnya sangat segar, anak-anak suka!" style={{ width: '100%', height: '180px', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', background: 'var(--bg)', outline: 'none', fontSize: '1.1rem', fontWeight: '500', transition: 'border-color 0.2s' }} onFocus={(e) => e.target.style.borderColor = 'var(--primary)'} onBlur={(e) => e.target.style.borderColor = 'var(--border)'} />
+             <textarea value={quickFeedbackNote} onChange={(e) => setQuickFeedbackNote(e.target.value)} placeholder="Contoh: Sayurnya sangat segar, anak-anak suka!" style={{ width: '100%', height: '180px', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', background: 'var(--bg)', outline: 'none', fontSize: '1.1rem', fontWeight: '500', transition: 'border-color 0.2s' }} onFocus={(e) => e.target.style.borderColor = 'var(--primary)'} onBlur={(e) => e.target.style.borderColor = 'var(--border)'} />
           </div>
           
           <button onClick={handleQuickFeedback} className="btn-primary" style={{ width: '100%', borderRadius: '60px', padding: '1.5rem', fontSize: '1.2rem', fontWeight: '900', background: 'linear-gradient(to right, var(--primary), var(--secondary))', border: 'none', color: 'white', boxShadow: '0 15px 30px rgba(16, 185, 129, 0.2)', cursor: 'pointer' }}>Kirim Penilaian Cepat & Tulis Laporan Detail</button>
@@ -386,13 +396,13 @@ const SekolahDashboard = ({ user, onLogout }) => {
           </AnimatePresence>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div>
-              <h1 style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-1px' }}>SDN 06 Baru</h1>
+              <h1 style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-1px' }}>{schoolProfile?.nama_sekolah || 'Sekolah MBG'}</h1>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: '500' }}>Pusat Penerimaan Gizi Nasional — Jakarta Timur</p>
             </div>
             <div style={{ padding: '12px 24px', background: 'var(--banana-light)', borderRadius: '14px', display: 'flex', gap: '12px', alignItems: 'center', border: '1px solid var(--banana)' }}>
               <Users size={20} color="var(--banana)" />
               <div>
-                <p style={{ fontWeight: '800', fontSize: '1.2rem', lineHeight: '1' }}>404</p>
+                <p style={{ fontWeight: '800', fontSize: '1.2rem', lineHeight: '1' }}>{schoolProfile?.jumlah_siswa ?? 0}</p>
                 <p style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--banana)' }}>SISWA TERDATA</p>
               </div>
             </div>
@@ -426,7 +436,7 @@ const SekolahDashboard = ({ user, onLogout }) => {
               <div className="card" style={{ borderRadius: '16px', padding: '1.5rem' }}>
                 <h4 style={{ fontWeight: '700', marginBottom: '0.75rem', fontSize: '0.9rem' }}>Bantuan Cepat</h4>
                 <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  <button style={{ width: '100%', textAlign: 'left', padding: '0.8rem', borderRadius: '10px', background: 'var(--bg)', border: 'none', color: 'var(--text-main)', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                  <button onClick={() => navigate('/sekolah/feedback')} style={{ width: '100%', textAlign: 'left', padding: '0.8rem', borderRadius: '10px', background: 'var(--bg)', border: 'none', color: 'var(--text-main)', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                     Hubungi Vendor <ChevronRight size={16} />
                   </button>
                   <button onClick={() => setShowAddForm(true)} style={{ width: '100%', textAlign: 'left', padding: '0.8rem', borderRadius: '10px', background: 'var(--bg)', border: 'none', color: 'var(--text-main)', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>

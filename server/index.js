@@ -2,6 +2,68 @@ import express from 'express'
 import cors from 'cors'
 import pool from './db.js'
 
+function parseBahanList(rawBahan) {
+  if (!rawBahan) return []
+  return typeof rawBahan === 'string' ? JSON.parse(rawBahan) : rawBahan
+}
+
+async function prepareStockDeductions(connection, { idDapur, idMenu, jumlahPorsi }) {
+  const [menus] = await connection.query('SELECT nama_menu, bahan FROM menus WHERE id_menu = ?', [idMenu])
+  if (menus.length === 0) {
+    throw new Error('Menu tidak ditemukan.')
+  }
+
+  const menuName = menus[0].nama_menu
+  const bahanList = parseBahanList(menus[0].bahan)
+  const [stokRows] = await connection.query(
+    'SELECT id_stok, nama_bahan, jumlah, satuan FROM dapur_stok WHERE id_dapur = ?',
+    [idDapur]
+  )
+
+  const deductions = []
+  for (const b of bahanList) {
+    const reqNama = (b.nama || '').toLowerCase()
+    let reqQty = parseFloat((b.takaran || '').replace(/[^0-9.]/g, ''))
+    if (isNaN(reqQty)) reqQty = 0
+    const takaran = (b.takaran || '').toLowerCase()
+    const isGram = takaran.includes('g') && !takaran.includes('kg')
+
+    const match = stokRows.find((s) => s.nama_bahan.toLowerCase() === reqNama)
+    if (!match) {
+      throw new Error(`Bahan ${b.nama} belum terdaftar di stok dapur ini.`)
+    }
+
+    let needed = reqQty * (jumlahPorsi || 0)
+    if (isGram && match.satuan.toLowerCase() === 'kg') {
+      needed = needed / 1000
+    }
+
+    if (match.jumlah < needed) {
+      throw new Error(`Stok ${b.nama} tidak mencukupi (Tersedia: ${match.jumlah} ${match.satuan}, Butuh: ${needed} ${match.satuan}).`)
+    }
+
+    deductions.push({
+      id_stok: match.id_stok,
+      nama_bahan: match.nama_bahan,
+      needed,
+      satuan: match.satuan,
+      new_jumlah: match.jumlah - needed,
+    })
+  }
+
+  return { menuName, deductions }
+}
+
+async function applyStockDeductions(connection, { idDapur, menuName, jumlahPorsi, deductions }) {
+  for (const d of deductions) {
+    await connection.query('UPDATE dapur_stok SET jumlah = ? WHERE id_stok = ?', [d.new_jumlah, d.id_stok])
+    await connection.query(
+      'INSERT INTO dapur_stok_history (id_dapur, nama_bahan, tipe, jumlah, satuan, keterangan) VALUES (?,?,?,?,?,?)',
+      [idDapur, d.nama_bahan, 'DEBIT', d.needed, d.satuan, `Masak ${menuName} (${jumlahPorsi || 0} Porsi)`]
+    )
+  }
+}
+
 // Auto-migrate: create dapur_stok_history table
 pool.query(`
   CREATE TABLE IF NOT EXISTS dapur_stok_history (
@@ -74,6 +136,14 @@ app.get('/api/sekolah/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+app.get('/api/sekolah/by-user/:userId', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM sekolah WHERE id_user = ? LIMIT 1', [req.params.userId])
+    if (rows.length === 0) return res.status(404).json({ error: 'Sekolah untuk user ini tidak ditemukan' })
+    res.json(rows[0])
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 app.post('/api/sekolah', async (req, res) => {
   try {
     const { nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count } = req.body
@@ -117,6 +187,14 @@ app.get('/api/vendors/:id', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM vendors WHERE id_vendor = ?', [req.params.id])
     if (rows.length === 0) return res.status(404).json({ error: 'Vendor tidak ditemukan' })
+    res.json(rows[0])
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.get('/api/vendors/by-user/:userId', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM vendors WHERE id_user = ? LIMIT 1', [req.params.userId])
+    if (rows.length === 0) return res.status(404).json({ error: 'Vendor untuk user ini tidak ditemukan' })
     res.json(rows[0])
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -315,7 +393,7 @@ app.delete('/api/menus/:id', async (req, res) => {
 app.get('/api/produksi', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT p.*, d.lokasi AS dapur_lokasi, m.nama_menu, s.nama_sekolah AS target_sekolah
+      SELECT p.*, d.lokasi AS dapur_lokasi, m.nama_menu, m.bahan, m.nilai_gizi, s.nama_sekolah AS target_sekolah, dis.kode_transaksi
       FROM produksi p
       JOIN dapur d ON p.id_dapur = d.id_dapur
       JOIN menus m ON p.id_menu = m.id_menu
@@ -328,119 +406,123 @@ app.get('/api/produksi', async (req, res) => {
 })
 
 app.post('/api/produksi', async (req, res) => {
+  let connection
   try {
     const { id_dapur, id_menu, status, jumlah_porsi, id_sekolah } = req.body
-    
-    // Create the produksi ticket first
-    const [result] = await pool.query(
+    connection = await pool.getConnection()
+    await connection.beginTransaction()
+
+    const [menuRows] = await connection.query('SELECT status_validasi FROM menus WHERE id_menu = ?', [id_menu])
+    if (menuRows.length === 0) {
+      await connection.rollback()
+      return res.status(400).json({ error: 'Menu tidak ditemukan.' })
+    }
+    if (menuRows[0].status_validasi !== 'approved') {
+      await connection.rollback()
+      return res.status(400).json({ error: 'Menu belum diverifikasi (approved) oleh Ahli Gizi' })
+    }
+
+    let stockPreparation = null
+    if (status === 'persiapan') {
+      stockPreparation = await prepareStockDeductions(connection, {
+        idDapur: id_dapur,
+        idMenu: id_menu,
+        jumlahPorsi: jumlah_porsi,
+      })
+    }
+
+    const [result] = await connection.query(
       'INSERT INTO produksi (id_dapur, id_menu, status, jumlah_porsi, waktu_mulai) VALUES (?,?,?,?,NOW())',
       [id_dapur, id_menu, status || 'pending', jumlah_porsi || 0]
     )
     const id_produksi = result.insertId
 
-    // Auto-create distribusi record if id_sekolah is provided
     if (id_sekolah) {
       const kode = `TX-${String(Date.now()).slice(-6)}`
-      const hash = '0x' + [...Array(12)].map(() => Math.floor(Math.random()*16).toString(16)).join('')
-      await pool.query(
+      const hash = '0x' + [...Array(12)].map(() => Math.floor(Math.random() * 16).toString(16)).join('')
+      await connection.query(
         'INSERT INTO distribusi (kode_transaksi, id_produksi, id_sekolah, jumlah_porsi, status, blockchain_hash) VALUES (?,?,?,?,?,?)',
         [kode, id_produksi, id_sekolah, jumlah_porsi, 'DIJADWALKAN', hash]
       )
     }
 
-    // If immediately set to persiapan, we deduct stock
-    if (status === 'persiapan') {
-      const [menus] = await pool.query('SELECT nama_menu, bahan FROM menus WHERE id_menu = ?', [id_menu])
-      if (menus.length > 0) {
-        const menuName = menus[0].nama_menu
-        const bahanList = typeof menus[0].bahan === 'string' ? JSON.parse(menus[0].bahan) : menus[0].bahan
-        const [stokRows] = await pool.query('SELECT id_stok, nama_bahan, jumlah, satuan FROM dapur_stok WHERE id_dapur = ?', [id_dapur])
-        
-        let deductions = []
-        for (let b of bahanList) {
-          let reqNama = b.nama.toLowerCase()
-          let reqQty = parseFloat(b.takaran.replace(/[^0-9.]/g, ''))
-          if (isNaN(reqQty)) reqQty = 0
-          let isGram = b.takaran.toLowerCase().includes('g') && !b.takaran.toLowerCase().includes('kg')
-          
-          let match = stokRows.find(s => s.nama_bahan.toLowerCase() === reqNama)
-          if (!match) return res.status(400).json({ error: `Bahan ${b.nama} belum terdaftar di stok dapur ini.` })
-          
-          let needed = reqQty * (jumlah_porsi || 0)
-          if (isGram && match.satuan.toLowerCase() === 'kg') needed = needed / 1000
-          
-          if (match.jumlah < needed) return res.status(400).json({ error: `Stok ${b.nama} tidak mencukupi (Tersedia: ${match.jumlah} ${match.satuan}, Butuh: ${needed} ${match.satuan}).` })
-          deductions.push({ id_stok: match.id_stok, nama_bahan: match.nama_bahan, needed, satuan: match.satuan, new_jumlah: match.jumlah - needed })
-        }
-        
-        for (let d of deductions) {
-          await pool.query('UPDATE dapur_stok SET jumlah = ? WHERE id_stok = ?', [d.new_jumlah, d.id_stok])
-          await pool.query(
-            'INSERT INTO dapur_stok_history (id_dapur, nama_bahan, tipe, jumlah, satuan, keterangan) VALUES (?,?,?,?,?,?)',
-            [id_dapur, d.nama_bahan, 'DEBIT', d.needed, d.satuan, `Masak ${menuName} (${jumlah_porsi || 0} Porsi)`]
-          )
-        }
-      }
+    if (stockPreparation) {
+      await applyStockDeductions(connection, {
+        idDapur: id_dapur,
+        menuName: stockPreparation.menuName,
+        jumlahPorsi: jumlah_porsi,
+        deductions: stockPreparation.deductions,
+      })
     }
 
+    await connection.commit()
     res.status(201).json({ id_produksi, ...req.body })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) {
+    if (connection) await connection.rollback()
+    const statusCode = err.message.includes('tidak mencukupi') || err.message.includes('belum terdaftar') || err.message.includes('Menu tidak ditemukan.')
+      ? 400
+      : 500
+    res.status(statusCode).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
 })
 
 app.put('/api/produksi/:id', async (req, res) => {
+  let connection
   try {
     const { status } = req.body
-    
-    // Check current state
-    const [prodRows] = await pool.query('SELECT * FROM produksi WHERE id_produksi = ?', [req.params.id])
-    if (prodRows.length === 0) return res.status(404).json({ error: 'Not found' })
+    connection = await pool.getConnection()
+    await connection.beginTransaction()
+
+    const [prodRows] = await connection.query('SELECT * FROM produksi WHERE id_produksi = ?', [req.params.id])
+    if (prodRows.length === 0) {
+      await connection.rollback()
+      return res.status(404).json({ error: 'Not found' })
+    }
     const p = prodRows[0]
 
-    // If transitioning to 'persiapan', deduct stock!
+    let stockPreparation = null
     if (status === 'persiapan' && p.status === 'pending') {
-      const [menus] = await pool.query('SELECT nama_menu, bahan FROM menus WHERE id_menu = ?', [p.id_menu])
-      if (menus.length > 0) {
-        const menuName = menus[0].nama_menu
-        const bahanList = typeof menus[0].bahan === 'string' ? JSON.parse(menus[0].bahan) : menus[0].bahan
-        const [stokRows] = await pool.query('SELECT id_stok, nama_bahan, jumlah, satuan FROM dapur_stok WHERE id_dapur = ?', [p.id_dapur])
-        
-        let deductions = []
-        for (let b of bahanList) {
-          let reqNama = b.nama.toLowerCase()
-          let reqQty = parseFloat(b.takaran.replace(/[^0-9.]/g, ''))
-          if (isNaN(reqQty)) reqQty = 0
-          let isGram = b.takaran.toLowerCase().includes('g') && !b.takaran.toLowerCase().includes('kg')
-          
-          let match = stokRows.find(s => s.nama_bahan.toLowerCase() === reqNama)
-          if (!match) return res.status(400).json({ error: `Bahan ${b.nama} belum terdaftar.` })
-          
-          let needed = reqQty * p.jumlah_porsi
-          if (isGram && match.satuan.toLowerCase() === 'kg') needed = needed / 1000
-          
-          if (match.jumlah < needed) return res.status(400).json({ error: `Stok ${b.nama} kurang! (Sisa: ${match.jumlah} ${match.satuan}, Butuh: ${needed} ${match.satuan}).` })
-          deductions.push({ id_stok: match.id_stok, nama_bahan: match.nama_bahan, needed, satuan: match.satuan, new_jumlah: match.jumlah - needed })
-        }
-        
-        for (let d of deductions) {
-          await pool.query('UPDATE dapur_stok SET jumlah = ? WHERE id_stok = ?', [d.new_jumlah, d.id_stok])
-          await pool.query(
-            'INSERT INTO dapur_stok_history (id_dapur, nama_bahan, tipe, jumlah, satuan, keterangan) VALUES (?,?,?,?,?,?)',
-            [p.id_dapur, d.nama_bahan, 'DEBIT', d.needed, d.satuan, `Masak ${menuName} (${p.jumlah_porsi} Porsi)`]
-          )
-        }
-      }
+      stockPreparation = await prepareStockDeductions(connection, {
+        idDapur: p.id_dapur,
+        idMenu: p.id_menu,
+        jumlahPorsi: p.jumlah_porsi,
+      })
     }
 
-    const extra = status === 'selesai' ? ', waktu_selesai=NOW()' : ''
-    await pool.query(`UPDATE produksi SET status=?${extra} WHERE id_produksi=?`, [status, req.params.id])
-
-    // If transitioning to 'selesai', update distribusi status to DISTRIBUSI (Pengiriman)
+    let extra = ''
     if (status === 'selesai') {
-      await pool.query("UPDATE distribusi SET status='DISTRIBUSI', waktu_kirim=NOW() WHERE id_produksi=? AND status='DIJADWALKAN'", [req.params.id])
+      extra = ', waktu_selesai=NOW()'
+    } else if (status === 'memasak') {
+      extra = ', waktu_mulai=NOW()'
+    }
+    await connection.query(`UPDATE produksi SET status=?${extra} WHERE id_produksi=?`, [status, req.params.id])
+
+    if (stockPreparation) {
+      await applyStockDeductions(connection, {
+        idDapur: p.id_dapur,
+        menuName: stockPreparation.menuName,
+        jumlahPorsi: p.jumlah_porsi,
+        deductions: stockPreparation.deductions,
+      })
     }
 
+    if (status === 'selesai') {
+      await connection.query("UPDATE distribusi SET status='DISTRIBUSI', waktu_kirim=NOW() WHERE id_produksi=? AND status='DIJADWALKAN'", [req.params.id])
+    }
+
+    await connection.commit()
     res.json({ message: 'Updated' })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) {
+    if (connection) await connection.rollback()
+    const statusCode = err.message.includes('tidak mencukupi') || err.message.includes('belum terdaftar')
+      ? 400
+      : 500
+    res.status(statusCode).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
 })
 
 // ============================================

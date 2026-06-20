@@ -450,9 +450,22 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
     }, 3000)
   }
 
+  const handleDownloadNutritionData = () => {
+    const blob = new Blob([JSON.stringify(nutritionDb, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'nutrition-database.json'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    triggerToast('Database referensi nutrisi berhasil diunduh.')
+  }
+
   const handleApprove = async (id) => {
     try {
-      await api.createValidasiLog({ id_menu: id, id_user: user.id_user || 3, aksi: 'approved', catatan: ahliSuggestion || null })
+      await api.createValidasiLog({ id_menu: id, id_user: user.id_user, aksi: 'approved', catatan: ahliSuggestion || null })
       setMenus(prev => prev.map(m => (m.id_menu || m.id) === id ? { ...m, status_validasi: 'approved' } : m))
       triggerToast('Menu berhasil disahkan untuk distribusi nasional.')
     } catch (err) { console.error(err) }
@@ -460,7 +473,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
 
   const handleReject = async (id) => {
     try {
-      await api.createValidasiLog({ id_menu: id, id_user: user.id_user || 3, aksi: 'rejected', catatan: ahliSuggestion || null })
+      await api.createValidasiLog({ id_menu: id, id_user: user.id_user, aksi: 'rejected', catatan: ahliSuggestion || null })
       setMenus(prev => prev.map(m => (m.id_menu || m.id) === id ? { ...m, status_validasi: 'rejected' } : m))
       triggerToast('Permintaan revisi dikirim ke vendor.', 'warning')
     } catch (err) { console.error(err) }
@@ -469,7 +482,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
   const handleSaveStandard = async () => {
     try {
       if (showModal.mode === 'add') {
-        const created = await api.createStandarGizi({ title: formStandard.title, requirement: formStandard.requirement, color: formStandard.color, deskripsi: formStandard.desc, detail: formStandard.details, id_user_pembuat: user.id_user || 3 })
+        const created = await api.createStandarGizi({ title: formStandard.title, requirement: formStandard.requirement, color: formStandard.color, deskripsi: formStandard.desc, detail: formStandard.details, id_user_pembuat: user.id_user })
         setStandards(prev => [...prev, { ...created, desc: formStandard.desc, details: formStandard.details }])
         triggerToast('Standar gizi baru berhasil ditambahkan.')
       } else {
@@ -521,7 +534,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
               }}
             >
               <div className="flex justify-between" style={{ marginBottom: '10px' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: '900', color: selectedMenuIdx === idx ? 'var(--primary)' : 'var(--text-muted)', textTransform: 'uppercase' }}>Vendor #1</span>
+                <span style={{ fontSize: '0.7rem', fontWeight: '900', color: selectedMenuIdx === idx ? 'var(--primary)' : 'var(--text-muted)', textTransform: 'uppercase' }}>{m.nama_vendor || 'Vendor Terdaftar'}</span>
                 {m.status_validasi === 'approved' ? (
                   <CheckCircle size={18} color="var(--primary)" />
                 ) : m.status_validasi === 'rejected' ? (
@@ -810,9 +823,9 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                   <Search size={14} color="#94a3b8" />
                   <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: '600' }}>Cari bahan...</span>
                </div>
-               <div style={{ padding: '6px 15px', background: 'var(--primary-light)', borderRadius: '10px', color: 'var(--primary)', fontWeight: '900', fontSize: '0.75rem' }}>
+               <button onClick={handleDownloadNutritionData} style={{ padding: '6px 15px', background: 'var(--primary-light)', borderRadius: '10px', color: 'var(--primary)', fontWeight: '900', fontSize: '0.75rem', border: 'none', cursor: 'pointer' }}>
                   DOWNLOAD PDF
-               </div>
+               </button>
             </div>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>

@@ -194,10 +194,82 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
   )
 }
 
+const VendorAuditModal = ({ vendor, docs, dapurs, onClose }) => {
+  if (!vendor) return null
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'grid', placeItems: 'center', padding: '1rem' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        style={{ width: '100%', maxWidth: '820px', background: 'white', borderRadius: '20px', padding: '2rem', boxShadow: '0 30px 80px rgba(0,0,0,0.2)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between" style={{ alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div>
+            <h2 style={{ fontWeight: '950', fontSize: '2rem', marginBottom: '0.25rem' }}>{vendor.nama_vendor}</h2>
+            <p style={{ color: 'var(--text-muted)', fontWeight: '600' }}>{vendor.region} • {vendor.izin_usaha}</p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', borderRadius: '999px', width: '42px', height: '42px', cursor: 'pointer', fontWeight: '900' }}>×</button>
+        </div>
+
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div className="card" style={{ padding: '1rem', borderRadius: '16px', background: 'var(--bg)' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: '900', color: 'var(--text-muted)' }}>STATUS</p>
+            <h3 style={{ fontWeight: '950', marginTop: '0.35rem' }}>{vendor.status_verifikasi?.toUpperCase()}</h3>
+          </div>
+          <div className="card" style={{ padding: '1rem', borderRadius: '16px', background: 'var(--bg)' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: '900', color: 'var(--text-muted)' }}>DAPUR AKTIF</p>
+            <h3 style={{ fontWeight: '950', marginTop: '0.35rem' }}>{dapurs.length}</h3>
+          </div>
+          <div className="card" style={{ padding: '1rem', borderRadius: '16px', background: 'var(--bg)' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: '900', color: 'var(--text-muted)' }}>DOKUMEN</p>
+            <h3 style={{ fontWeight: '950', marginTop: '0.35rem' }}>{docs.length}</h3>
+          </div>
+        </div>
+
+        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="card" style={{ padding: '1rem', borderRadius: '16px' }}>
+            <h3 style={{ fontWeight: '900', marginBottom: '0.75rem' }}>Dapur Vendor</h3>
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {dapurs.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Belum ada dapur terdaftar.</p>
+              ) : dapurs.map((d) => (
+                <div key={d.id_dapur} style={{ padding: '0.9rem', borderRadius: '12px', background: 'var(--bg)' }}>
+                  <p style={{ fontWeight: '800' }}>{d.lokasi}</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Kapasitas {d.kapasitas_produksi} porsi/hari</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card" style={{ padding: '1rem', borderRadius: '16px' }}>
+            <h3 style={{ fontWeight: '900', marginBottom: '0.75rem' }}>Dokumen Vendor</h3>
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {docs.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Belum ada dokumen vendor.</p>
+              ) : docs.map((doc) => (
+                <div key={doc.id_dokumen} style={{ padding: '0.9rem', borderRadius: '12px', background: 'var(--bg)' }}>
+                  <p style={{ fontWeight: '800' }}>{doc.nama_dokumen}</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>{doc.status} • {doc.jenis}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 const PemerintahDashboard = ({ user, onLogout }) => {
   const location = useLocation()
   const [showAddForm, setShowAddForm] = useState(false)
   const [showToast, setShowToast] = useState({ show: false, message: '' })
+  const [selectedVendorAudit, setSelectedVendorAudit] = useState(null)
+  const [selectedVendorDocs, setSelectedVendorDocs] = useState([])
   
   const triggerToast = (msg) => {
     setShowToast({ show: true, message: msg })
@@ -225,10 +297,13 @@ const PemerintahDashboard = ({ user, onLogout }) => {
           intoleran_count: 0
         })
         setSekolahList(prev => [...prev, createdSekolah])
-        
-        // Map the new school to the first dapur
+        const targetDapur = dapurs[0]
+        if (!targetDapur) {
+          throw new Error('Belum ada dapur aktif untuk dipetakan ke sekolah baru.')
+        }
+
         await api.createMapping({
-          id_dapur: 1,
+          id_dapur: targetDapur.id_dapur,
           id_sekolah: createdSekolah.id_sekolah
         })
         const m = await api.getMapping()
@@ -257,6 +332,7 @@ const PemerintahDashboard = ({ user, onLogout }) => {
   const [alerts, setAlerts] = useState([])
   const [mappingData, setMappingData] = useState([])
   const [sekolahList, setSekolahList] = useState([])
+  const [dapurs, setDapurs] = useState([])
   const [chartData, setChartData] = useState([
     { jenjang: 'PAUD', penerima: 1500, kondisi_khusus: 45 },
     { jenjang: 'SD', penerima: 4200, kondisi_khusus: 120 },
@@ -268,13 +344,14 @@ const PemerintahDashboard = ({ user, onLogout }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [v, w, a, m, s, stats] = await Promise.all([
+        const [v, w, a, m, s, stats, d] = await Promise.all([
           api.getVendors(),
           api.getWilayah(),
           api.getAlerts(),
           api.getMapping(),
           api.getSekolah(),
-          api.getPemerintahStats()
+          api.getPemerintahStats(),
+          api.getDapur()
         ])
         setActiveVendors(v.filter(x => x.status_verifikasi === 'approved'))
         setRegQueue(v.filter(x => x.status_verifikasi === 'pending'))
@@ -282,6 +359,7 @@ const PemerintahDashboard = ({ user, onLogout }) => {
         setAlerts(a)
         setMappingData(m)
         setSekolahList(s)
+        setDapurs(d)
         if (stats && stats.length > 0) {
           setChartData(stats)
         }
@@ -299,6 +377,32 @@ const PemerintahDashboard = ({ user, onLogout }) => {
         setRegQueue(prev => prev.filter(v => v.id_vendor !== vendor.id_vendor))
         triggerToast(`${vendor.nama_vendor} telah resmi disahkan oleh Pemerintah!`)
       } catch (err) { console.error(err) }
+    }
+  }
+
+  const handleResolveAlert = async (alertId) => {
+    try {
+      await api.resolveAlert(alertId, user.id_user)
+      setAlerts(prev => prev.map(item => (
+        item.id_alert === alertId
+          ? { ...item, is_resolved: true, resolved_by: user.id_user, resolved_at: new Date().toISOString() }
+          : item
+      )))
+      triggerToast('Alert berhasil ditandai selesai.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menyelesaikan alert: ' + err.message)
+    }
+  }
+
+  const handleOpenVendorAudit = async (vendor) => {
+    try {
+      const docs = await api.getDokumen(vendor.id_vendor)
+      setSelectedVendorDocs(docs)
+      setSelectedVendorAudit(vendor)
+    } catch (err) {
+      console.error(err)
+      alert('Gagal memuat detail audit vendor: ' + err.message)
     }
   }
 
@@ -385,7 +489,7 @@ const PemerintahDashboard = ({ user, onLogout }) => {
                      </span>
                   </td>
                   <td style={{ padding: '1.5rem', borderRadius: '0 20px 20px 0' }}>
-                     <button onClick={() => triggerToast(`Memuat detail audit untuk ${v.nama_vendor}...`)} style={{ color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Detail Audit</button>
+                     <button onClick={() => handleOpenVendorAudit(v)} style={{ color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Detail Audit</button>
                   </td>
                 </tr>
               ))}
@@ -477,9 +581,28 @@ const PemerintahDashboard = ({ user, onLogout }) => {
               <div style={{ flex: 1 }}>
                 <div className="flex justify-between" style={{ marginBottom: '5px' }}>
                   <h4 style={{ fontWeight: '900', fontSize: '1.2rem' }}>{a.judul}</h4>
+                  <span className="badge" style={{
+                    background: a.is_resolved ? 'var(--primary-light)' : 'var(--banana-light)',
+                    color: a.is_resolved ? 'var(--primary)' : 'var(--banana)',
+                    fontWeight: '900'
+                  }}>
+                    {a.is_resolved ? 'SELESAI' : 'TERBUKA'}
+                  </span>
                 </div>
                 <p style={{ color: 'var(--text-muted)', fontWeight: '500' }}>{a.deskripsi}</p>
+                <p style={{ color: 'var(--text-muted)', fontWeight: '700', fontSize: '0.8rem', marginTop: '0.75rem' }}>
+                  Wilayah: {a.wilayah || 'Tidak ditentukan'}
+                </p>
               </div>
+              {!a.is_resolved && (
+                <button
+                  onClick={() => handleResolveAlert(a.id_alert)}
+                  className="btn-primary"
+                  style={{ padding: '0.8rem 1rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer' }}
+                >
+                  Tandai Selesai
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -489,9 +612,27 @@ const PemerintahDashboard = ({ user, onLogout }) => {
     if (isPeta) return (
       <div className="grid">
         <Header title="Peta Distribusi Real-time" subtitle="Visualisasi sebaran dapur dan sekolah di seluruh Nusantara." />
-        <div className="card" style={{ height: '600px', background: 'var(--bg)', borderRadius: '16px', display: 'grid', placeItems: 'center', position: 'relative' }}>
-           <Globe size={100} color="var(--primary)" style={{ opacity: 0.1 }} />
-           <p style={{ color: 'var(--text-muted)', fontWeight: '700' }}>Live Map Monitoring (Sabang s/d Merauke)...</p>
+        <div className="card" style={{ minHeight: '600px', background: 'var(--bg)', borderRadius: '16px', padding: '1.5rem', position: 'relative' }}>
+           <div style={{ display: 'grid', gap: '1rem' }}>
+             {mappingData.length === 0 ? (
+               <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
+                 <Globe size={100} color="var(--primary)" style={{ opacity: 0.1 }} />
+                 <p style={{ color: 'var(--text-muted)', fontWeight: '700' }}>Belum ada pemetaan dapur dan sekolah.</p>
+               </div>
+             ) : mappingData.map((m) => (
+               <div key={m.id_mapping} style={{ padding: '1.1rem', borderRadius: '14px', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <div>
+                   <p style={{ fontWeight: '900' }}>{m.dapur_lokasi}</p>
+                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Dapur Aktif</p>
+                 </div>
+                 <ChevronRight color="var(--primary)" />
+                 <div style={{ textAlign: 'right' }}>
+                   <p style={{ fontWeight: '900' }}>{m.nama_sekolah}</p>
+                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Sekolah Terlayani</p>
+                 </div>
+               </div>
+             ))}
+           </div>
         </div>
       </div>
     )
@@ -523,6 +664,19 @@ const PemerintahDashboard = ({ user, onLogout }) => {
 
   return (
     <DashboardLayout user={user} onLogout={onLogout}>
+      <AnimatePresence>
+        {selectedVendorAudit && (
+          <VendorAuditModal
+            vendor={selectedVendorAudit}
+            docs={selectedVendorDocs}
+            dapurs={dapurs.filter((d) => d.id_vendor === selectedVendorAudit.id_vendor)}
+            onClose={() => {
+              setSelectedVendorAudit(null)
+              setSelectedVendorDocs([])
+            }}
+          />
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {showToast.show && (
           <motion.div 

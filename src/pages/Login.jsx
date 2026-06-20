@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { ShieldCheck, Building, GraduationCap, Microscope, Zap, ArrowRight, LogIn } from 'lucide-react'
 import api from '../api'
 
-const ENABLE_QUICK_LOGIN = true
+const ENABLE_QUICK_LOGIN = false
 
 const roleColors = {
   vendor: { primary: '#f97316', light: '#fff7ed', label: 'Vendor Dapur' },
