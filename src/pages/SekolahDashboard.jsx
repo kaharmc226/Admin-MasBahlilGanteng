@@ -27,7 +27,6 @@ import {
   HardDrive
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { mockData } from '../data/mockData'
 import api from '../api'
 import DashboardLayout from '../components/DashboardLayout'
 
@@ -210,18 +209,24 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [distribusi, setDistribusi] = useState([])
   const [feedback, setFeedback] = useState([])
   const [schoolProfile, setSchoolProfile] = useState(null)
+  const [konfirmasiHistory, setKonfirmasiHistory] = useState([])
+  const [proofUpload, setProofUpload] = useState(null)
+  const [proofPreview, setProofPreview] = useState('')
+  const [isConfirming, setIsConfirming] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dist, fb, matchedSchool] = await Promise.all([api.getDistribusi(), api.getFeedback(), api.getSekolahByUser(user.id_user)])
+        const [dist, fb, matchedSchool, confirmations] = await Promise.all([api.getDistribusi(), api.getFeedback(), api.getSekolahByUser(user.id_user), api.getKonfirmasi()])
         setSchoolProfile(matchedSchool)
         setDistribusi(matchedSchool ? dist.filter((item) => item.id_sekolah === matchedSchool.id_sekolah) : [])
+        setKonfirmasiHistory(matchedSchool ? confirmations.filter((item) => item.id_sekolah === matchedSchool.id_sekolah) : [])
         setFeedback(fb)
       } catch (err) {
         console.error('Failed to fetch:', err)
         setSchoolProfile(null)
         setDistribusi([])
+        setKonfirmasiHistory([])
       }
     }
     fetchData()
@@ -255,21 +260,47 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
       alert('Tidak ada distribusi aktif saat ini.')
       return
     }
+    if (!proofUpload) {
+      alert('Upload foto bukti serah terima terlebih dahulu.')
+      return
+    }
+    setIsConfirming(true)
     try {
+      const uploaded = await api.uploadConfirmationPhoto({
+        imageData: proofUpload.dataUrl,
+        fileName: proofUpload.fileName
+      })
       await api.createKonfirmasi({
         id_distribusi: activeDelivery.id_distribusi,
         id_user: user.id_user,
         kondisi_makanan: 'baik',
         jumlah_diterima: schoolProfile?.jumlah_siswa || activeDelivery.jumlah_porsi || 0,
-        catatan: 'Diterima sesuai jadwal'
+        catatan: 'Diterima sesuai jadwal',
+        foto_bukti: uploaded.foto_bukti
       })
       
       setDistribusi(prev => prev.map(d => d.id_distribusi === activeDelivery.id_distribusi ? { ...d, status: 'SELESAI' } : d))
+      const confirmations = await api.getKonfirmasi()
+      setKonfirmasiHistory(schoolProfile ? confirmations.filter((item) => item.id_sekolah === schoolProfile.id_sekolah) : confirmations)
+      setProofUpload(null)
+      setProofPreview('')
       alert("✅ Konfirmasi Berhasil! Data dikunci ke Ledger Nasional.")
     } catch (err) {
       console.error(err)
       alert('Gagal konfirmasi: ' + err.message)
+    } finally {
+      setIsConfirming(false)
     }
+  }
+
+  const handleProofFile = (file) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setProofUpload({ dataUrl: reader.result, fileName: file.name })
+      setProofPreview(reader.result)
+    }
+    reader.readAsDataURL(file)
   }
 
   const handleQuickFeedback = async () => {
@@ -311,11 +342,17 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
              <Camera size={64} color="var(--primary)" style={{ marginBottom: '1.5rem', opacity: 0.4 }} />
              <p style={{ fontWeight: '950', fontSize: '1.4rem', color: 'var(--text-main)' }}>Bukti Serah Terima</p>
              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontWeight: '600', maxWidth: '400px', margin: '0 auto 2.5rem' }}>Ambil foto makanan yang diterima untuk validasi transparansi blockchain.</p>
-             <button onClick={() => alert("📸 Membuka Kamera Perangkat... Audit GPS Aktif.")} className="btn-primary" style={{ padding: '1.5rem 3.5rem', borderRadius: '60px', border: 'none', color: 'white', fontWeight: '900', cursor: 'pointer', fontSize: '1.1rem' }}>Aktifkan Kamera</button>
+             {proofPreview && (
+               <img src={proofPreview} alt="Preview bukti serah terima" style={{ width: '100%', maxWidth: '360px', height: '220px', objectFit: 'cover', borderRadius: '16px', marginBottom: '1rem', border: '4px solid white' }} />
+             )}
+             <label className="btn-primary" style={{ padding: '1.5rem 3.5rem', borderRadius: '60px', border: 'none', color: 'white', fontWeight: '900', cursor: 'pointer', fontSize: '1.1rem', display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+               <Camera size={20} /> Upload / Ambil Foto
+               <input type="file" accept="image/*" capture="environment" onChange={(e) => handleProofFile(e.target.files?.[0])} style={{ display: 'none' }} />
+             </label>
           </div>
           
           <div style={{ display: 'flex', gap: '1rem' }}>
-             <button onClick={handleConfirmArrival} className="btn-primary" style={{ flex: 1.5, padding: '1.5rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.2rem', cursor: 'pointer' }}>Konfirmasi Sesuai</button>
+             <button onClick={handleConfirmArrival} disabled={isConfirming} className="btn-primary" style={{ flex: 1.5, padding: '1.5rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.2rem', cursor: isConfirming ? 'wait' : 'pointer', opacity: isConfirming ? 0.75 : 1 }}>{isConfirming ? 'Menyimpan Bukti...' : 'Konfirmasi Sesuai'}</button>
              <button onClick={() => setShowAddForm(true)} className="btn-outline" style={{ flex: 1, padding: '1.5rem', borderRadius: '12px', color: 'var(--error)', borderColor: 'var(--error)', fontWeight: '900', cursor: 'pointer' }}>Lapor Selisih</button>
           </div>
         </div>
@@ -324,12 +361,13 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
           <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px' }}>
             <h3 style={{ marginBottom: '1rem', fontWeight: '950', fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}><History color="var(--primary)" /> Riwayat 3 Hari</h3>
             <div style={{ display: 'grid', gap: '1.2rem' }}>
-              {(distribusi.length > 0 ? distribusi.slice(0, 3) : [
+              {(konfirmasiHistory.length > 0 ? konfirmasiHistory.slice(0, 3) : distribusi.length > 0 ? distribusi.slice(0, 3) : [
                 { created_at: '2026-03-13T00:00:00Z', nama_menu: 'Nasi Kuning Special', jumlah_porsi: 404, status: 'SELESAI' },
                 { created_at: '2026-03-12T00:00:00Z', nama_menu: 'Ayam Kecap Madu', jumlah_porsi: 404, status: 'SELESAI' },
                 { created_at: '2026-03-11T00:00:00Z', nama_menu: 'Sup Bakso Sehat', jumlah_porsi: 404, status: 'SELESAI' }
               ]).map((h, i) => {
-                const dateStr = h.waktu_tiba ? new Date(h.waktu_tiba).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(h.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                const rawDate = h.waktu_konfirmasi || h.waktu_tiba || h.created_at || new Date().toISOString()
+                const dateStr = new Date(rawDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
                 const isFinished = h.status === 'SELESAI' || h.status === 'TIBA';
                 
                 return (
@@ -337,6 +375,7 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
                      <div>
                         <p style={{ fontWeight: '900', fontSize: '1rem' }}>{dateStr}</p>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>{h.nama_menu} ({h.jumlah_porsi} Porsi)</p>
+                        {h.foto_bukti && <button onClick={() => window.open(api.assetUrl(h.foto_bukti), '_blank')} style={{ marginTop: '0.5rem', border: 'none', background: 'white', color: 'var(--primary)', borderRadius: '8px', padding: '0.35rem 0.6rem', fontWeight: '800', cursor: 'pointer' }}>Lihat Foto</button>}
                      </div>
                      <div style={{ background: isFinished ? 'var(--primary)' : 'var(--banana)', padding: '10px', borderRadius: '12px', display: 'grid', placeItems: 'center' }}>
                        {isFinished ? <CheckCircle2 color="white" size={20} /> : <Clock color="white" size={20} />}

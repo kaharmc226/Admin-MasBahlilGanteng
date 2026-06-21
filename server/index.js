@@ -142,7 +142,33 @@ async function applyStockDeductions(connection, { idDapur, menuName, jumlahPorsi
 
 const uploadRoot = path.resolve(process.cwd(), 'public', 'uploads')
 const menuPhotoDir = path.join(uploadRoot, 'menu-photos')
+const vendorDocumentDir = path.join(uploadRoot, 'vendor-documents')
+const confirmationPhotoDir = path.join(uploadRoot, 'confirmation-photos')
 fs.mkdirSync(menuPhotoDir, { recursive: true })
+fs.mkdirSync(vendorDocumentDir, { recursive: true })
+fs.mkdirSync(confirmationPhotoDir, { recursive: true })
+
+function saveUploadFromDataUrl({ imageData, fileName, targetDir, publicPath, allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf'], maxBytes = 8 * 1024 * 1024 }) {
+  const match = /^data:([^;]+);base64,([A-Za-z0-9+/=]+)$/.exec(imageData || '')
+  if (!match || !allowedTypes.includes(match[1])) {
+    throw new Error('Format file tidak didukung.')
+  }
+
+  const extensionMap = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/webp': 'webp',
+    'application/pdf': 'pdf'
+  }
+  const buffer = Buffer.from(match[2], 'base64')
+  if (buffer.length > maxBytes) throw new Error('Ukuran file terlalu besar.')
+
+  const safeBaseName = path.basename(fileName || 'upload').replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/gi, '-').slice(0, 50) || 'upload'
+  const storedName = `${Date.now()}-${safeBaseName}.${extensionMap[match[1]]}`
+  fs.writeFileSync(path.join(targetDir, storedName), buffer)
+  return `${publicPath}/${storedName}`
+}
 
 // Auto-migrate: create dapur_stok_history table
 pool.query(`
@@ -210,6 +236,48 @@ pool.query(`
   `)
 }).then(() => {
   console.log('Table nutrition database and requests are ready.')
+  return pool.query(`
+    ALTER TABLE vendors MODIFY COLUMN status_verifikasi ENUM('pending','approved','rejected','suspended') DEFAULT 'pending'
+  `)
+}).then(() => {
+  return pool.query(`
+    CREATE TABLE IF NOT EXISTS vendor_registrations (
+      id_registration INT PRIMARY KEY AUTO_INCREMENT,
+      nama_vendor VARCHAR(150) NOT NULL,
+      alamat TEXT NULL,
+      region VARCHAR(100) NULL,
+      kontak VARCHAR(100) NULL,
+      email VARCHAR(150) NULL,
+      izin_usaha VARCHAR(100) NULL,
+      status ENUM('pending','approved','rejected','revision') NOT NULL DEFAULT 'pending',
+      review_note TEXT NULL,
+      reviewed_by INT NULL,
+      reviewed_at DATETIME NULL,
+      id_vendor INT NULL,
+      documents JSON NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (reviewed_by) REFERENCES users(id_user) ON DELETE SET NULL,
+      FOREIGN KEY (id_vendor) REFERENCES vendors(id_vendor) ON DELETE SET NULL
+    )
+  `)
+}).then(() => {
+  return pool.query('SHOW COLUMNS FROM dokumen_vendor')
+}).then(([columns]) => {
+  const existing = new Set(columns.map(col => col.Field))
+  const migrations = []
+  if (!existing.has('is_archived')) migrations.push(pool.query('ALTER TABLE dokumen_vendor ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE AFTER status'))
+  if (!existing.has('review_note')) migrations.push(pool.query('ALTER TABLE dokumen_vendor ADD COLUMN review_note TEXT NULL AFTER status'))
+  return Promise.all(migrations)
+}).then(() => {
+  return pool.query('SHOW COLUMNS FROM alerts')
+}).then(([columns]) => {
+  const existing = new Set(columns.map(col => col.Field))
+  const migrations = []
+  if (!existing.has('is_archived')) migrations.push(pool.query('ALTER TABLE alerts ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE AFTER is_resolved'))
+  return Promise.all(migrations)
+}).then(() => {
+  console.log('Vendor registration, document, and alert workflow tables are ready.')
 }).catch(err => {
   console.error('❌ Failed to run auto-migrations:', err.message)
 })
@@ -350,8 +418,81 @@ app.put('/api/vendors/:id', async (req, res) => {
 
 app.delete('/api/vendors/:id', async (req, res) => {
   try {
-    await pool.query('DELETE FROM vendors WHERE id_vendor = ?', [req.params.id])
-    res.json({ message: 'Deleted' })
+    await pool.query("UPDATE vendors SET status_verifikasi='suspended' WHERE id_vendor = ?", [req.params.id])
+    res.json({ message: 'Suspended' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.get('/api/vendor-registrations', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT r.*, reviewer.name AS reviewer_name
+      FROM vendor_registrations r
+      LEFT JOIN users reviewer ON r.reviewed_by = reviewer.id_user
+      ORDER BY FIELD(r.status, 'pending', 'revision', 'approved', 'rejected'), r.created_at DESC
+    `)
+    res.json(rows)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.post('/api/vendor-registrations', async (req, res) => {
+  try {
+    const { nama_vendor, alamat, region, kontak, email, izin_usaha, documents } = req.body
+    if (!nama_vendor || !alamat) return res.status(400).json({ error: 'Nama vendor dan alamat wajib diisi.' })
+    const [result] = await pool.query(
+      'INSERT INTO vendor_registrations (nama_vendor, alamat, region, kontak, email, izin_usaha, documents) VALUES (?,?,?,?,?,?,?)',
+      [nama_vendor, alamat, region || null, kontak || null, email || null, izin_usaha || `REG-${Date.now()}`, JSON.stringify(documents || [])]
+    )
+    res.status(201).json({ id_registration: result.insertId, status: 'pending', ...req.body })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.put('/api/vendor-registrations/:id/approve', async (req, res) => {
+  let connection
+  try {
+    const { reviewed_by, review_note } = req.body
+    connection = await pool.getConnection()
+    await connection.beginTransaction()
+    const [regs] = await connection.query('SELECT * FROM vendor_registrations WHERE id_registration=?', [req.params.id])
+    if (regs.length === 0) {
+      await connection.rollback()
+      return res.status(404).json({ error: 'Registrasi vendor tidak ditemukan.' })
+    }
+    const reg = regs[0]
+    const [vendorResult] = await connection.query(
+      'INSERT INTO vendors (nama_vendor, region, status_verifikasi, izin_usaha) VALUES (?,?,?,?)',
+      [reg.nama_vendor, reg.region || 'Belum ditentukan', 'approved', reg.izin_usaha || `REG-${reg.id_registration}`]
+    )
+    const idVendor = vendorResult.insertId
+    const docs = typeof reg.documents === 'string' ? JSON.parse(reg.documents || '[]') : (reg.documents || [])
+    for (const doc of docs) {
+      await connection.query(
+        'INSERT INTO dokumen_vendor (id_vendor, nama_dokumen, jenis, file_path, status) VALUES (?,?,?,?,?)',
+        [idVendor, doc.nama_dokumen || doc.label || 'Dokumen Vendor', doc.jenis || 'lainnya', doc.file_path || null, 'pending_review']
+      )
+    }
+    await connection.query(
+      'UPDATE vendor_registrations SET status="approved", reviewed_by=?, review_note=?, reviewed_at=NOW(), id_vendor=? WHERE id_registration=?',
+      [reviewed_by || null, review_note || null, idVendor, req.params.id]
+    )
+    await connection.commit()
+    res.json({ message: 'Approved', id_vendor: idVendor })
+  } catch (err) {
+    if (connection) await connection.rollback()
+    res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
+
+app.put('/api/vendor-registrations/:id/reject', async (req, res) => {
+  try {
+    const { reviewed_by, review_note, revision = false } = req.body
+    await pool.query(
+      'UPDATE vendor_registrations SET status=?, reviewed_by=?, review_note=?, reviewed_at=NOW() WHERE id_registration=?',
+      [revision ? 'revision' : 'rejected', reviewed_by || null, review_note || null, req.params.id]
+    )
+    res.json({ message: revision ? 'Revision requested' : 'Rejected' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -437,30 +578,41 @@ app.delete('/api/mapping/:id', async (req, res) => {
 // ============================================
 app.post('/api/uploads/menu-photo', async (req, res) => {
   try {
-    const { imageData, fileName } = req.body
-    const match = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(imageData || '')
-    if (!match) return res.status(400).json({ error: 'Format foto harus PNG, JPG, atau WebP.' })
-
-    const extensionMap = {
-      'image/png': 'png',
-      'image/jpeg': 'jpg',
-      'image/jpg': 'jpg',
-      'image/webp': 'webp'
-    }
-    const extension = extensionMap[match[1]]
-    const buffer = Buffer.from(match[2], 'base64')
-    if (buffer.length > 5 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Ukuran foto maksimal 5MB.' })
-    }
-
-    const safeBaseName = path.basename(fileName || 'menu').replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/gi, '-').slice(0, 40) || 'menu'
-    const storedName = `${Date.now()}-${safeBaseName}.${extension}`
-    fs.writeFileSync(path.join(menuPhotoDir, storedName), buffer)
-
-    res.status(201).json({ foto_url: `/uploads/menu-photos/${storedName}` })
+    const file_path = saveUploadFromDataUrl({
+      ...req.body,
+      targetDir: menuPhotoDir,
+      publicPath: '/uploads/menu-photos',
+      allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
+      maxBytes: 5 * 1024 * 1024
+    })
+    res.status(201).json({ foto_url: file_path })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(400).json({ error: err.message })
   }
+})
+
+app.post('/api/uploads/vendor-document', async (req, res) => {
+  try {
+    const file_path = saveUploadFromDataUrl({
+      ...req.body,
+      targetDir: vendorDocumentDir,
+      publicPath: '/uploads/vendor-documents'
+    })
+    res.status(201).json({ file_path })
+  } catch (err) { res.status(400).json({ error: err.message }) }
+})
+
+app.post('/api/uploads/confirmation-photo', async (req, res) => {
+  try {
+    const foto_bukti = saveUploadFromDataUrl({
+      ...req.body,
+      targetDir: confirmationPhotoDir,
+      publicPath: '/uploads/confirmation-photos',
+      allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
+      maxBytes: 5 * 1024 * 1024
+    })
+    res.status(201).json({ foto_bukti })
+  } catch (err) { res.status(400).json({ error: err.message }) }
 })
 
 app.get('/api/menus', async (req, res) => {
@@ -839,9 +991,11 @@ app.post('/api/feedback', async (req, res) => {
 app.get('/api/konfirmasi', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT k.*, d.kode_transaksi, s.nama_sekolah
+      SELECT k.*, d.kode_transaksi, d.id_sekolah, p.id_menu, m.nama_menu, s.nama_sekolah
       FROM konfirmasi_kedatangan k
       JOIN distribusi d ON k.id_distribusi = d.id_distribusi
+      JOIN produksi p ON d.id_produksi = p.id_produksi
+      JOIN menus m ON p.id_menu = m.id_menu
       JOIN sekolah s ON d.id_sekolah = s.id_sekolah
       ORDER BY k.created_at DESC
     `)
@@ -851,10 +1005,10 @@ app.get('/api/konfirmasi', async (req, res) => {
 
 app.post('/api/konfirmasi', async (req, res) => {
   try {
-    const { id_distribusi, id_user, kondisi_makanan, jumlah_diterima, catatan } = req.body
+    const { id_distribusi, id_user, kondisi_makanan, jumlah_diterima, catatan, foto_bukti } = req.body
     const [result] = await pool.query(
-      'INSERT INTO konfirmasi_kedatangan (id_distribusi, id_user, waktu_konfirmasi, kondisi_makanan, jumlah_diterima, catatan) VALUES (?,?,NOW(),?,?,?)',
-      [id_distribusi, id_user, kondisi_makanan || 'baik', jumlah_diterima, catatan]
+      'INSERT INTO konfirmasi_kedatangan (id_distribusi, id_user, waktu_konfirmasi, kondisi_makanan, jumlah_diterima, catatan, foto_bukti) VALUES (?,?,NOW(),?,?,?,?)',
+      [id_distribusi, id_user, kondisi_makanan || 'baik', jumlah_diterima, catatan, foto_bukti || null]
     )
     // Update distribution status
     await pool.query('UPDATE distribusi SET status="SELESAI" WHERE id_distribusi=?', [id_distribusi])
@@ -867,7 +1021,7 @@ app.post('/api/konfirmasi', async (req, res) => {
 // ============================================
 app.get('/api/alerts', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM alerts ORDER BY created_at DESC')
+    const [rows] = await pool.query('SELECT * FROM alerts WHERE is_archived = FALSE ORDER BY created_at DESC')
     res.json(rows)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -894,6 +1048,24 @@ app.put('/api/alerts/:id/resolve', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+app.put('/api/alerts/:id', async (req, res) => {
+  try {
+    const { judul, deskripsi, severity, wilayah, is_resolved } = req.body
+    await pool.query(
+      'UPDATE alerts SET judul=?, deskripsi=?, severity=?, wilayah=?, is_resolved=? WHERE id_alert=?',
+      [judul, deskripsi, severity || 'info', wilayah || null, !!is_resolved, req.params.id]
+    )
+    res.json({ message: 'Updated' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.delete('/api/alerts/:id', async (req, res) => {
+  try {
+    await pool.query('UPDATE alerts SET is_archived=TRUE WHERE id_alert=?', [req.params.id])
+    res.json({ message: 'Archived' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 // ============================================
 // WILAYAH DATA
 // ============================================
@@ -909,19 +1081,45 @@ app.get('/api/wilayah', async (req, res) => {
 // ============================================
 app.get('/api/dokumen/:vendorId', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM dokumen_vendor WHERE id_vendor = ?', [req.params.vendorId])
+    const [rows] = await pool.query('SELECT * FROM dokumen_vendor WHERE id_vendor = ? AND is_archived = FALSE', [req.params.vendorId])
     res.json(rows)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.post('/api/dokumen', async (req, res) => {
   try {
-    const { id_vendor, nama_dokumen, jenis, status, tanggal_berlaku, tanggal_kadaluarsa } = req.body
+    const { id_vendor, nama_dokumen, jenis, status, tanggal_berlaku, tanggal_kadaluarsa, file_path, review_note } = req.body
     const [result] = await pool.query(
-      'INSERT INTO dokumen_vendor (id_vendor, nama_dokumen, jenis, status, tanggal_berlaku, tanggal_kadaluarsa) VALUES (?,?,?,?,?,?)',
-      [id_vendor, nama_dokumen, jenis, status || 'pending_review', tanggal_berlaku, tanggal_kadaluarsa]
+      'INSERT INTO dokumen_vendor (id_vendor, nama_dokumen, jenis, status, tanggal_berlaku, tanggal_kadaluarsa, file_path, review_note) VALUES (?,?,?,?,?,?,?,?)',
+      [id_vendor, nama_dokumen, jenis, status || 'pending_review', tanggal_berlaku, tanggal_kadaluarsa, file_path || null, review_note || null]
     )
     res.status(201).json({ id_dokumen: result.insertId, ...req.body })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.put('/api/dokumen/:id', async (req, res) => {
+  try {
+    const { nama_dokumen, jenis, status, tanggal_berlaku, tanggal_kadaluarsa, file_path, review_note } = req.body
+    await pool.query(
+      'UPDATE dokumen_vendor SET nama_dokumen=?, jenis=?, status=?, tanggal_berlaku=?, tanggal_kadaluarsa=?, file_path=?, review_note=? WHERE id_dokumen=?',
+      [nama_dokumen, jenis, status || 'pending_review', tanggal_berlaku || null, tanggal_kadaluarsa || null, file_path || null, review_note || null, req.params.id]
+    )
+    res.json({ message: 'Updated' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.put('/api/dokumen/:id/status', async (req, res) => {
+  try {
+    const { status, review_note } = req.body
+    await pool.query('UPDATE dokumen_vendor SET status=?, review_note=? WHERE id_dokumen=?', [status, review_note || null, req.params.id])
+    res.json({ message: 'Status updated' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.delete('/api/dokumen/:id', async (req, res) => {
+  try {
+    await pool.query('UPDATE dokumen_vendor SET is_archived=TRUE WHERE id_dokumen=?', [req.params.id])
+    res.json({ message: 'Archived' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

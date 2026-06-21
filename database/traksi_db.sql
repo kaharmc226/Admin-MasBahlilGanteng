@@ -61,7 +61,7 @@ CREATE TABLE vendors (
   id_vendor INT PRIMARY KEY AUTO_INCREMENT,
   nama_vendor VARCHAR(150) NOT NULL,
   region VARCHAR(100) NOT NULL,
-  status_verifikasi ENUM('pending','approved','rejected') DEFAULT 'pending',
+  status_verifikasi ENUM('pending','approved','rejected','suspended') DEFAULT 'pending',
   izin_usaha VARCHAR(50) NOT NULL,
   id_user INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -71,6 +71,26 @@ CREATE TABLE vendors (
 
 INSERT INTO vendors (id_vendor, nama_vendor, region, status_verifikasi, izin_usaha, id_user) VALUES
 (1, 'Dapur Sehat Nusantara', 'DKI Jakarta', 'approved', 'B-992/MBG/2026', 1);
+
+CREATE TABLE vendor_registrations (
+  id_registration INT PRIMARY KEY AUTO_INCREMENT,
+  nama_vendor VARCHAR(150) NOT NULL,
+  alamat TEXT NULL,
+  region VARCHAR(100) NULL,
+  kontak VARCHAR(100) NULL,
+  email VARCHAR(150) NULL,
+  izin_usaha VARCHAR(100) NULL,
+  status ENUM('pending','approved','rejected','revision') NOT NULL DEFAULT 'pending',
+  review_note TEXT NULL,
+  reviewed_by INT NULL,
+  reviewed_at DATETIME NULL,
+  id_vendor INT NULL,
+  documents JSON NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (reviewed_by) REFERENCES users(id_user) ON DELETE SET NULL,
+  FOREIGN KEY (id_vendor) REFERENCES vendors(id_vendor) ON DELETE SET NULL
+);
 
 -- ============================================
 -- 4. DAPUR (Kitchens)
@@ -281,6 +301,7 @@ CREATE TABLE alerts (
   severity ENUM('info','warning','critical') DEFAULT 'info',
   wilayah VARCHAR(100) NULL,
   is_resolved BOOLEAN DEFAULT FALSE,
+  is_archived BOOLEAN NOT NULL DEFAULT FALSE,
   resolved_by INT NULL,
   resolved_at DATETIME NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -337,6 +358,8 @@ CREATE TABLE dokumen_vendor (
   jenis ENUM('izin_usaha','sertifikat_halal','sertifikat_laik_hygiene','npwp','siup','lainnya') NOT NULL,
   file_path VARCHAR(500) NULL,
   status ENUM('valid','expired','pending_review') DEFAULT 'pending_review',
+  is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+  review_note TEXT NULL,
   tanggal_berlaku DATE NULL,
   tanggal_kadaluarsa DATE NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

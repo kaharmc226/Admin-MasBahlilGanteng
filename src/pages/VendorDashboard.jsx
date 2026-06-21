@@ -233,9 +233,14 @@ const getDocumentAsset = (title = '') => {
 
 const PdfModal = ({ doc, onClose }) => {
   if (!doc) return null;
-  const assetPath = getDocumentAsset(doc.title)
+  const assetPath = api.assetUrl(doc.file_path) || getDocumentAsset(doc.title)
+  const isPdf = assetPath?.toLowerCase().includes('.pdf')
 
   const handleDownload = () => {
+    if (doc.file_path) {
+      window.open(assetPath, '_blank')
+      return
+    }
     const link = document.createElement('a')
     link.href = assetPath
     link.download = `${(doc.title || 'dokumen').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`
@@ -245,6 +250,10 @@ const PdfModal = ({ doc, onClose }) => {
   }
 
   const handlePrint = () => {
+    if (doc.file_path) {
+      window.open(assetPath, '_blank')
+      return
+    }
     const printWindow = window.open('', '_blank', 'width=1000,height=800')
     if (!printWindow) return
     printWindow.document.write(`
@@ -318,8 +327,8 @@ const PdfModal = ({ doc, onClose }) => {
              <button style={{ background: 'none', border: 'none', color: 'white', padding: '10px', cursor: 'pointer', opacity: 0.8 }}><ZoomIn size={20} /></button>
           </div>
           <div style={{ display: 'flex', gap: '15px' }}>
-             <button onClick={() => alert("🖨️ Mengirim ke Antrian Print...")} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', cursor: 'pointer', width: '45px', height: '45px', borderRadius: '12px', display: 'grid', placeItems: 'center' }} title="Cetak"><Printer size={22} /></button>
-             <button onClick={() => alert("📥 Mengunduh Salinan PDF Resmi...")} style={{ background: 'var(--primary)', border: 'none', color: 'white', padding: '0 25px', borderRadius: '12px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', height: '45px', boxShadow: '0 10px 20px rgba(16, 185, 129, 0.3)' }}>
+             <button onClick={handlePrint} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', cursor: 'pointer', width: '45px', height: '45px', borderRadius: '12px', display: 'grid', placeItems: 'center' }} title="Cetak"><Printer size={22} /></button>
+             <button onClick={handleDownload} style={{ background: 'var(--primary)', border: 'none', color: 'white', padding: '0 25px', borderRadius: '12px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', height: '45px', boxShadow: '0 10px 20px rgba(16, 185, 129, 0.3)' }}>
                <Download size={20} /> Download PDF
              </button>
           </div>
@@ -349,7 +358,11 @@ const PdfModal = ({ doc, onClose }) => {
             marginBottom: '4rem'
           }}
         >
-          {doc.title.includes('NIB') ? (
+          {doc.file_path && isPdf ? (
+            <iframe src={assetPath} title={doc.title} style={{ width: '100%', height: '80vh', border: 'none', display: 'block' }} />
+          ) : doc.file_path ? (
+            <img src={assetPath} style={{ width: '100%', height: 'auto', display: 'block' }} alt={doc.title} />
+          ) : doc.title.includes('NIB') ? (
             <img src="/nib_mockup.png" style={{ width: '100%', height: 'auto', display: 'block' }} alt="NIB Photo" />
           ) : doc.title.includes('Halal') ? (
             <img src="/halal_mockup.png" style={{ width: '100%', height: 'auto', display: 'block' }} alt="Halal" />
@@ -677,6 +690,9 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [selectedAuditMenu, setSelectedAuditMenu] = useState(null)
   const [selectedDapurForStok, setSelectedDapurForStok] = useState(() => localStorage.getItem('selectedDapurForStok') || null)
   const [currentVendor, setCurrentVendor] = useState(null)
+  const [documentForm, setDocumentForm] = useState({ nama_dokumen: '', jenis: 'izin_usaha', tanggal_berlaku: '' })
+  const [documentUpload, setDocumentUpload] = useState(null)
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false)
   
   // Stock history and alert states
   const [stokHistory, setStokHistory] = useState([])
@@ -876,6 +892,64 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
     })
   }
 
+  const handleDocumentFile = (file) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setDocumentUpload({ dataUrl: reader.result, fileName: file.name })
+      setDocumentForm(prev => ({ ...prev, nama_dokumen: prev.nama_dokumen || file.name.replace(/\.[^.]+$/, '') }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleUploadDocument = async (e) => {
+    e.preventDefault()
+    if (!currentVendor) {
+      alert('Vendor tidak ditemukan.')
+      return
+    }
+    if (!documentUpload) {
+      alert('Pilih file dokumen terlebih dahulu.')
+      return
+    }
+    setIsUploadingDocument(true)
+    try {
+      const uploaded = await api.uploadVendorDocument({
+        imageData: documentUpload.dataUrl,
+        fileName: documentUpload.fileName
+      })
+      await api.createDokumen({
+        id_vendor: currentVendor.id_vendor,
+        nama_dokumen: documentForm.nama_dokumen || documentUpload.fileName,
+        jenis: documentForm.jenis,
+        status: 'pending_review',
+        tanggal_berlaku: documentForm.tanggal_berlaku || null,
+        file_path: uploaded.file_path
+      })
+      const refreshed = await api.getDokumen(currentVendor.id_vendor)
+      setDokumen(refreshed)
+      setDocumentForm({ nama_dokumen: '', jenis: 'izin_usaha', tanggal_berlaku: '' })
+      setDocumentUpload(null)
+      alert('Dokumen berhasil diunggah untuk review Pemerintah.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal upload dokumen: ' + err.message)
+    } finally {
+      setIsUploadingDocument(false)
+    }
+  }
+
+  const handleArchiveDocument = async (doc) => {
+    if (!window.confirm(`Arsipkan ${doc.nama_dokumen}?`)) return
+    try {
+      await api.archiveDokumen(doc.id_dokumen)
+      setDokumen(prev => prev.filter(item => item.id_dokumen !== doc.id_dokumen))
+    } catch (err) {
+      console.error(err)
+      alert('Gagal mengarsipkan dokumen: ' + err.message)
+    }
+  }
+
   const handleAddStok = async (e) => {
     e.preventDefault()
     const form = e.target
@@ -1050,17 +1124,42 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
         {/* Section: Dokumen Izin Usaha */}
         <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px' }}>
           <h3 style={{ fontWeight: '950', marginBottom: '1rem' }}>Dokumen & Izin Usaha</h3>
+          <form onSubmit={handleUploadDocument} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr auto', gap: '0.75rem', alignItems: 'end', padding: '1rem', borderRadius: '12px', background: 'var(--bg)', marginBottom: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: '900', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>NAMA DOKUMEN</label>
+              <input value={documentForm.nama_dokumen} onChange={(e) => setDocumentForm({ ...documentForm, nama_dokumen: e.target.value })} placeholder="Contoh: Sertifikat Halal" style={{ width: '100%', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border)', fontWeight: '700' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: '900', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>JENIS</label>
+              <select value={documentForm.jenis} onChange={(e) => setDocumentForm({ ...documentForm, jenis: e.target.value })} style={{ width: '100%', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border)', fontWeight: '700', background: 'white' }}>
+                <option value="izin_usaha">Izin Usaha</option>
+                <option value="sertifikat_halal">Sertifikat Halal</option>
+                <option value="izin_edar">Izin Edar</option>
+                <option value="sertifikat_laik_hygiene">Higiene Sanitasi</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: '900', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>FILE</label>
+              <label style={{ width: '100%', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border)', fontWeight: '800', background: 'white', display: 'block', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {documentUpload?.fileName || 'Pilih file'}
+                <input type="file" accept="image/*,application/pdf" onChange={(e) => handleDocumentFile(e.target.files?.[0])} style={{ display: 'none' }} />
+              </label>
+            </div>
+            <button type="submit" disabled={isUploadingDocument} className="btn-primary" style={{ padding: '0.95rem 1.2rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '900', cursor: isUploadingDocument ? 'wait' : 'pointer', opacity: isUploadingDocument ? 0.7 : 1 }}>
+              {isUploadingDocument ? 'Upload...' : 'Upload'}
+            </button>
+          </form>
           <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-            {(dokumen.length > 0 ? dokumen : [
-              { nama_dokumen: 'NIB (Nomor Induk Berusaha)', status: 'valid', created_at: '2026-01-12', jenis: 'izin_usaha' },
-              { nama_dokumen: 'Sertifikat Halal', status: 'valid', created_at: '2026-02-05', jenis: 'sertifikat_halal' },
-              { nama_dokumen: 'Izin Edar P-IRT', status: 'pending', created_at: '2026-03-20', jenis: 'izin_edar' },
-              { nama_dokumen: 'Sertifikat Higiene Sanitasi', status: 'valid', created_at: '2026-02-10', jenis: 'sertifikat_laik_hygiene' }
-            ]).map((doc, i) => {
+            {dokumen.length === 0 && (
+              <div className="card" style={{ padding: '1rem', borderRadius: '12px', border: '1px dashed var(--border)', background: 'white' }}>
+                <p style={{ color: 'var(--text-muted)', fontWeight: '800' }}>Belum ada dokumen vendor. Upload dokumen untuk review Pemerintah.</p>
+              </div>
+            )}
+            {dokumen.map((doc, i) => {
               const docIcon = doc.jenis === 'sertifikat_halal' ? <ShieldCheck color="var(--secondary)" /> : 
                               doc.jenis === 'sertifikat_laik_hygiene' ? <ClipboardCheck color="var(--primary)" /> : 
                               doc.status === 'pending' ? <Clock color="var(--banana)" /> : <FileText color="var(--primary)" />;
-              const displayStatus = doc.status === 'valid' || doc.status === 'approved' ? 'Verified' : doc.status === 'pending' ? 'Pending' : 'Expired';
+              const displayStatus = doc.status === 'valid' || doc.status === 'approved' ? 'Verified' : (doc.status === 'pending' || doc.status === 'pending_review') ? 'Pending' : 'Expired';
               const displayDate = doc.tanggal_berlaku ? new Date(doc.tanggal_berlaku).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(doc.created_at || '2026-01-01').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
               
               return (
@@ -1070,12 +1169,15 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Diunggah: {displayDate}</p>
                   <div className="flex justify-between" style={{ alignItems: 'center' }}>
                     <span className="badge" style={{ background: displayStatus === 'Verified' ? 'var(--primary-light)' : 'var(--banana-light)', color: displayStatus === 'Verified' ? 'var(--primary)' : 'var(--banana)', fontWeight: '900' }}>{displayStatus}</span>
-                    <button 
-                      onClick={() => setActiveDoc({ ...doc, title: doc.nama_dokumen, date: displayDate, status: displayStatus })}
-                      style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: '800', cursor: 'pointer', fontSize: '0.85rem' }}
-                    >
-                      Lihat Detail
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <button 
+                        onClick={() => setActiveDoc({ ...doc, title: doc.nama_dokumen, date: displayDate, status: displayStatus })}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: '800', cursor: 'pointer', fontSize: '0.85rem' }}
+                      >
+                        Lihat Detail
+                      </button>
+                      <button onClick={() => handleArchiveDocument(doc)} style={{ background: '#fee2e2', border: 'none', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', fontWeight: '900', cursor: 'pointer', fontSize: '0.8rem' }}>Arsip</button>
+                    </div>
                   </div>
                 </div>
               );

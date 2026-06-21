@@ -74,7 +74,7 @@ const Header = ({ title, subtitle, showAdd = false, onAdd, isVendor, isMapping }
   </div>
 )
 
-const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
+const AddFormModal = ({ onClose, onSave, isVendor, isMapping, dapurs = [] }) => {
   const [isSaving, setIsSaving] = useState(false)
   const [fields, setFields] = useState({
     nama_vendor: '',
@@ -82,7 +82,8 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
     izin_usaha: '',
     nama_sekolah: '',
     jumlah_siswa: '',
-    alamat: ''
+    alamat: '',
+    id_dapur: ''
   })
 
   const handleSave = () => {
@@ -112,6 +113,15 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
     )
     if (isMapping) return (
       <>
+        <div>
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DAPUR PENANGGUNG JAWAB</label>
+          <select required value={fields.id_dapur} onChange={(e) => setFields({ ...fields, id_dapur: e.target.value })} style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', background: 'white' }}>
+            <option value="">Pilih dapur</option>
+            {dapurs.map((d) => (
+              <option key={d.id_dapur} value={d.id_dapur}>Dapur {d.lokasi} - Vendor #{d.id_vendor}</option>
+            ))}
+          </select>
+        </div>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA SEKOLAH BARU</label>
           <input required value={fields.nama_sekolah} onChange={(e) => setFields({ ...fields, nama_sekolah: e.target.value })} placeholder="Contoh: SDN 05 Menteng" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
@@ -194,7 +204,7 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping }) => {
   )
 }
 
-const VendorAuditModal = ({ vendor, docs, dapurs, onClose }) => {
+const VendorAuditModal = ({ vendor, docs, dapurs, onClose, onReviewDocument, onSuspendVendor, onReinstateVendor }) => {
   if (!vendor) return null
 
   return (
@@ -253,11 +263,26 @@ const VendorAuditModal = ({ vendor, docs, dapurs, onClose }) => {
               ) : docs.map((doc) => (
                 <div key={doc.id_dokumen} style={{ padding: '0.9rem', borderRadius: '12px', background: 'var(--bg)' }}>
                   <p style={{ fontWeight: '800' }}>{doc.nama_dokumen}</p>
+                  {doc.file_path && (
+                    <button onClick={() => window.open(api.assetUrl(doc.file_path), '_blank')} style={{ border: 'none', borderRadius: '10px', padding: '0.45rem 0.7rem', background: 'white', color: 'var(--primary)', fontWeight: '800', cursor: 'pointer', marginTop: '0.5rem' }}>Buka File</button>
+                  )}
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                    {['valid', 'expired', 'pending_review'].map((status) => (
+                      <button key={status} onClick={() => onReviewDocument(doc, status)} style={{ border: 'none', borderRadius: '10px', padding: '0.45rem 0.7rem', background: doc.status === status ? 'var(--primary)' : 'white', color: doc.status === status ? 'white' : 'var(--text-main)', fontWeight: '800', cursor: 'pointer' }}>{status}</button>
+                    ))}
+                  </div>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>{doc.status} • {doc.jenis}</p>
                 </div>
               ))}
             </div>
           </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+          {vendor.status_verifikasi === 'suspended' ? (
+            <button onClick={() => onReinstateVendor(vendor)} className="btn-primary" style={{ border: 'none', borderRadius: '12px', padding: '0.8rem 1rem', color: 'white', fontWeight: '900', cursor: 'pointer' }}>Aktifkan Lagi</button>
+          ) : (
+            <button onClick={() => onSuspendVendor(vendor)} style={{ border: 'none', borderRadius: '12px', padding: '0.8rem 1rem', background: '#fee2e2', color: '#b91c1c', fontWeight: '900', cursor: 'pointer' }}>Suspend Vendor</button>
+          )}
         </div>
       </motion.div>
     </div>
@@ -297,13 +322,12 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
           intoleran_count: 0
         })
         setSekolahList(prev => [...prev, createdSekolah])
-        const targetDapur = dapurs[0]
-        if (!targetDapur) {
-          throw new Error('Belum ada dapur aktif untuk dipetakan ke sekolah baru.')
+        if (!data.id_dapur) {
+          throw new Error('Pilih dapur penanggung jawab sebelum membuat mapping.')
         }
 
         await api.createMapping({
-          id_dapur: targetDapur.id_dapur,
+          id_dapur: data.id_dapur,
           id_sekolah: createdSekolah.id_sekolah
         })
         const m = await api.getMapping()
@@ -344,17 +368,18 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [v, w, a, m, s, stats, d] = await Promise.all([
+        const [v, w, a, m, s, stats, d, registrations] = await Promise.all([
           api.getVendors(),
           api.getWilayah(),
           api.getAlerts(),
           api.getMapping(),
           api.getSekolah(),
           api.getPemerintahStats(),
-          api.getDapur()
+          api.getDapur(),
+          api.getVendorRegistrations()
         ])
-        setActiveVendors(v.filter(x => x.status_verifikasi === 'approved'))
-        setRegQueue(v.filter(x => x.status_verifikasi === 'pending'))
+        setActiveVendors(v.filter(x => ['approved', 'suspended'].includes(x.status_verifikasi)))
+        setRegQueue(registrations.filter(x => ['pending', 'revision'].includes(x.status)))
         setWilayahData(w)
         setAlerts(a)
         setMappingData(m)
@@ -368,15 +393,82 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
     fetchData()
   }, [])
 
+  const refreshGovernmentData = async () => {
+    const [vendors, registrations, mapping, alertRows] = await Promise.all([
+      api.getVendors(),
+      api.getVendorRegistrations(),
+      api.getMapping(),
+      api.getAlerts()
+    ])
+    setActiveVendors(vendors.filter(x => ['approved', 'suspended'].includes(x.status_verifikasi)))
+    setRegQueue(registrations.filter(x => ['pending', 'revision'].includes(x.status)))
+    setMappingData(mapping)
+    setAlerts(alertRows)
+  }
+
   const handleApproveVendor = async (vendor) => {
     const isConfirm = window.confirm(`Sahkan ${vendor.nama_vendor} sebagai Vendor MBG Resmi?`);
     if (isConfirm) {
       try {
-        await api.updateVendor(vendor.id_vendor, { ...vendor, status_verifikasi: 'approved' })
-        setActiveVendors(prev => [{ ...vendor, status_verifikasi: 'approved' }, ...prev])
-        setRegQueue(prev => prev.filter(v => v.id_vendor !== vendor.id_vendor))
+        if (vendor.id_registration) {
+          await api.approveVendorRegistration(vendor.id_registration, { reviewed_by: user.id_user })
+        } else {
+          await api.updateVendor(vendor.id_vendor, { ...vendor, status_verifikasi: 'approved' })
+        }
+        await refreshGovernmentData()
         triggerToast(`${vendor.nama_vendor} telah resmi disahkan oleh Pemerintah!`)
       } catch (err) { console.error(err) }
+    }
+  }
+
+  const handleRejectRegistration = async (registration, revision = false) => {
+    const review_note = window.prompt(revision ? 'Catatan revisi untuk vendor:' : 'Alasan penolakan:', '')
+    if (review_note === null) return
+    try {
+      await api.rejectVendorRegistration(registration.id_registration, { review_note, reviewed_by: user.id_user, revision })
+      await refreshGovernmentData()
+      triggerToast(revision ? 'Permintaan revisi tersimpan.' : 'Pendaftaran vendor ditolak.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menyimpan review: ' + err.message)
+    }
+  }
+
+  const handleReviewDocument = async (doc, status) => {
+    const review_note = window.prompt(`Catatan review untuk status ${status}:`, doc.review_note || '')
+    if (review_note === null) return
+    try {
+      const updated = await api.updateDokumenStatus(doc.id_dokumen, { status, review_note, reviewed_by: user.id_user })
+      setSelectedVendorDocs(prev => prev.map(item => item.id_dokumen === doc.id_dokumen ? { ...item, ...updated } : item))
+      triggerToast('Status dokumen vendor diperbarui.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal memperbarui dokumen: ' + err.message)
+    }
+  }
+
+  const handleSuspendVendor = async (vendor) => {
+    if (!window.confirm(`Suspend ${vendor.nama_vendor}?`)) return
+    try {
+      await api.deleteVendor(vendor.id_vendor)
+      await refreshGovernmentData()
+      setSelectedVendorAudit(prev => prev ? { ...prev, status_verifikasi: 'suspended' } : prev)
+      triggerToast('Vendor disuspend.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal suspend vendor: ' + err.message)
+    }
+  }
+
+  const handleReinstateVendor = async (vendor) => {
+    try {
+      await api.updateVendor(vendor.id_vendor, { ...vendor, status_verifikasi: 'approved' })
+      await refreshGovernmentData()
+      setSelectedVendorAudit(prev => prev ? { ...prev, status_verifikasi: 'approved' } : prev)
+      triggerToast('Vendor diaktifkan kembali.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal mengaktifkan vendor: ' + err.message)
     }
   }
 
@@ -392,6 +484,40 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
     } catch (err) {
       console.error(err)
       alert('Gagal menyelesaikan alert: ' + err.message)
+    }
+  }
+
+  const handleArchiveAlert = async (alertId) => {
+    try {
+      await api.archiveAlert(alertId)
+      setAlerts(prev => prev.filter(item => item.id_alert !== alertId))
+      triggerToast('Alert diarsipkan.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal mengarsipkan alert: ' + err.message)
+    }
+  }
+
+  const handleAlertSeverity = async (alertItem, severity) => {
+    try {
+      const updated = await api.updateAlert(alertItem.id_alert, { ...alertItem, severity })
+      setAlerts(prev => prev.map(item => item.id_alert === alertItem.id_alert ? { ...item, ...updated } : item))
+      triggerToast('Severity alert diperbarui.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal memperbarui alert: ' + err.message)
+    }
+  }
+
+  const handleUnlinkMapping = async (mappingId) => {
+    if (!window.confirm('Lepas hubungan dapur dan sekolah ini?')) return
+    try {
+      await api.deleteMapping(mappingId)
+      setMappingData(prev => prev.filter(item => item.id_mapping !== mappingId))
+      triggerToast('Mapping dapur-sekolah dilepas.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal melepas mapping: ' + err.message)
     }
   }
 
@@ -451,10 +577,14 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
                   <tr key={i} style={{ background: 'var(--bg)' }}>
                     <td style={{ padding: '1.5rem', fontWeight: '900', borderRadius: '20px 0 0 20px' }}>{v.nama_vendor}</td>
                     <td style={{ padding: '1.5rem', fontWeight: '700' }}>{v.izin_usaha}</td>
-                    <td style={{ padding: '1.5rem', fontWeight: '700' }}>{v.date_pendaftaran}</td>
-                    <td style={{ padding: '1.5rem' }}><span className="badge badge-warning" style={{ fontWeight: '900' }}>PENDING REVIEW</span></td>
+                    <td style={{ padding: '1.5rem', fontWeight: '700' }}>{v.created_at ? new Date(v.created_at).toLocaleDateString('id-ID') : v.date_pendaftaran}</td>
+                    <td style={{ padding: '1.5rem' }}><span className="badge badge-warning" style={{ fontWeight: '900' }}>{v.status?.toUpperCase() || 'PENDING REVIEW'}</span></td>
                     <td style={{ padding: '1.5rem', borderRadius: '0 20px 20px 0' }}>
-                       <button onClick={() => handleApproveVendor(v)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: '15px', border: 'none', fontWeight: '900', color: 'white', cursor: 'pointer' }}>SAHKAN VENDOR</button>
+                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                         <button onClick={() => handleApproveVendor(v)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: '15px', border: 'none', fontWeight: '900', color: 'white', cursor: 'pointer' }}>SAHKAN</button>
+                         <button onClick={() => handleRejectRegistration(v, true)} style={{ padding: '8px 16px', borderRadius: '15px', border: 'none', fontWeight: '900', color: '#92400e', background: '#fef3c7', cursor: 'pointer' }}>REVISI</button>
+                         <button onClick={() => handleRejectRegistration(v, false)} style={{ padding: '8px 16px', borderRadius: '15px', border: 'none', fontWeight: '900', color: '#b91c1c', background: '#fee2e2', cursor: 'pointer' }}>TOLAK</button>
+                       </div>
                     </td>
                   </tr>
                 ))}
@@ -489,7 +619,14 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
                      </span>
                   </td>
                   <td style={{ padding: '1.5rem', borderRadius: '0 20px 20px 0' }}>
-                     <button onClick={() => handleOpenVendorAudit(v)} style={{ color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Detail Audit</button>
+                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                       <button onClick={() => handleOpenVendorAudit(v)} style={{ color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Detail Audit</button>
+                       {v.status_verifikasi === 'suspended' ? (
+                         <button onClick={() => handleReinstateVendor(v)} style={{ color: 'var(--primary)', background: 'white', border: '1px solid var(--primary)', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Aktifkan</button>
+                       ) : (
+                         <button onClick={() => handleSuspendVendor(v)} style={{ color: '#b91c1c', background: '#fee2e2', border: 'none', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Suspend</button>
+                       )}
+                     </div>
                   </td>
                 </tr>
               ))}
@@ -508,6 +645,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
               onClose={() => setShowAddForm(false)} 
               onSave={handleModalSave}
               isMapping={isMapping} 
+              dapurs={dapurs}
             />
           )}
         </AnimatePresence>
@@ -530,6 +668,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
                             <p style={{ fontWeight: '800' }}>{m.nama_sekolah || 'Sekolah'}</p>
                          </div>
                          <div style={{ background: 'white', padding: '10px', borderRadius: '12px' }}><Users color="var(--carrot)" size={18} /></div>
+                         <button onClick={() => handleUnlinkMapping(m.id_mapping)} style={{ border: 'none', borderRadius: '10px', padding: '0.55rem 0.75rem', background: '#fee2e2', color: '#b91c1c', fontWeight: '900', cursor: 'pointer' }}>Unlink</button>
                       </div>
                    </div>
                  )
@@ -594,15 +733,25 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
                   Wilayah: {a.wilayah || 'Tidak ditentukan'}
                 </p>
               </div>
-              {!a.is_resolved && (
-                <button
-                  onClick={() => handleResolveAlert(a.id_alert)}
-                  className="btn-primary"
-                  style={{ padding: '0.8rem 1rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer' }}
-                >
-                  Tandai Selesai
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <select value={a.severity || 'info'} onChange={(e) => handleAlertSeverity(a, e.target.value)} style={{ padding: '0.7rem', borderRadius: '12px', border: '1px solid var(--border)', fontWeight: '800', background: 'white' }}>
+                  <option value="info">Info</option>
+                  <option value="warning">Warning</option>
+                  <option value="critical">Critical</option>
+                </select>
+                {!a.is_resolved && (
+                  <button
+                    onClick={() => handleResolveAlert(a.id_alert)}
+                    className="btn-primary"
+                    style={{ padding: '0.8rem 1rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer' }}
+                  >
+                    Tandai Selesai
+                  </button>
+                )}
+                <button onClick={() => handleArchiveAlert(a.id_alert)} style={{ padding: '0.8rem 1rem', borderRadius: '12px', border: 'none', background: '#fee2e2', color: '#b91c1c', fontWeight: '800', cursor: 'pointer' }}>
+                  Arsipkan
                 </button>
-              )}
+              </div>
             </div>
           ))}
         </div>
@@ -670,6 +819,9 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
             vendor={selectedVendorAudit}
             docs={selectedVendorDocs}
             dapurs={dapurs.filter((d) => d.id_vendor === selectedVendorAudit.id_vendor)}
+            onReviewDocument={handleReviewDocument}
+            onSuspendVendor={handleSuspendVendor}
+            onReinstateVendor={handleReinstateVendor}
             onClose={() => {
               setSelectedVendorAudit(null)
               setSelectedVendorDocs([])

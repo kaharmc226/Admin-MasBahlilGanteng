@@ -62,6 +62,8 @@ const api = {
   updateMenu: (id, data) => request(`/menus/${id}`, { method: 'PUT', body: data }),
   deleteMenu: (id) => request(`/menus/${id}`, { method: 'DELETE' }),
   uploadMenuPhoto: (data) => request('/uploads/menu-photo', { method: 'POST', body: data }),
+  uploadVendorDocument: (data) => request('/uploads/vendor-document', { method: 'POST', body: data }),
+  uploadConfirmationPhoto: (data) => request('/uploads/confirmation-photo', { method: 'POST', body: data }),
   assetUrl: (path) => path?.startsWith('/uploads') ? `${API_ORIGIN}${path}` : path,
 
   // Produksi
@@ -95,6 +97,8 @@ const api = {
   // Alerts
   getAlerts: () => request('/alerts'),
   createAlert: (data) => request('/alerts', { method: 'POST', body: data }),
+  updateAlert: (id, data) => request(`/alerts/${id}`, { method: 'PUT', body: data }),
+  archiveAlert: (id) => request(`/alerts/${id}`, { method: 'DELETE' }),
   resolveAlert: (id, userId) => request(`/alerts/${id}/resolve`, { method: 'PUT', body: { resolved_by: userId } }),
 
   // Wilayah
@@ -103,6 +107,15 @@ const api = {
   // Dokumen
   getDokumen: (vendorId) => request(`/dokumen/${vendorId}`),
   createDokumen: (data) => request('/dokumen', { method: 'POST', body: data }),
+  updateDokumen: (id, data) => request(`/dokumen/${id}`, { method: 'PUT', body: data }),
+  updateDokumenStatus: (id, data) => request(`/dokumen/${id}/status`, { method: 'PUT', body: data }),
+  archiveDokumen: (id) => request(`/dokumen/${id}`, { method: 'DELETE' }),
+
+  // Vendor Registrations
+  getVendorRegistrations: () => request('/vendor-registrations'),
+  createVendorRegistration: (data) => request('/vendor-registrations', { method: 'POST', body: data }),
+  approveVendorRegistration: (id, data) => request(`/vendor-registrations/${id}/approve`, { method: 'PUT', body: data }),
+  rejectVendorRegistration: (id, data) => request(`/vendor-registrations/${id}/reject`, { method: 'PUT', body: data }),
 
   // Nutrition Database
   getNutrition: () => request('/nutrition'),
