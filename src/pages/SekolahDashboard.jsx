@@ -195,7 +195,7 @@ const AddFormModal = ({ onClose, isFeedback, activeDelivery, user }) => {
   )
 }
 
-const SekolahDashboard = ({ user, onLogout }) => {
+const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const [showAddForm, setShowAddForm] = useState(false)
@@ -388,7 +388,7 @@ const SekolahDashboard = ({ user, onLogout }) => {
   }
 
   return (
-    <DashboardLayout user={user} onLogout={onLogout}>
+    <DashboardLayout user={user} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       {isMain ? (
         <>
           <AnimatePresence>

@@ -367,6 +367,11 @@ const PdfModal = ({ doc, onClose }) => {
 const VisualAuditModal = ({ menu, onClose, onRevise }) => {
   if (!menu) return null;
 
+  const bahan = Array.isArray(menu.bahan) ? menu.bahan : []
+  const leftBahan = bahan.slice(0, 3)
+  const rightBahan = bahan.slice(3, 5)
+  const photoUrl = api.assetUrl(menu.foto_url)
+
   return (
     <motion.div 
       initial={{ opacity: 0 }} 
@@ -417,10 +422,10 @@ const VisualAuditModal = ({ menu, onClose, onRevise }) => {
         <div style={{ position: 'relative', height: '380px', width: '100%', margin: '0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1.5rem' }}>
            {/* Annotations Left */}
            <div style={{ position: 'absolute', left: '0', top: '10%', zIndex: 10 }}>
-              {[{n: 'Tahu Goreng', t: '~30 g'}, {n: 'Nasi Putih', t: '~100 g'}, {n: 'Chicken Wings', t: '~48 g'}].map((b, i) => (
+              {leftBahan.map((b, i) => (
                 <motion.div key={i} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.1 }} style={{ textAlign: 'right', marginBottom: '35px', position: 'relative' }}>
-                   <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.2rem', margin: 0, lineHeight: '1.1' }}>{b.n}</p>
-                   <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1.1rem', margin: 0 }}>{b.t}</p>
+                   <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.2rem', margin: 0, lineHeight: '1.1' }}>{b.nama}</p>
+                   <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1.1rem', margin: 0 }}>{b.takaran}</p>
                    <div style={{ width: '40px', height: '3px', background: '#334155', position: 'relative', marginTop: '8px', marginLeft: 'auto', opacity: 0.6 }}>
                       <div style={{ position: 'absolute', left: '100%', top: '-5px', borderLeft: '12px solid #334155', borderTop: '6px solid transparent', borderBottom: '6px solid transparent' }}></div>
                    </div>
@@ -431,16 +436,22 @@ const VisualAuditModal = ({ menu, onClose, onRevise }) => {
            {/* Main Tray Image Container */}
            <div style={{ position: 'relative', width: '380px', height: '320px', display: 'grid', placeItems: 'center' }}>
               <div style={{ width: '100%', height: '100%', border: '12px solid #cbd5e1', borderRadius: '16px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 40px 80px -15px rgba(0,0,0,0.3)', position: 'relative' }}>
-                 <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=600" alt="Menu Tray" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                 {photoUrl ? (
+                   <img src={photoUrl} alt={`Foto ${menu.nama_menu}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                 ) : (
+                   <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', textAlign: 'center', padding: '1.5rem', color: '#64748b', fontWeight: '850', background: '#f8fafc' }}>
+                     Belum ada foto menu
+                   </div>
+                 )}
               </div>
            </div>
 
            {/* Annotations Right */}
            <div style={{ position: 'absolute', right: '0', top: '15%', zIndex: 10 }}>
-              {[{n: 'Pisang', t: '~50 g'}, {n: 'Tumis Buncis+Jagung', t: '~50 g'}].map((b, i) => (
+              {rightBahan.map((b, i) => (
                 <motion.div key={i} initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: (i+3) * 0.1 }} style={{ textAlign: 'left', marginBottom: '40px' }}>
-                   <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.2rem', margin: 0, lineHeight: '1.1' }}>{b.n}</p>
-                   <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1.1rem', margin: 0 }}>{b.t}</p>
+                   <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.2rem', margin: 0, lineHeight: '1.1' }}>{b.nama}</p>
+                   <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1.1rem', margin: 0 }}>{b.takaran}</p>
                    <div style={{ width: '40px', height: '3px', background: '#334155', position: 'relative', marginTop: '8px', opacity: 0.6 }}>
                       <div style={{ position: 'absolute', right: '100%', top: '-5px', borderRight: '12px solid #334155', borderTop: '6px solid transparent', borderBottom: '6px solid transparent' }}></div>
                    </div>
@@ -648,7 +659,7 @@ const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah }) => {
   )
 }
 
-const VendorDashboard = ({ user, onLogout }) => {
+const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -682,19 +693,21 @@ const VendorDashboard = ({ user, onLogout }) => {
   const [stokData, setStokData] = useState([])
   const [sekolah, setSekolah] = useState([])
   const [mappingData, setMappingData] = useState([])
+  const [nutritionItems, setNutritionItems] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [vendor, d, m, prod, dist, sek, mappings] = await Promise.all([
+        const [vendor, d, m, prod, dist, sek, mappings, nutrition] = await Promise.all([
           api.getVendorByUser(user.id_user),
           api.getDapur(),
           api.getMenus(),
           api.getProduksi(),
           api.getDistribusi(),
           api.getSekolah(),
-          api.getMapping()
+          api.getMapping(),
+          api.getNutrition()
         ])
         const vendorDapurs = d.filter(item => item.id_vendor === vendor.id_vendor)
         const vendorDapurIds = new Set(vendorDapurs.map(item => item.id_dapur))
@@ -720,6 +733,7 @@ const VendorDashboard = ({ user, onLogout }) => {
         setDistribusi(vendorDistribusi)
         setSekolah(vendorSekolah)
         setMappingData(vendorMappings)
+        setNutritionItems(Array.isArray(nutrition) ? nutrition.filter(item => item.status !== 'retired') : [])
       } catch (err) {
         console.error('Failed to fetch data:', err)
         setCurrentVendor(null)
@@ -730,6 +744,7 @@ const VendorDashboard = ({ user, onLogout }) => {
         setDistribusi([])
         setSekolah([])
         setMappingData([])
+        setNutritionItems([])
       } finally {
         setLoading(false)
       }
@@ -819,11 +834,20 @@ const VendorDashboard = ({ user, onLogout }) => {
 
   const handleAddMenu = async (newMenu) => {
     try {
+      let fotoUrl = newMenu.foto_url || null
+      if (newMenu.foto_data_url) {
+        const uploaded = await api.uploadMenuPhoto({
+          imageData: newMenu.foto_data_url,
+          fileName: newMenu.foto_file_name || newMenu.nama_menu
+        })
+        fotoUrl = uploaded.foto_url
+      }
+
       if (editingMenu) {
         await api.updateMenu(newMenu.id || newMenu.id_menu, {
           nama_menu: newMenu.nama_menu,
           bahan: newMenu.bahan,
-          nilai_gizi: newMenu.nilai_gizi,
+          foto_url: fotoUrl,
           tanggal: newMenu.date || newMenu.tanggal
         })
       } else {
@@ -832,7 +856,7 @@ const VendorDashboard = ({ user, onLogout }) => {
           id_vendor: currentVendor.id_vendor,
           nama_menu: newMenu.nama_menu,
           bahan: newMenu.bahan,
-          nilai_gizi: newMenu.nilai_gizi || {},
+          foto_url: fotoUrl,
           tanggal: newMenu.date || newMenu.tanggal || new Date().toISOString().split('T')[0]
         })
       }
@@ -841,6 +865,15 @@ const VendorDashboard = ({ user, onLogout }) => {
       }).catch(console.error)
       setEditingMenu(null)
     } catch (err) { console.error(err) }
+  }
+
+  const handleRequestIngredient = async (requestData) => {
+    if (!currentVendor) throw new Error('Vendor tidak ditemukan untuk user yang sedang login.')
+    await api.createNutritionRequest({
+      id_vendor: currentVendor.id_vendor,
+      requested_by: user.id_user,
+      ...requestData
+    })
   }
 
   const handleAddStok = async (e) => {
@@ -1489,6 +1522,8 @@ const VendorDashboard = ({ user, onLogout }) => {
               onClose={() => { setShowMenuForm(false); setEditingMenu(null); }}
               onSave={handleAddMenu}
               editData={editingMenu}
+              nutritionItems={nutritionItems}
+              onRequestIngredient={handleRequestIngredient}
             />
           )}
         </AnimatePresence>
@@ -2018,7 +2053,7 @@ const VendorDashboard = ({ user, onLogout }) => {
   }
 
   return (
-    <DashboardLayout user={user} onLogout={onLogout}>
+    <DashboardLayout user={user} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       {isMain ? (
         <>
           <WelcomeBanner name="Vendor Jakarta Timur" />

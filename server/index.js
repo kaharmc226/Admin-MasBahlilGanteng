@@ -1,10 +1,86 @@
 import express from 'express'
 import cors from 'cors'
+import fs from 'fs'
+import path from 'path'
 import pool from './db.js'
 
 function parseBahanList(rawBahan) {
   if (!rawBahan) return []
   return typeof rawBahan === 'string' ? JSON.parse(rawBahan) : rawBahan
+}
+
+const nutrientKeys = ['energi', 'protein', 'lemak', 'karbohidrat', 'serat', 'natrium']
+
+function parseNutritionNumber(value) {
+  const parsed = parseFloat(String(value ?? '').replace(',', '.').replace(/[^0-9.-]/g, ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function formatNutritionTotals(totals) {
+  return {
+    energi: `${Math.round(totals.energi)} kkal`,
+    protein: `${totals.protein.toFixed(1)} g`,
+    lemak: `${totals.lemak.toFixed(1)} g`,
+    karbohidrat: `${totals.karbohidrat.toFixed(1)} g`,
+    serat: `${totals.serat.toFixed(1)} g`,
+    natrium: `${Math.round(totals.natrium)} mg`,
+    calculated: true
+  }
+}
+
+function normalizeMenuIngredient(row, input) {
+  const jumlah = parseNutritionNumber(input.jumlah ?? input.berat ?? input.takaran)
+  return {
+    id_nutrition: row.id,
+    nama: row.nama,
+    jumlah,
+    satuan: 'gram',
+    takaran: `~${jumlah} g`
+  }
+}
+
+async function calculateMenuNutrition(bahan = []) {
+  if (!Array.isArray(bahan) || bahan.length === 0) {
+    throw new Error('Menu harus memiliki minimal satu bahan dari database nutrisi.')
+  }
+
+  const totals = nutrientKeys.reduce((acc, key) => ({ ...acc, [key]: 0 }), {})
+  const normalizedBahan = []
+
+  for (const item of bahan) {
+    const idNutrition = item.id_nutrition || item.id
+    if (!idNutrition) {
+      throw new Error(`Bahan ${item.nama || ''} belum terhubung ke database nutrisi.`)
+    }
+
+    const [rows] = await pool.query(
+      'SELECT * FROM nutrition_database WHERE id = ? AND status = "active" LIMIT 1',
+      [idNutrition]
+    )
+    if (rows.length === 0) {
+      throw new Error(`Bahan ${item.nama || idNutrition} belum tersedia atau belum disetujui Ahli Gizi.`)
+    }
+
+    const row = rows[0]
+    const normalized = normalizeMenuIngredient(row, item)
+    if (!normalized.jumlah || normalized.jumlah <= 0) {
+      throw new Error(`Jumlah bahan ${row.nama} harus lebih dari 0 gram per porsi.`)
+    }
+
+    const factor = normalized.jumlah / 100
+    totals.energi += parseNutritionNumber(row.energi) * factor
+    totals.protein += parseNutritionNumber(row.protein) * factor
+    totals.lemak += parseNutritionNumber(row.lemak) * factor
+    totals.karbohidrat += parseNutritionNumber(row.karbohidrat) * factor
+    totals.serat += parseNutritionNumber(row.serat) * factor
+    totals.natrium += parseNutritionNumber(row.natrium) * factor
+    normalizedBahan.push(normalized)
+  }
+
+  return {
+    bahan: normalizedBahan,
+    nilai_gizi: formatNutritionTotals(totals)
+  }
 }
 
 async function prepareStockDeductions(connection, { idDapur, idMenu, jumlahPorsi }) {
@@ -64,6 +140,10 @@ async function applyStockDeductions(connection, { idDapur, menuName, jumlahPorsi
   }
 }
 
+const uploadRoot = path.resolve(process.cwd(), 'public', 'uploads')
+const menuPhotoDir = path.join(uploadRoot, 'menu-photos')
+fs.mkdirSync(menuPhotoDir, { recursive: true })
+
 // Auto-migrate: create dapur_stok_history table
 pool.query(`
   CREATE TABLE IF NOT EXISTS dapur_stok_history (
@@ -84,13 +164,60 @@ pool.query(`
   `)
 }).then(() => {
   console.log('✅ Table produksi status column updated to include pending.')
+  return pool.query('SHOW COLUMNS FROM menus LIKE "foto_url"')
+}).then(([columns]) => {
+  if (columns.length > 0) return null
+  return pool.query('ALTER TABLE menus ADD COLUMN foto_url VARCHAR(255) NULL AFTER nilai_gizi')
+}).then(() => {
+  console.log('Table menus foto_url column is ready.')
+  return pool.query('SHOW COLUMNS FROM nutrition_database')
+}).then(([columns]) => {
+  const existing = new Set(columns.map(col => col.Field))
+  const migrations = []
+  const numericColumns = ['protein', 'lemak', 'karbohidrat', 'serat', 'natrium']
+  for (const column of numericColumns) {
+    if (!existing.has(column)) {
+      migrations.push(pool.query(`ALTER TABLE nutrition_database ADD COLUMN ${column} DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER energi`))
+    }
+  }
+  if (!existing.has('status')) {
+    migrations.push(pool.query('ALTER TABLE nutrition_database ADD COLUMN status ENUM("active","retired") NOT NULL DEFAULT "active" AFTER natrium'))
+  }
+  if (!existing.has('updated_at')) {
+    migrations.push(pool.query('ALTER TABLE nutrition_database ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at'))
+  }
+  return Promise.all(migrations)
+}).then(() => {
+  return pool.query(`
+    CREATE TABLE IF NOT EXISTS nutrition_requests (
+      id_request INT PRIMARY KEY AUTO_INCREMENT,
+      id_vendor INT NULL,
+      requested_by INT NULL,
+      nama VARCHAR(150) NOT NULL,
+      kategori VARCHAR(50) NULL,
+      catatan TEXT NULL,
+      status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+      reviewed_by INT NULL,
+      id_nutrition INT NULL,
+      review_note TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at DATETIME NULL,
+      FOREIGN KEY (id_vendor) REFERENCES vendors(id_vendor) ON DELETE SET NULL,
+      FOREIGN KEY (requested_by) REFERENCES users(id_user) ON DELETE SET NULL,
+      FOREIGN KEY (reviewed_by) REFERENCES users(id_user) ON DELETE SET NULL,
+      FOREIGN KEY (id_nutrition) REFERENCES nutrition_database(id) ON DELETE SET NULL
+    )
+  `)
+}).then(() => {
+  console.log('Table nutrition database and requests are ready.')
 }).catch(err => {
   console.error('❌ Failed to run auto-migrations:', err.message)
 })
 
 const app = express()
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '8mb' }))
+app.use('/uploads', express.static(uploadRoot))
 
 // ============================================
 // AUTH
@@ -308,6 +435,34 @@ app.delete('/api/mapping/:id', async (req, res) => {
 // ============================================
 // MENUS
 // ============================================
+app.post('/api/uploads/menu-photo', async (req, res) => {
+  try {
+    const { imageData, fileName } = req.body
+    const match = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(imageData || '')
+    if (!match) return res.status(400).json({ error: 'Format foto harus PNG, JPG, atau WebP.' })
+
+    const extensionMap = {
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/webp': 'webp'
+    }
+    const extension = extensionMap[match[1]]
+    const buffer = Buffer.from(match[2], 'base64')
+    if (buffer.length > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Ukuran foto maksimal 5MB.' })
+    }
+
+    const safeBaseName = path.basename(fileName || 'menu').replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/gi, '-').slice(0, 40) || 'menu'
+    const storedName = `${Date.now()}-${safeBaseName}.${extension}`
+    fs.writeFileSync(path.join(menuPhotoDir, storedName), buffer)
+
+    res.status(201).json({ foto_url: `/uploads/menu-photos/${storedName}` })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.get('/api/menus', async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -330,16 +485,17 @@ app.get('/api/menus/:id', async (req, res) => {
 
 app.post('/api/menus', async (req, res) => {
   try {
-    const { id_vendor, nama_menu, bahan, nilai_gizi, tanggal } = req.body
+    const { id_vendor, nama_menu, bahan, tanggal, foto_url } = req.body
+    const calculatedMenu = await calculateMenuNutrition(bahan)
 
     // Auto-register missing ingredients to all vendor's kitchens
     const [dapurs] = await pool.query('SELECT id_dapur FROM dapur WHERE id_vendor = ?', [id_vendor])
-    if (dapurs.length > 0 && bahan && Array.isArray(bahan)) {
+    if (dapurs.length > 0 && calculatedMenu.bahan && Array.isArray(calculatedMenu.bahan)) {
       for (let d of dapurs) {
         const [stokRows] = await pool.query('SELECT nama_bahan FROM dapur_stok WHERE id_dapur = ?', [d.id_dapur])
         const existingNames = stokRows.map(s => s.nama_bahan.toLowerCase())
         
-        for (let b of bahan) {
+        for (let b of calculatedMenu.bahan) {
           if (b.nama && !existingNames.includes(b.nama.toLowerCase())) {
             let reqQtyStr = b.takaran ? b.takaran.toLowerCase() : ''
             let isKg = reqQtyStr.includes('kg')
@@ -357,23 +513,30 @@ app.post('/api/menus', async (req, res) => {
     }
 
     const [result] = await pool.query(
-      'INSERT INTO menus (id_vendor, nama_menu, bahan, nilai_gizi, tanggal) VALUES (?,?,?,?,?)',
-      [id_vendor, nama_menu, JSON.stringify(bahan), JSON.stringify(nilai_gizi), tanggal]
+      'INSERT INTO menus (id_vendor, nama_menu, bahan, nilai_gizi, foto_url, tanggal) VALUES (?,?,?,?,?,?)',
+      [id_vendor, nama_menu, JSON.stringify(calculatedMenu.bahan), JSON.stringify(calculatedMenu.nilai_gizi), foto_url || null, tanggal]
     )
-    res.status(201).json({ id_menu: result.insertId, ...req.body })
+    res.status(201).json({ id_menu: result.insertId, ...req.body, ...calculatedMenu })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.put('/api/menus/:id', async (req, res) => {
   try {
-    const { nama_menu, bahan, nilai_gizi, status_validasi, notes, tanggal } = req.body
+    const { nama_menu, bahan, nilai_gizi, foto_url, status_validasi, notes, tanggal } = req.body
     const fields = [], values = []
     if (nama_menu !== undefined) { fields.push('nama_menu=?'); values.push(nama_menu) }
-    if (bahan !== undefined) { fields.push('bahan=?'); values.push(JSON.stringify(bahan)) }
-    if (nilai_gizi !== undefined) { fields.push('nilai_gizi=?'); values.push(JSON.stringify(nilai_gizi)) }
+    if (bahan !== undefined) {
+      const calculatedMenu = await calculateMenuNutrition(bahan)
+      fields.push('bahan=?'); values.push(JSON.stringify(calculatedMenu.bahan))
+      fields.push('nilai_gizi=?'); values.push(JSON.stringify(calculatedMenu.nilai_gizi))
+    } else if (nilai_gizi !== undefined) {
+      fields.push('nilai_gizi=?'); values.push(JSON.stringify(nilai_gizi))
+    }
+    if (foto_url !== undefined) { fields.push('foto_url=?'); values.push(foto_url || null) }
     if (status_validasi !== undefined) { fields.push('status_validasi=?'); values.push(status_validasi) }
     if (notes !== undefined) { fields.push('notes=?'); values.push(JSON.stringify(notes)) }
     if (tanggal !== undefined) { fields.push('tanggal=?'); values.push(tanggal) }
+    if (fields.length === 0) return res.status(400).json({ error: 'Tidak ada data menu untuk diperbarui.' })
     values.push(req.params.id)
     await pool.query(`UPDATE menus SET ${fields.join(', ')} WHERE id_menu=?`, values)
     res.json({ message: 'Updated' })
@@ -622,6 +785,17 @@ app.get('/api/validasi-log', async (req, res) => {
 app.post('/api/validasi-log', async (req, res) => {
   try {
     const { id_menu, id_user, aksi, catatan } = req.body
+    if (aksi === 'approved') {
+      const [menuRows] = await pool.query('SELECT bahan, nilai_gizi FROM menus WHERE id_menu=?', [id_menu])
+      if (menuRows.length === 0) return res.status(404).json({ error: 'Menu tidak ditemukan.' })
+      const bahan = parseBahanList(menuRows[0].bahan)
+      const nilaiGizi = typeof menuRows[0].nilai_gizi === 'string' ? JSON.parse(menuRows[0].nilai_gizi) : menuRows[0].nilai_gizi
+      const isCalculated = !!nilaiGizi?.calculated
+      const hasLinkedIngredients = Array.isArray(bahan) && bahan.length > 0 && bahan.every(item => item.id_nutrition)
+      if (!isCalculated || !hasLinkedIngredients) {
+        return res.status(400).json({ error: 'Menu belum memiliki data nutrisi terhitung dari bahan terverifikasi.' })
+      }
+    }
     // Also update menu status
     await pool.query('UPDATE menus SET status_validasi=? WHERE id_menu=?', [aksi, id_menu])
     const [result] = await pool.query(
@@ -843,13 +1017,126 @@ app.get('/api/stok/history/:id_dapur', async (req, res) => {
 // ============================================
 app.get('/api/nutrition', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM nutrition_database ORDER BY kategori, nama')
-    const grouped = rows.reduce((acc, row) => {
-      if (!acc[row.kategori]) acc[row.kategori] = []
-      acc[row.kategori].push({ nama: row.nama, satuan: row.satuan, energi: row.energi })
-      return acc
-    }, {})
-    res.json(grouped)
+    const [rows] = await pool.query('SELECT * FROM nutrition_database ORDER BY status, kategori, nama')
+    res.json(rows)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.post('/api/nutrition', async (req, res) => {
+  try {
+    const { kategori, nama, satuan, energi, protein, lemak, karbohidrat, serat, natrium, status } = req.body
+    if (!nama || !kategori) return res.status(400).json({ error: 'Nama dan kategori bahan wajib diisi.' })
+    const [result] = await pool.query(
+      'INSERT INTO nutrition_database (kategori, nama, satuan, energi, protein, lemak, karbohidrat, serat, natrium, status) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [
+        kategori,
+        nama.trim(),
+        satuan || '100 gram',
+        parseNutritionNumber(energi),
+        parseNutritionNumber(protein),
+        parseNutritionNumber(lemak),
+        parseNutritionNumber(karbohidrat),
+        parseNutritionNumber(serat),
+        parseNutritionNumber(natrium),
+        status || 'active'
+      ]
+    )
+    res.status(201).json({ id: result.insertId, ...req.body, status: status || 'active' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.put('/api/nutrition/:id', async (req, res) => {
+  try {
+    const { kategori, nama, satuan, energi, protein, lemak, karbohidrat, serat, natrium, status } = req.body
+    await pool.query(
+      'UPDATE nutrition_database SET kategori=?, nama=?, satuan=?, energi=?, protein=?, lemak=?, karbohidrat=?, serat=?, natrium=?, status=? WHERE id=?',
+      [
+        kategori,
+        nama,
+        satuan || '100 gram',
+        parseNutritionNumber(energi),
+        parseNutritionNumber(protein),
+        parseNutritionNumber(lemak),
+        parseNutritionNumber(karbohidrat),
+        parseNutritionNumber(serat),
+        parseNutritionNumber(natrium),
+        status || 'active',
+        req.params.id
+      ]
+    )
+    res.json({ message: 'Updated' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.delete('/api/nutrition/:id', async (req, res) => {
+  try {
+    await pool.query('UPDATE nutrition_database SET status="retired" WHERE id=?', [req.params.id])
+    res.json({ message: 'Retired' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.get('/api/nutrition-requests', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT r.*, v.nama_vendor, u.name AS requester_name, reviewer.name AS reviewer_name
+      FROM nutrition_requests r
+      LEFT JOIN vendors v ON r.id_vendor = v.id_vendor
+      LEFT JOIN users u ON r.requested_by = u.id_user
+      LEFT JOIN users reviewer ON r.reviewed_by = reviewer.id_user
+      ORDER BY FIELD(r.status, 'pending', 'approved', 'rejected'), r.created_at DESC
+    `)
+    res.json(rows)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.post('/api/nutrition-requests', async (req, res) => {
+  try {
+    const { id_vendor, requested_by, nama, kategori, catatan } = req.body
+    if (!nama) return res.status(400).json({ error: 'Nama bahan yang diminta wajib diisi.' })
+    const [result] = await pool.query(
+      'INSERT INTO nutrition_requests (id_vendor, requested_by, nama, kategori, catatan) VALUES (?,?,?,?,?)',
+      [id_vendor || null, requested_by || null, nama.trim(), kategori || null, catatan || null]
+    )
+    res.status(201).json({ id_request: result.insertId, ...req.body, status: 'pending' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.put('/api/nutrition-requests/:id/approve', async (req, res) => {
+  try {
+    const { reviewed_by, review_note, kategori, nama, satuan, energi, protein, lemak, karbohidrat, serat, natrium } = req.body
+    const [requestRows] = await pool.query('SELECT * FROM nutrition_requests WHERE id_request=?', [req.params.id])
+    if (requestRows.length === 0) return res.status(404).json({ error: 'Permintaan bahan tidak ditemukan.' })
+    const request = requestRows[0]
+    const [result] = await pool.query(
+      'INSERT INTO nutrition_database (kategori, nama, satuan, energi, protein, lemak, karbohidrat, serat, natrium, status) VALUES (?,?,?,?,?,?,?,?,?,"active")',
+      [
+        kategori || request.kategori || 'lainnya',
+        (nama || request.nama).trim(),
+        satuan || '100 gram',
+        parseNutritionNumber(energi),
+        parseNutritionNumber(protein),
+        parseNutritionNumber(lemak),
+        parseNutritionNumber(karbohidrat),
+        parseNutritionNumber(serat),
+        parseNutritionNumber(natrium)
+      ]
+    )
+    await pool.query(
+      'UPDATE nutrition_requests SET status="approved", reviewed_by=?, id_nutrition=?, review_note=?, reviewed_at=NOW() WHERE id_request=?',
+      [reviewed_by || null, result.insertId, review_note || null, req.params.id]
+    )
+    res.json({ id_nutrition: result.insertId, message: 'Approved' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.put('/api/nutrition-requests/:id/reject', async (req, res) => {
+  try {
+    const { reviewed_by, review_note } = req.body
+    await pool.query(
+      'UPDATE nutrition_requests SET status="rejected", reviewed_by=?, review_note=?, reviewed_at=NOW() WHERE id_request=?',
+      [reviewed_by || null, review_note || null, req.params.id]
+    )
+    res.json({ message: 'Rejected' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

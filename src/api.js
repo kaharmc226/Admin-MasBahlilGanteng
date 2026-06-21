@@ -1,4 +1,5 @@
-const API_BASE = 'http://localhost:3001/api'
+const API_ORIGIN = 'http://localhost:3001'
+const API_BASE = `${API_ORIGIN}/api`
 
 async function request(endpoint, options = {}) {
   const { method = 'GET', body } = options
@@ -60,6 +61,8 @@ const api = {
   createMenu: (data) => request('/menus', { method: 'POST', body: data }),
   updateMenu: (id, data) => request(`/menus/${id}`, { method: 'PUT', body: data }),
   deleteMenu: (id) => request(`/menus/${id}`, { method: 'DELETE' }),
+  uploadMenuPhoto: (data) => request('/uploads/menu-photo', { method: 'POST', body: data }),
+  assetUrl: (path) => path?.startsWith('/uploads') ? `${API_ORIGIN}${path}` : path,
 
   // Produksi
   getProduksi: () => request('/produksi'),
@@ -103,6 +106,13 @@ const api = {
 
   // Nutrition Database
   getNutrition: () => request('/nutrition'),
+  createNutrition: (data) => request('/nutrition', { method: 'POST', body: data }),
+  updateNutrition: (id, data) => request(`/nutrition/${id}`, { method: 'PUT', body: data }),
+  retireNutrition: (id) => request(`/nutrition/${id}`, { method: 'DELETE' }),
+  getNutritionRequests: () => request('/nutrition-requests'),
+  createNutritionRequest: (data) => request('/nutrition-requests', { method: 'POST', body: data }),
+  approveNutritionRequest: (id, data) => request(`/nutrition-requests/${id}/approve`, { method: 'PUT', body: data }),
+  rejectNutritionRequest: (id, data) => request(`/nutrition-requests/${id}/reject`, { method: 'PUT', body: data }),
 
   // Government Stats
   getPemerintahStats: () => request('/pemerintah/stats'),

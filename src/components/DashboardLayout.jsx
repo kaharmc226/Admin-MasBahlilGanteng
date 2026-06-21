@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Bell, Search, LogOut, Menu, RefreshCw, ChevronRight, Home } from 'lucide-react'
+import { Bell, LogOut, Menu, ChevronDown, ChevronRight, Home } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Sidebar from './Sidebar'
 
@@ -17,6 +17,13 @@ const roleLabelMap = {
   sekolah: 'Sekolah',
   pemerintah: 'Pemerintah'
 }
+
+const roleOptions = [
+  { id: 'vendor', label: 'Vendor Dapur', path: '/vendor' },
+  { id: 'ahli_gizi', label: 'Ahli Gizi', path: '/ahli-gizi' },
+  { id: 'sekolah', label: 'Sekolah', path: '/sekolah' },
+  { id: 'pemerintah', label: 'Pemerintah', path: '/pemerintah' }
+]
 
 const pageTitleMap = {
   '/vendor': 'Dashboard',
@@ -39,9 +46,10 @@ const pageTitleMap = {
   '/pemerintah/alert': 'Sistem Alert'
 }
 
-const DashboardLayout = ({ user, onLogout, children }) => {
+const DashboardLayout = ({ user, onLogout, onSwitchRole, children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -53,11 +61,26 @@ const DashboardLayout = ({ user, onLogout, children }) => {
   // Close mobile sidebar on route change
   useEffect(() => {
     setMobileOpen(false)
+    setAccountMenuOpen(false)
   }, [location.pathname])
 
   const handleLogout = () => {
     onLogout()
     navigate('/')
+  }
+
+  const handleRoleSwitch = (role) => {
+    if (role === user?.role) {
+      setAccountMenuOpen(false)
+      return
+    }
+
+    const switchedUser = onSwitchRole?.(role)
+    if (!switchedUser) return
+
+    const target = roleOptions.find((item) => item.id === role)?.path || '/'
+    navigate(target)
+    setAccountMenuOpen(false)
   }
 
   return (
@@ -129,12 +152,63 @@ const DashboardLayout = ({ user, onLogout, children }) => {
             }} />
           </button>
 
-          <div className="nav-user" onClick={handleLogout} title="Keluar Sistem">
-            <div className="avatar">
-              {user?.name?.charAt(0) || 'U'}
-            </div>
-            <span className="user-name">{user?.name || 'User'}</span>
-            <LogOut size={16} color="var(--text-muted)" />
+          <div className="nav-account">
+            <button
+              type="button"
+              className="nav-user"
+              onClick={() => setAccountMenuOpen((open) => !open)}
+              aria-expanded={accountMenuOpen}
+              aria-haspopup="menu"
+              title="Akun dan peran"
+            >
+              <div className="avatar">
+                {user?.name?.charAt(0) || 'U'}
+              </div>
+              <span className="user-name">{user?.name || 'User'}</span>
+              <ChevronDown size={16} color="var(--text-muted)" />
+            </button>
+
+            <AnimatePresence>
+              {accountMenuOpen && (
+                <motion.div
+                  className="account-menu"
+                  role="menu"
+                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{ duration: 0.16 }}
+                >
+                  <div className="account-menu-header">
+                    <strong>{user?.name || 'User'}</strong>
+                    <span>{roleLabel || 'Akun demo'}</span>
+                  </div>
+
+                  <div className="account-menu-section">
+                    <p>Ganti akun / peran</p>
+                    {roleOptions.map((role) => {
+                      const isActive = role.id === user?.role
+                      return (
+                        <button
+                          key={role.id}
+                          type="button"
+                          className={`account-role-option ${isActive ? 'active' : ''}`}
+                          onClick={() => handleRoleSwitch(role.id)}
+                          disabled={isActive}
+                        >
+                          <span>{role.label}</span>
+                          {isActive && <small>Aktif</small>}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <button type="button" className="account-logout" onClick={handleLogout}>
+                    <LogOut size={16} />
+                    Keluar Sistem
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </header>
@@ -156,15 +230,6 @@ const DashboardLayout = ({ user, onLogout, children }) => {
         </div>
       </main>
 
-      {/* FAB: Quick Role Switch */}
-      <button
-        className="fab-switch-role"
-        onClick={() => navigate('/login')}
-        title="Ganti peran (demo)"
-      >
-        <RefreshCw size={16} />
-        Ganti Peran
-      </button>
     </div>
   )
 }

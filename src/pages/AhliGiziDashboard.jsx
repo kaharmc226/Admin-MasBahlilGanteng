@@ -67,6 +67,62 @@ const NUTRITION_DATABASE = {
     { nama: 'Pepaya', satuan: '100 gram', energi: '39 kkal' },
   ]
 }
+
+const nutrientKeys = ['energi', 'protein', 'lemak', 'karbohidrat', 'serat', 'natrium']
+
+const parseNutrientValue = (value) => {
+  const parsed = parseFloat(String(value ?? '').replace(',', '.').replace(/[^0-9.-]/g, ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const normalizeNutritionItem = (item) => ({
+  ...item,
+  energi: parseNutrientValue(item.energi),
+  protein: parseNutrientValue(item.protein),
+  lemak: parseNutrientValue(item.lemak),
+  karbohidrat: parseNutrientValue(item.karbohidrat),
+  serat: parseNutrientValue(item.serat),
+  natrium: parseNutrientValue(item.natrium),
+  status: item.status || 'active'
+})
+
+const flattenDefaultNutrition = () => Object.entries(NUTRITION_DATABASE).flatMap(([kategori, items], idx) =>
+  items.map((item, itemIdx) => ({
+    id: `default-${idx}-${itemIdx}`,
+    kategori,
+    nama: item.nama,
+    satuan: item.satuan,
+    energi: parseNutrientValue(item.energi),
+    protein: 0,
+    lemak: 0,
+    karbohidrat: 0,
+    serat: 0,
+    natrium: 0,
+    status: 'active'
+  }))
+)
+
+const groupNutritionItems = (items) => items.reduce((acc, item) => {
+  const key = item.kategori || 'lainnya'
+  if (!acc[key]) acc[key] = []
+  acc[key].push(item)
+  return acc
+}, {})
+
+const emptyNutritionForm = {
+  id: null,
+  kategori: 'lauk_sayur',
+  nama: '',
+  satuan: '100 gram',
+  energi: '',
+  protein: '',
+  lemak: '',
+  karbohidrat: '',
+  serat: '',
+  natrium: '',
+  status: 'active'
+}
+
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api'
 import DashboardLayout from '../components/DashboardLayout'
@@ -378,7 +434,7 @@ const StandardModal = ({ onClose, onSave, standard, setStandard, isEdit = false 
   </div>
 )
 
-const AhliGiziDashboard = ({ user, onLogout }) => {
+const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
   const location = useLocation()
   const [showModal, setShowModal] = useState({ show: false, mode: 'add', index: -1 })
   const [selectedMenuIdx, setSelectedMenuIdx] = useState(0)
@@ -388,7 +444,10 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
   const [isAiLoading, setIsAiLoading] = useState(false)
   
   const [standards, setStandards] = useState([])
-  const [nutritionDb, setNutritionDb] = useState(NUTRITION_DATABASE)
+  const [nutritionItems, setNutritionItems] = useState([])
+  const [nutritionRequests, setNutritionRequests] = useState([])
+  const [nutritionForm, setNutritionForm] = useState(emptyNutritionForm)
+  const [requestReviewForms, setRequestReviewForms] = useState({})
 
   const [formStandard, setFormStandard] = useState({ title: '', requirement: '', color: 'var(--primary)', desc: '', details: '' })
   const [ahliSuggestion, setAhliSuggestion] = useState('')
@@ -400,17 +459,47 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
 
   const [menus, setMenus] = useState([])
   const selectedMenu = menus[selectedMenuIdx] || menus[0] || {}
+  const nutritionDb = groupNutritionItems(nutritionItems.length > 0 ? nutritionItems : flattenDefaultNutrition())
+  const selectedBahan = Array.isArray(selectedMenu.bahan) ? selectedMenu.bahan : []
+  const selectedLeftBahan = selectedBahan.slice(0, 3)
+  const selectedRightBahan = selectedBahan.slice(3, 5)
+  const selectedPhotoUrl = api.assetUrl(selectedMenu.foto_url)
+  const selectedNotes = Array.isArray(selectedMenu.notes) ? selectedMenu.notes : []
+  const canApproveSelectedMenu = !!selectedMenu.nilai_gizi?.calculated && selectedBahan.length > 0 && selectedBahan.every(item => item.id_nutrition)
+  const nutritionRows = [
+    { l: 'Energi', v: selectedMenu.nilai_gizi?.energi || '-' },
+    { l: 'Protein', v: selectedMenu.nilai_gizi?.protein || '-' },
+    { l: 'Lemak', v: selectedMenu.nilai_gizi?.lemak || '-' },
+    { l: 'Karbohidrat', v: selectedMenu.nilai_gizi?.karbohidrat || '-' },
+    { l: 'Serat', v: selectedMenu.nilai_gizi?.serat || '-' },
+    { l: 'Natrium', v: selectedMenu.nilai_gizi?.natrium || '-' }
+  ]
+  const standardComparisons = standards.map((standard) => {
+    const title = (standard.title || '').toLowerCase()
+    const nutrientKey = title.includes('kalori') || title.includes('energi') ? 'energi'
+      : title.includes('protein') ? 'protein'
+      : title.includes('lemak') ? 'lemak'
+      : title.includes('karbo') ? 'karbohidrat'
+      : title.includes('serat') ? 'serat'
+      : title.includes('natrium') || title.includes('sodium') ? 'natrium'
+      : null
+    const numbers = String(standard.requirement || '').match(/\d+(\.\d+)?/g)?.map(Number) || []
+    const value = nutrientKey ? parseNutrientValue(selectedMenu.nilai_gizi?.[nutrientKey]) : 0
+    const min = numbers[0] ?? null
+    const max = numbers[1] ?? null
+    const pass = nutrientKey && (min === null || value >= min) && (max === null || value <= max)
+    return { ...standard, nutrientKey, value, pass, min, max }
+  }).filter(item => item.nutrientKey)
 
   // Fetch data from API
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [m, s, nut] = await Promise.all([api.getMenus(), api.getStandarGizi(), api.getNutrition()])
+        const [m, s, nut, requests] = await Promise.all([api.getMenus(), api.getStandarGizi(), api.getNutrition(), api.getNutritionRequests()])
         setMenus(m)
         setStandards(s.map(st => ({ ...st, desc: st.deskripsi, details: st.detail })))
-        if (nut && Object.keys(nut).length > 0) {
-          setNutritionDb(nut)
-        }
+        setNutritionItems(Array.isArray(nut) ? nut.map(normalizeNutritionItem) : flattenDefaultNutrition())
+        setNutritionRequests(Array.isArray(requests) ? requests : [])
       } catch (err) { console.error('Failed to fetch:', err) }
     }
     fetchData()
@@ -451,7 +540,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
   }
 
   const handleDownloadNutritionData = () => {
-    const blob = new Blob([JSON.stringify(nutritionDb, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(nutritionItems, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -503,6 +592,89 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
     setShowModal({ show: true, mode: 'edit', index: idx })
   }
 
+  const refreshNutrition = async () => {
+    const [nut, requests] = await Promise.all([api.getNutrition(), api.getNutritionRequests()])
+    setNutritionItems(Array.isArray(nut) ? nut.map(normalizeNutritionItem) : [])
+    setNutritionRequests(Array.isArray(requests) ? requests : [])
+  }
+
+  const handleSaveNutrition = async () => {
+    try {
+      if (!nutritionForm.nama || !nutritionForm.kategori) {
+        triggerToast('Nama dan kategori bahan wajib diisi.', 'warning')
+        return
+      }
+      if (nutritionForm.id) {
+        await api.updateNutrition(nutritionForm.id, nutritionForm)
+        triggerToast('Data bahan nutrisi diperbarui.')
+      } else {
+        await api.createNutrition(nutritionForm)
+        triggerToast('Bahan nutrisi baru ditambahkan.')
+      }
+      setNutritionForm(emptyNutritionForm)
+      await refreshNutrition()
+    } catch (err) { console.error(err); triggerToast(err.message, 'warning') }
+  }
+
+  const handleEditNutrition = (item) => {
+    setNutritionForm({
+      id: item.id,
+      kategori: item.kategori || 'lauk_sayur',
+      nama: item.nama || '',
+      satuan: item.satuan || '100 gram',
+      energi: item.energi ?? '',
+      protein: item.protein ?? '',
+      lemak: item.lemak ?? '',
+      karbohidrat: item.karbohidrat ?? '',
+      serat: item.serat ?? '',
+      natrium: item.natrium ?? '',
+      status: item.status || 'active'
+    })
+  }
+
+  const handleRetireNutrition = async (id) => {
+    try {
+      await api.retireNutrition(id)
+      triggerToast('Bahan dinonaktifkan dari pilihan vendor.', 'warning')
+      await refreshNutrition()
+    } catch (err) { console.error(err); triggerToast(err.message, 'warning') }
+  }
+
+  const updateRequestReviewForm = (id, patch) => {
+    setRequestReviewForms(prev => ({ ...prev, [id]: { ...(prev[id] || {}), ...patch } }))
+  }
+
+  const getRequestReviewForm = (request) => ({
+    kategori: request.kategori || 'lauk_sayur',
+    nama: request.nama || '',
+    satuan: '100 gram',
+    energi: '',
+    protein: '',
+    lemak: '',
+    karbohidrat: '',
+    serat: '',
+    natrium: '',
+    review_note: '',
+    ...(requestReviewForms[request.id_request] || {})
+  })
+
+  const handleApproveRequest = async (request) => {
+    try {
+      await api.approveNutritionRequest(request.id_request, { reviewed_by: user.id_user, ...getRequestReviewForm(request) })
+      triggerToast('Permintaan bahan disetujui dan masuk database nutrisi.')
+      await refreshNutrition()
+    } catch (err) { console.error(err); triggerToast(err.message, 'warning') }
+  }
+
+  const handleRejectRequest = async (request) => {
+    try {
+      const review = getRequestReviewForm(request)
+      await api.rejectNutritionRequest(request.id_request, { reviewed_by: user.id_user, review_note: review.review_note })
+      triggerToast('Permintaan bahan ditolak.', 'warning')
+      await refreshNutrition()
+    } catch (err) { console.error(err); triggerToast(err.message, 'warning') }
+  }
+
   const renderContent = () => {
     if (isValidasi) return (
       <div className="grid" style={{ gap: '1rem' }}>
@@ -543,7 +715,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
               </div>
               <h4 style={{ fontWeight: '900', fontSize: '1.1rem' }}>{m.nama_menu}</h4>
               <div className="flex justify-between" style={{ marginTop: '12px', alignItems: 'center' }}>
-                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>Input: {m.date}</p>
+                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>Input: {m.tanggal || m.date}</p>
                  <ChevronRight size={16} color={selectedMenuIdx === idx ? 'var(--primary)' : 'var(--text-muted)'} />
               </div>
             </motion.div>
@@ -604,10 +776,10 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                   <div style={{ height: '350px', width: '100%', display: 'grid', gridTemplateColumns: '1fr 350px 1fr', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
                      {/* Annotations Left */}
                      <div>
-                        {[{n: 'Tahu Goreng', t: '~30 g'}, {n: 'Nasi Putih', t: '~100 g'}, {n: 'Chicken Wings', t: '~48 g'}].map((b, i) => (
+                        {selectedLeftBahan.map((b, i) => (
                           <motion.div key={i} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.1 }} style={{ textAlign: 'right', marginBottom: '30px', position: 'relative' }}>
-                             <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.1rem', margin: 0, lineHeight: '1.1' }}>{b.n}</p>
-                             <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1rem', margin: 0 }}>{b.t}</p>
+                             <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.1rem', margin: 0, lineHeight: '1.1' }}>{b.nama}</p>
+                             <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1rem', margin: 0 }}>{b.takaran}</p>
                              <div style={{ width: '35px', height: '2.5px', background: '#334155', position: 'relative', marginTop: '6px', marginLeft: 'auto', opacity: 0.6 }}>
                                 <div style={{ position: 'absolute', left: '100%', top: '-4px', borderLeft: '10px solid #334155', borderTop: '5px solid transparent', borderBottom: '5px solid transparent' }}></div>
                              </div>
@@ -618,16 +790,22 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                      {/* Main Tray Image Container */}
                      <div style={{ position: 'relative', width: '100%', height: '300px', display: 'grid', placeItems: 'center' }}>
                         <div style={{ width: '100%', height: '100%', border: '12px solid #cbd5e1', borderRadius: '16px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 30px 60px -12px rgba(0,0,0,0.25)', position: 'relative' }}>
-                           <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=600" alt="Menu Tray" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                           {selectedPhotoUrl ? (
+                             <img src={selectedPhotoUrl} alt={`Foto ${selectedMenu.nama_menu}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                           ) : (
+                             <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', textAlign: 'center', padding: '1.25rem', color: '#64748b', fontWeight: '850', background: '#f8fafc' }}>
+                               Vendor belum mengunggah foto menu.
+                             </div>
+                           )}
                         </div>
                      </div>
 
                      {/* Annotations Right */}
                      <div>
-                        {[{n: 'Pisang', t: '~50 g'}, {n: 'Tumis Buncis+Jagung', t: '~50 g'}].map((b, i) => (
+                        {selectedRightBahan.map((b, i) => (
                           <motion.div key={i} initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: (i+3) * 0.1 }} style={{ textAlign: 'left', marginBottom: '35px' }}>
-                             <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.1rem', margin: 0, lineHeight: '1.1' }}>{b.n}</p>
-                             <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1rem', margin: 0 }}>{b.t}</p>
+                             <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.1rem', margin: 0, lineHeight: '1.1' }}>{b.nama}</p>
+                             <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1rem', margin: 0 }}>{b.takaran}</p>
                              <div style={{ width: '35px', height: '2.5px', background: '#334155', position: 'relative', marginTop: '6px', opacity: 0.6 }}>
                                 <div style={{ position: 'absolute', right: '100%', top: '-4px', borderRight: '10px solid #334155', borderTop: '5px solid transparent', borderBottom: '5px solid transparent' }}></div>
                              </div>
@@ -637,8 +815,8 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                   </div>
 
                   <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', marginBottom: '1.5rem', fontWeight: '700' }}>
-                     Menu MBG SD GIT Manumuti, Kabupaten Kupang, NTT<br/>
-                     <span style={{ fontWeight: '600', opacity: 0.8 }}>Sumber: traksi.go.id</span>
+                     {selectedMenu.nama_vendor || 'Vendor Terdaftar'}<br/>
+                     <span style={{ fontWeight: '600', opacity: 0.8 }}>Sumber: unggahan vendor TRAKSI</span>
                   </div>
 
                   {/* Bottom Grid: Notes & Table Side-by-side */}
@@ -647,8 +825,11 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                      <div style={{ border: '2.5px solid #ef4444', borderRadius: '25px', padding: '1.5rem', background: 'white', position: 'relative' }}>
                         <p style={{ fontWeight: '950', color: '#ef4444', fontSize: '1.2rem', marginBottom: '12px', marginTop: '-5px' }}>*Notes</p>
                         <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#334155', fontWeight: '750', fontSize: '0.95rem', lineHeight: '1.6' }}>
-                           <li>Kandungan gizi menu ini <span style={{color: '#dc2626'}}>cukup</span> untuk memenuhi kebutuhan makan siang anak sekolah, tetapi kebutuhan <span style={{color: '#dc2626'}}>seratnya</span> masih kurang.</li>
-                           <li>Metode pengolahan bisa lebih <span style={{color: '#dc2626'}}>bervariasi</span>, tidak hanya digoreng.</li>
+                           {selectedNotes.length > 0 ? (
+                             selectedNotes.map((note, i) => <li key={i}>{note}</li>)
+                           ) : (
+                             <li>Belum ada catatan validasi untuk menu ini.</li>
+                           )}
                         </ul>
                      </div>
 
@@ -656,14 +837,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                      <div style={{ border: '2.5px solid #1e293b', borderRadius: '25px', overflow: 'hidden', background: 'white' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                            <tbody>
-                              {[
-                                { l: 'Energi', v: '503 kkal' },
-                                { l: 'Protein', v: '15.9 g' },
-                                { l: 'Lemak', v: '21.3 g' },
-                                { l: 'Karbohidrat', v: '61.4 g' },
-                                { l: 'Serat', v: '3.6 g' },
-                                { l: 'Natrium', v: '558 mg' }
-                              ].map((row, i) => (
+                              {nutritionRows.map((row, i) => (
                                 <tr key={i} style={{ borderBottom: i === 5 ? 'none' : '1px solid #e2e8f0' }}>
                                    <td style={{ padding: '10px 15px', fontWeight: '850', color: '#475569', fontSize: '0.95rem' }}>{row.l}</td>
                                    <td style={{ padding: '10px 15px', fontWeight: '950', color: '#1e293b', textAlign: 'right', fontSize: '1.05rem' }}>{row.v}</td>
@@ -672,6 +846,19 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                            </tbody>
                         </table>
                      </div>
+                  </div>
+                  <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+                    {standardComparisons.map((item) => (
+                      <div key={item.id_standar || item.title} style={{ padding: '12px', borderRadius: '14px', border: `1.5px solid ${item.pass ? '#bbf7d0' : '#fed7aa'}`, background: item.pass ? '#f0fdf4' : '#fff7ed' }}>
+                        <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: '900', color: item.pass ? '#16a34a' : '#ea580c', textTransform: 'uppercase' }}>
+                          {item.pass ? 'Memenuhi' : 'Perlu Cek'}
+                        </p>
+                        <p style={{ margin: '4px 0 0', fontWeight: '900', color: '#0f172a' }}>{item.title}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: '700' }}>
+                          {item.value.toFixed(item.nutrientKey === 'energi' || item.nutrientKey === 'natrium' ? 0 : 1)} / {item.requirement}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                </div>
 
@@ -701,10 +888,16 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => handleApprove(selectedMenu.id_menu)} 
-                          style={{ width: '100%', padding: '1.4rem', borderRadius: '24px', background: 'var(--primary)', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 15px 35px rgba(16, 185, 129, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
+                          disabled={!canApproveSelectedMenu}
+                          style={{ width: '100%', padding: '1.4rem', borderRadius: '24px', background: canApproveSelectedMenu ? 'var(--primary)' : '#94a3b8', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.1rem', cursor: canApproveSelectedMenu ? 'pointer' : 'not-allowed', boxShadow: '0 15px 35px rgba(16, 185, 129, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
                         >
                           <CheckCircle2 size={24} /> Sahkan Menu
                         </motion.button>
+                        {!canApproveSelectedMenu && (
+                          <p style={{ margin: '-0.5rem 0 0', color: '#64748b', fontWeight: '750', fontSize: '0.82rem', lineHeight: '1.4' }}>
+                            Menu hanya bisa disahkan setelah nutrisi dihitung dari bahan terverifikasi.
+                          </p>
+                        )}
                         <motion.button 
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
@@ -808,8 +1001,78 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
             <BookOpen size={32} color="var(--primary)" /> Database Referensi Nutrisi (Real-time)
           </h3>
           <p style={{ fontSize: '1.1rem', color: '#64748b', fontWeight: '600', maxWidth: '800px', lineHeight: '1.6' }}>
-            Data standar energi per satuan takaran untuk audit akurasi menu vendor nasional.
+            Data Core MBG per 100 gram. Hanya bahan aktif di database ini yang bisa dipilih vendor saat mengajukan menu.
           </p>
+        </div>
+
+        <div className="card" style={{ padding: '1.5rem', borderRadius: '16px', background: 'white', border: '1.5px solid var(--border)', marginBottom: '1.5rem' }}>
+          <h4 style={{ margin: '0 0 1rem', fontWeight: '950', fontSize: '1.2rem' }}>{nutritionForm.id ? 'Edit Bahan Nutrisi' : 'Tambah Bahan Nutrisi'}</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr repeat(6, 0.8fr)', gap: '10px', alignItems: 'end' }}>
+            <input placeholder="Nama bahan" value={nutritionForm.nama} onChange={(e) => setNutritionForm({ ...nutritionForm, nama: e.target.value })} style={{ padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontWeight: '700' }} />
+            <select value={nutritionForm.kategori} onChange={(e) => setNutritionForm({ ...nutritionForm, kategori: e.target.value })} style={{ padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontWeight: '700' }}>
+              <option value="makanan_pokok">Makanan Pokok</option>
+              <option value="lauk_sayur">Lauk/Sayur</option>
+              <option value="buah">Buah</option>
+              <option value="lainnya">Lainnya</option>
+            </select>
+            <select value={nutritionForm.status} onChange={(e) => setNutritionForm({ ...nutritionForm, status: e.target.value })} style={{ padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontWeight: '700' }}>
+              <option value="active">Aktif</option>
+              <option value="retired">Nonaktif</option>
+            </select>
+            {nutrientKeys.map((key) => (
+              <input key={key} type="number" step="0.01" placeholder={key} value={nutritionForm[key]} onChange={(e) => setNutritionForm({ ...nutritionForm, [key]: e.target.value })} style={{ padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontWeight: '700', minWidth: 0 }} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+            <button onClick={handleSaveNutrition} style={{ padding: '10px 16px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: 'white', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Save size={16} /> Simpan Bahan
+            </button>
+            {nutritionForm.id && (
+              <button onClick={() => setNutritionForm(emptyNutritionForm)} style={{ padding: '10px 16px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', fontWeight: '900', cursor: 'pointer' }}>
+                Batal Edit
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '1.5rem', borderRadius: '16px', background: 'white', border: '1.5px solid var(--border)', marginBottom: '1.5rem' }}>
+          <h4 style={{ margin: '0 0 1rem', fontWeight: '950', fontSize: '1.2rem' }}>Permintaan Bahan dari Vendor</h4>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {nutritionRequests.filter(req => req.status === 'pending').map((req) => {
+              const review = getRequestReviewForm(req)
+              return (
+                <div key={req.id_request} style={{ padding: '1rem', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: '950', color: '#0f172a' }}>{req.nama}</p>
+                      <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: '700', fontSize: '0.85rem' }}>{req.nama_vendor || 'Vendor'} - {req.catatan || 'Tanpa catatan'}</p>
+                    </div>
+                    <span style={{ alignSelf: 'flex-start', padding: '6px 10px', borderRadius: '999px', background: '#fef3c7', color: '#d97706', fontWeight: '900', fontSize: '0.75rem' }}>PENDING</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr repeat(6, 0.8fr)', gap: '10px' }}>
+                    <input value={review.nama} onChange={(e) => updateRequestReviewForm(req.id_request, { nama: e.target.value })} style={{ padding: '10px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontWeight: '700' }} />
+                    <select value={review.kategori} onChange={(e) => updateRequestReviewForm(req.id_request, { kategori: e.target.value })} style={{ padding: '10px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontWeight: '700' }}>
+                      <option value="makanan_pokok">Pokok</option>
+                      <option value="lauk_sayur">Lauk/Sayur</option>
+                      <option value="buah">Buah</option>
+                      <option value="lainnya">Lainnya</option>
+                    </select>
+                    {nutrientKeys.map((key) => (
+                      <input key={key} type="number" step="0.01" placeholder={key} value={review[key]} onChange={(e) => updateRequestReviewForm(req.id_request, { [key]: e.target.value })} style={{ padding: '10px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontWeight: '700', minWidth: 0 }} />
+                    ))}
+                  </div>
+                  <textarea placeholder="Catatan review opsional..." value={review.review_note} onChange={(e) => updateRequestReviewForm(req.id_request, { review_note: e.target.value })} style={{ width: '100%', marginTop: '10px', minHeight: '60px', padding: '10px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontFamily: 'inherit', fontWeight: '650', boxSizing: 'border-box' }} />
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                    <button onClick={() => handleApproveRequest(req)} style={{ padding: '10px 14px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: 'white', fontWeight: '900', cursor: 'pointer' }}>Setujui & Tambahkan</button>
+                    <button onClick={() => handleRejectRequest(req)} style={{ padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #fecaca', background: '#fef2f2', color: '#dc2626', fontWeight: '900', cursor: 'pointer' }}>Tolak</button>
+                  </div>
+                </div>
+              )
+            })}
+            {nutritionRequests.filter(req => req.status === 'pending').length === 0 && (
+              <p style={{ margin: 0, padding: '1rem', borderRadius: '12px', background: '#f8fafc', color: '#64748b', fontWeight: '800', textAlign: 'center' }}>Tidak ada permintaan bahan pending.</p>
+            )}
+          </div>
         </div>
 
         <div className="card shadow-sm" style={{ padding: '0', borderRadius: '16px', overflow: 'hidden', border: '1.5px solid #eef2f6', background: 'white', marginBottom: '5rem', position: 'relative', zIndex: 1, boxShadow: '0 25px 60px -15px rgba(0,0,0,0.03)' }}>
@@ -821,10 +1084,10 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
             <div style={{ display: 'flex', gap: '15px' }}>
                <div style={{ padding: '6px 15px', background: 'white', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Search size={14} color="#94a3b8" />
-                  <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: '600' }}>Cari bahan...</span>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: '600' }}>{nutritionItems.filter(item => item.status !== 'retired').length} bahan aktif</span>
                </div>
                <button onClick={handleDownloadNutritionData} style={{ padding: '6px 15px', background: 'var(--primary-light)', borderRadius: '10px', color: 'var(--primary)', fontWeight: '900', fontSize: '0.75rem', border: 'none', cursor: 'pointer' }}>
-                  DOWNLOAD PDF
+                  DOWNLOAD JSON
                </button>
             </div>
           </div>
@@ -833,8 +1096,14 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
               <tr style={{ background: 'white', borderBottom: '2.2px solid #f1f5f9' }}>
                 <th style={{ padding: '1.4rem 2.5rem', textAlign: 'left', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px', width: '220px' }}>Kelompok</th>
                 <th style={{ padding: '1.4rem 2rem', textAlign: 'left', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Item Nutrisi</th>
-                <th style={{ padding: '1.4rem 2rem', textAlign: 'left', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ukuran Porsi</th>
-                <th style={{ padding: '1.4rem 2rem', textAlign: 'right', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Kalori</th>
+                <th style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Energi</th>
+                <th style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Protein</th>
+                <th style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Lemak</th>
+                <th style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Karbo</th>
+                <th style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Serat</th>
+                <th style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Natrium</th>
+                <th style={{ padding: '1.4rem 1rem', textAlign: 'center', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</th>
+                <th style={{ padding: '1.4rem 1rem', textAlign: 'center', fontWeight: '950', color: '#1e293b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -864,15 +1133,23 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
                           </div>
                         </td>
                       )}
-                      <td style={{ padding: '1.4rem 2rem', fontWeight: '800', fontSize: '1.1rem', color: '#334155' }}>{item.nama}</td>
-                      <td style={{ padding: '1.4rem 2rem', fontWeight: '600', fontSize: '1rem', color: '#64748b' }}>{item.satuan}</td>
-                      <td style={{ padding: '1.4rem 2rem', textAlign: 'right' }}>
-                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontWeight: '950', fontSize: '1.1rem', color: 'var(--primary)' }}>
-                               {item.energi.split(' ')[0]}
-                            </span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: '900', color: '#94a3b8' }}>KKAL</span>
-                         </div>
+                      <td style={{ padding: '1.4rem 2rem', fontWeight: '800', fontSize: '1.1rem', color: '#334155' }}>{item.nama}<br/><span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{item.satuan || '100 gram'}</span></td>
+                      <td style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '900', color: 'var(--primary)' }}>{parseNutrientValue(item.energi)}</td>
+                      <td style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '800' }}>{parseNutrientValue(item.protein)}</td>
+                      <td style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '800' }}>{parseNutrientValue(item.lemak)}</td>
+                      <td style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '800' }}>{parseNutrientValue(item.karbohidrat)}</td>
+                      <td style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '800' }}>{parseNutrientValue(item.serat)}</td>
+                      <td style={{ padding: '1.4rem 1rem', textAlign: 'right', fontWeight: '800' }}>{parseNutrientValue(item.natrium)}</td>
+                      <td style={{ padding: '1.4rem 1rem', textAlign: 'center' }}>
+                        <span style={{ padding: '6px 10px', borderRadius: '999px', background: item.status === 'retired' ? '#f1f5f9' : '#dcfce7', color: item.status === 'retired' ? '#64748b' : '#16a34a', fontWeight: '900', fontSize: '0.72rem' }}>
+                          {item.status === 'retired' ? 'NONAKTIF' : 'AKTIF'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1.4rem 1rem', textAlign: 'center' }}>
+                        <button onClick={() => handleEditNutrition(item)} style={{ border: '1.5px solid #e2e8f0', background: 'white', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', fontWeight: '800', marginRight: '6px' }}>Edit</button>
+                        {item.status !== 'retired' && !String(item.id).startsWith('default-') && (
+                          <button onClick={() => handleRetireNutrition(item.id)} style={{ border: 'none', background: '#fef2f2', color: '#dc2626', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', fontWeight: '800' }}>Nonaktif</button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -896,7 +1173,7 @@ const AhliGiziDashboard = ({ user, onLogout }) => {
   }
 
   return (
-    <DashboardLayout user={user} onLogout={onLogout}>
+    <DashboardLayout user={user} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       <AnimatePresence>
         {showToast.show && (
           <motion.div 

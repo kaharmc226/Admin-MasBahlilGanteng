@@ -264,7 +264,7 @@ const VendorAuditModal = ({ vendor, docs, dapurs, onClose }) => {
   )
 }
 
-const PemerintahDashboard = ({ user, onLogout }) => {
+const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const location = useLocation()
   const [showAddForm, setShowAddForm] = useState(false)
   const [showToast, setShowToast] = useState({ show: false, message: '' })
@@ -663,7 +663,7 @@ const PemerintahDashboard = ({ user, onLogout }) => {
   }
 
   return (
-    <DashboardLayout user={user} onLogout={onLogout}>
+    <DashboardLayout user={user} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       <AnimatePresence>
         {selectedVendorAudit && (
           <VendorAuditModal

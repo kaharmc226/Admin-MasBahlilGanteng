@@ -69,7 +69,7 @@ export const Select = ({ label, options, className = '', style: customStyle = {}
         {...props}
       >
         {options.map((opt, i) => (
-          <option key={i} value={opt.value || opt}>{opt.label || opt}</option>
+          <option key={i} value={opt.value ?? opt} disabled={!!opt.disabled}>{opt.label || opt}</option>
         ))}
       </select>
     </div>

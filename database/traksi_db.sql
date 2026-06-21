@@ -132,6 +132,7 @@ CREATE TABLE menus (
   nama_menu VARCHAR(200) NOT NULL,
   bahan JSON NOT NULL COMMENT 'Array of {nama, takaran}',
   nilai_gizi JSON NOT NULL COMMENT '{energi, protein, lemak, karbohidrat, serat, natrium}',
+  foto_url VARCHAR(255) NULL,
   notes JSON NULL COMMENT 'Array of reviewer notes',
   status_validasi ENUM('pending','approved','rejected') DEFAULT 'pending',
   tanggal DATE NOT NULL,
@@ -356,7 +357,33 @@ CREATE TABLE nutrition_database (
   nama VARCHAR(150) NOT NULL,
   satuan VARCHAR(50) NOT NULL,
   energi VARCHAR(50) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  protein DECIMAL(10,2) NOT NULL DEFAULT 0,
+  lemak DECIMAL(10,2) NOT NULL DEFAULT 0,
+  karbohidrat DECIMAL(10,2) NOT NULL DEFAULT 0,
+  serat DECIMAL(10,2) NOT NULL DEFAULT 0,
+  natrium DECIMAL(10,2) NOT NULL DEFAULT 0,
+  status ENUM('active','retired') NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE nutrition_requests (
+  id_request INT PRIMARY KEY AUTO_INCREMENT,
+  id_vendor INT NULL,
+  requested_by INT NULL,
+  nama VARCHAR(150) NOT NULL,
+  kategori VARCHAR(50) NULL,
+  catatan TEXT NULL,
+  status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  reviewed_by INT NULL,
+  id_nutrition INT NULL,
+  review_note TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at DATETIME NULL,
+  FOREIGN KEY (id_vendor) REFERENCES vendors(id_vendor) ON DELETE SET NULL,
+  FOREIGN KEY (requested_by) REFERENCES users(id_user) ON DELETE SET NULL,
+  FOREIGN KEY (reviewed_by) REFERENCES users(id_user) ON DELETE SET NULL,
+  FOREIGN KEY (id_nutrition) REFERENCES nutrition_database(id) ON DELETE SET NULL
 );
 
 -- ============================================

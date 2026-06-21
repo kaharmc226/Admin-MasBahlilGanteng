@@ -8,6 +8,13 @@ import AhliGiziDashboard from './pages/AhliGiziDashboard'
 import SekolahDashboard from './pages/SekolahDashboard'
 import PemerintahDashboard from './pages/PemerintahDashboard'
 
+const demoUsersByRole = {
+  vendor: { id_user: 1, name: 'Vendor Jakarta Timur', email: 'v.jaktim@traksi.id', role: 'vendor', status: 'active' },
+  ahli_gizi: { id_user: 3, name: 'Ahli Gizi Jakarta Timur', email: 'nutri.jaktim@traksi.id', role: 'ahli_gizi', status: 'active' },
+  sekolah: { id_user: 4, name: 'Admin SDN 06 Baru', email: 'sdn06@sekolah.traksi.id', role: 'sekolah', status: 'active' },
+  pemerintah: { id_user: 2, name: 'Gov DKI Jakarta', email: 'gov.dki@traksi.id', role: 'pemerintah', status: 'active' }
+}
+
 function App() {
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('traksi_user')
@@ -25,6 +32,15 @@ function App() {
   const handleLogout = () => {
     setUser(null)
     localStorage.removeItem('traksi_user')
+  }
+
+  const handleSwitchRole = (role) => {
+    const demoUser = demoUsersByRole[role]
+    if (!demoUser) return null
+
+    setUser(demoUser)
+    localStorage.setItem('traksi_user', JSON.stringify(demoUser))
+    return demoUser
   }
 
   // Helper component for Protected Routes
@@ -48,19 +64,19 @@ function App() {
       {/* Role Based Routes */}
       <Route 
         path="/vendor/*" 
-        element={<ProtectedRoute role="vendor"><VendorDashboard user={user} onLogout={handleLogout} /></ProtectedRoute>} 
+        element={<ProtectedRoute role="vendor"><VendorDashboard user={user} onLogout={handleLogout} onSwitchRole={handleSwitchRole} /></ProtectedRoute>} 
       />
       <Route 
         path="/ahli-gizi/*" 
-        element={<ProtectedRoute role="ahli_gizi"><AhliGiziDashboard user={user} onLogout={handleLogout} /></ProtectedRoute>} 
+        element={<ProtectedRoute role="ahli_gizi"><AhliGiziDashboard user={user} onLogout={handleLogout} onSwitchRole={handleSwitchRole} /></ProtectedRoute>} 
       />
       <Route 
         path="/sekolah/*" 
-        element={<ProtectedRoute role="sekolah"><SekolahDashboard user={user} onLogout={handleLogout} /></ProtectedRoute>} 
+        element={<ProtectedRoute role="sekolah"><SekolahDashboard user={user} onLogout={handleLogout} onSwitchRole={handleSwitchRole} /></ProtectedRoute>} 
       />
       <Route 
         path="/pemerintah/*" 
-        element={<ProtectedRoute role="pemerintah"><PemerintahDashboard user={user} onLogout={handleLogout} /></ProtectedRoute>} 
+        element={<ProtectedRoute role="pemerintah"><PemerintahDashboard user={user} onLogout={handleLogout} onSwitchRole={handleSwitchRole} /></ProtectedRoute>} 
       />
       
       {/* Handle potential dashes or underscores from login */}
