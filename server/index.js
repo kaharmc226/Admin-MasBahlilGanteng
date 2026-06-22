@@ -9,6 +9,25 @@ function parseBahanList(rawBahan) {
   return typeof rawBahan === 'string' ? JSON.parse(rawBahan) : rawBahan
 }
 
+function parseRequirementBounds(requirement) {
+  const numbers = String(requirement || '').match(/\d+(\.\d+)?/g)?.map(Number) || []
+  return {
+    min: numbers[0] ?? null,
+    max: numbers[1] ?? null
+  }
+}
+
+function getStandardNutrientKey(title) {
+  const lowerTitle = String(title || '').toLowerCase()
+  if (lowerTitle.includes('kalori') || lowerTitle.includes('energi')) return 'energi'
+  if (lowerTitle.includes('protein')) return 'protein'
+  if (lowerTitle.includes('lemak')) return 'lemak'
+  if (lowerTitle.includes('karbo')) return 'karbohidrat'
+  if (lowerTitle.includes('serat')) return 'serat'
+  if (lowerTitle.includes('natrium') || lowerTitle.includes('sodium')) return 'natrium'
+  return null
+}
+
 const nutrientKeys = ['energi', 'protein', 'lemak', 'karbohidrat', 'serat', 'natrium']
 
 function parseNutritionNumber(value) {
@@ -170,6 +189,14 @@ function saveUploadFromDataUrl({ imageData, fileName, targetDir, publicPath, all
   return `${publicPath}/${storedName}`
 }
 
+const produksiStatusFlow = ['pending', 'persiapan', 'memasak', 'siap_kirim', 'selesai']
+
+function getDistribusiStatusForProduksi(status, currentDistribusiStatus) {
+  if (status === 'siap_kirim') return 'DISTRIBUSI'
+  if (status === 'selesai') return currentDistribusiStatus === 'SELESAI' ? 'SELESAI' : 'TIBA'
+  return 'DIJADWALKAN'
+}
+
 // Auto-migrate: create dapur_stok_history table
 pool.query(`
   CREATE TABLE IF NOT EXISTS dapur_stok_history (
@@ -277,7 +304,13 @@ pool.query(`
   if (!existing.has('is_archived')) migrations.push(pool.query('ALTER TABLE alerts ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE AFTER is_resolved'))
   return Promise.all(migrations)
 }).then(() => {
-  console.log('Vendor registration, document, and alert workflow tables are ready.')
+  return pool.query('SHOW COLUMNS FROM sekolah')
+}).then(([columns]) => {
+  const existing = new Set(columns.map(col => col.Field))
+  if (existing.has('status')) return null
+  return pool.query('ALTER TABLE sekolah ADD COLUMN status ENUM("active","inactive") NOT NULL DEFAULT "active" AFTER id_user')
+}).then(() => {
+  console.log('Vendor registration, document, alert, and school workflow tables are ready.')
 }).catch(err => {
   console.error('❌ Failed to run auto-migrations:', err.message)
 })
@@ -318,7 +351,10 @@ app.get('/api/users', async (req, res) => {
 // ============================================
 app.get('/api/sekolah', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM sekolah ORDER BY nama_sekolah')
+    const includeInactive = req.query.includeInactive === 'true'
+    const [rows] = await pool.query(
+      `SELECT * FROM sekolah ${includeInactive ? '' : 'WHERE status = "active"'} ORDER BY nama_sekolah`
+    )
     res.json(rows)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -333,7 +369,11 @@ app.get('/api/sekolah/:id', async (req, res) => {
 
 app.get('/api/sekolah/by-user/:userId', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM sekolah WHERE id_user = ? LIMIT 1', [req.params.userId])
+    const includeInactive = req.query.includeInactive === 'true'
+    const [rows] = await pool.query(
+      `SELECT * FROM sekolah WHERE id_user = ? ${includeInactive ? '' : 'AND status = "active"'} LIMIT 1`,
+      [req.params.userId]
+    )
     if (rows.length === 0) return res.status(404).json({ error: 'Sekolah untuk user ini tidak ditemukan' })
     res.json(rows[0])
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -341,21 +381,21 @@ app.get('/api/sekolah/by-user/:userId', async (req, res) => {
 
 app.post('/api/sekolah', async (req, res) => {
   try {
-    const { nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count } = req.body
+    const { nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, status } = req.body
     const [result] = await pool.query(
-      'INSERT INTO sekolah (nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count) VALUES (?,?,?,?,?,?)',
-      [nama_sekolah, alamat, jenjang, jumlah_siswa || 0, alergi_count || 0, intoleran_count || 0]
+      'INSERT INTO sekolah (nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, status) VALUES (?,?,?,?,?,?,?)',
+      [nama_sekolah, alamat, jenjang, jumlah_siswa || 0, alergi_count || 0, intoleran_count || 0, status || 'active']
     )
-    res.status(201).json({ id_sekolah: result.insertId, ...req.body })
+    res.status(201).json({ id_sekolah: result.insertId, status: status || 'active', ...req.body })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.put('/api/sekolah/:id', async (req, res) => {
   try {
-    const { nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count } = req.body
+    const { nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, status } = req.body
     await pool.query(
-      'UPDATE sekolah SET nama_sekolah=?, alamat=?, jenjang=?, jumlah_siswa=?, alergi_count=?, intoleran_count=? WHERE id_sekolah=?',
-      [nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, req.params.id]
+      'UPDATE sekolah SET nama_sekolah=?, alamat=?, jenjang=?, jumlah_siswa=?, alergi_count=?, intoleran_count=?, status=? WHERE id_sekolah=?',
+      [nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, status || 'active', req.params.id]
     )
     res.json({ message: 'Updated' })
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -363,8 +403,15 @@ app.put('/api/sekolah/:id', async (req, res) => {
 
 app.delete('/api/sekolah/:id', async (req, res) => {
   try {
-    await pool.query('DELETE FROM sekolah WHERE id_sekolah = ?', [req.params.id])
-    res.json({ message: 'Deleted' })
+    await pool.query('UPDATE sekolah SET status="inactive" WHERE id_sekolah = ?', [req.params.id])
+    res.json({ message: 'Deactivated' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.put('/api/sekolah/:id/reactivate', async (req, res) => {
+  try {
+    await pool.query('UPDATE sekolah SET status="active" WHERE id_sekolah = ?', [req.params.id])
+    res.json({ message: 'Reactivated' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -558,6 +605,9 @@ app.get('/api/mapping', async (req, res) => {
 app.post('/api/mapping', async (req, res) => {
   try {
     const { id_dapur, id_sekolah } = req.body
+    const [schoolRows] = await pool.query('SELECT status FROM sekolah WHERE id_sekolah = ? LIMIT 1', [id_sekolah])
+    if (schoolRows.length === 0) return res.status(404).json({ error: 'Sekolah tidak ditemukan.' })
+    if (schoolRows[0].status !== 'active') return res.status(400).json({ error: 'Sekolah nonaktif tidak dapat dipetakan ke dapur.' })
     const [result] = await pool.query(
       'INSERT INTO mapping_dapur_sekolah (id_dapur, id_sekolah) VALUES (?,?)',
       [id_dapur, id_sekolah]
@@ -708,11 +758,19 @@ app.delete('/api/menus/:id', async (req, res) => {
 app.get('/api/produksi', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT p.*, d.lokasi AS dapur_lokasi, m.nama_menu, m.bahan, m.nilai_gizi, s.nama_sekolah AS target_sekolah, dis.kode_transaksi
+      SELECT p.*, d.lokasi AS dapur_lokasi, m.nama_menu, m.bahan, m.nilai_gizi, s.nama_sekolah AS target_sekolah, dis.kode_transaksi, dis.status AS distribusi_status
       FROM produksi p
       JOIN dapur d ON p.id_dapur = d.id_dapur
       JOIN menus m ON p.id_menu = m.id_menu
-      LEFT JOIN distribusi dis ON p.id_produksi = dis.id_produksi
+      LEFT JOIN (
+        SELECT d1.*
+        FROM distribusi d1
+        JOIN (
+          SELECT id_produksi, MAX(id_distribusi) AS latest_id_distribusi
+          FROM distribusi
+          GROUP BY id_produksi
+        ) latest ON latest.latest_id_distribusi = d1.id_distribusi
+      ) dis ON p.id_produksi = dis.id_produksi
       LEFT JOIN sekolah s ON dis.id_sekolah = s.id_sekolah
       ORDER BY p.created_at DESC
     `)
@@ -787,6 +845,9 @@ app.put('/api/produksi/:id', async (req, res) => {
   let connection
   try {
     const { status } = req.body
+    if (!produksiStatusFlow.includes(status)) {
+      return res.status(400).json({ error: 'Status produksi tidak valid.' })
+    }
     connection = await pool.getConnection()
     await connection.beginTransaction()
 
@@ -796,6 +857,12 @@ app.put('/api/produksi/:id', async (req, res) => {
       return res.status(404).json({ error: 'Not found' })
     }
     const p = prodRows[0]
+    const currentIndex = produksiStatusFlow.indexOf(p.status)
+    const nextIndex = produksiStatusFlow.indexOf(status)
+    if (currentIndex === -1 || nextIndex === -1 || nextIndex < currentIndex || nextIndex - currentIndex > 1) {
+      await connection.rollback()
+      return res.status(400).json({ error: `Transisi status tidak valid dari ${p.status} ke ${status}.` })
+    }
 
     let stockPreparation = null
     if (status === 'persiapan' && p.status === 'pending') {
@@ -807,10 +874,10 @@ app.put('/api/produksi/:id', async (req, res) => {
     }
 
     let extra = ''
-    if (status === 'selesai') {
+    if (status === 'persiapan' || status === 'memasak') {
+      extra = ', waktu_mulai=COALESCE(waktu_mulai, NOW())'
+    } else if (status === 'selesai') {
       extra = ', waktu_selesai=NOW()'
-    } else if (status === 'memasak') {
-      extra = ', waktu_mulai=NOW()'
     }
     await connection.query(`UPDATE produksi SET status=?${extra} WHERE id_produksi=?`, [status, req.params.id])
 
@@ -823,8 +890,24 @@ app.put('/api/produksi/:id', async (req, res) => {
       })
     }
 
-    if (status === 'selesai') {
-      await connection.query("UPDATE distribusi SET status='DISTRIBUSI', waktu_kirim=NOW() WHERE id_produksi=? AND status='DIJADWALKAN'", [req.params.id])
+    const [deliveryRows] = await connection.query(
+      'SELECT id_distribusi, status FROM distribusi WHERE id_produksi=? ORDER BY id_distribusi DESC',
+      [req.params.id]
+    )
+    for (const delivery of deliveryRows) {
+      const syncedStatus = getDistribusiStatusForProduksi(status, delivery.status)
+      let deliveryExtra = ''
+      if (syncedStatus === 'DISTRIBUSI') {
+        deliveryExtra = ', waktu_kirim=COALESCE(waktu_kirim, NOW())'
+      } else if (syncedStatus === 'TIBA') {
+        deliveryExtra = ', waktu_kirim=COALESCE(waktu_kirim, NOW()), waktu_tiba=COALESCE(waktu_tiba, NOW())'
+      } else if (syncedStatus === 'DIJADWALKAN') {
+        deliveryExtra = ', waktu_kirim=NULL, waktu_tiba=NULL'
+      }
+      await connection.query(
+        `UPDATE distribusi SET status=?${deliveryExtra} WHERE id_distribusi=?`,
+        [syncedStatus, delivery.id_distribusi]
+      )
     }
 
     await connection.commit()
@@ -873,7 +956,12 @@ app.post('/api/distribusi', async (req, res) => {
 app.put('/api/distribusi/:id', async (req, res) => {
   try {
     const { status } = req.body
-    const extra = status === 'TIBA' ? ', waktu_tiba=NOW()' : ''
+    let extra = ''
+    if (status === 'DISTRIBUSI') {
+      extra = ', waktu_kirim=COALESCE(waktu_kirim, NOW())'
+    } else if (status === 'TIBA' || status === 'SELESAI') {
+      extra = ', waktu_kirim=COALESCE(waktu_kirim, NOW()), waktu_tiba=COALESCE(waktu_tiba, NOW())'
+    }
     await pool.query(`UPDATE distribusi SET status=?${extra} WHERE id_distribusi=?`, [status, req.params.id])
     res.json({ message: 'Updated' })
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -936,7 +1024,7 @@ app.get('/api/validasi-log', async (req, res) => {
 
 app.post('/api/validasi-log', async (req, res) => {
   try {
-    const { id_menu, id_user, aksi, catatan } = req.body
+    const { id_menu, id_user, aksi, catatan, force_override } = req.body
     if (aksi === 'approved') {
       const [menuRows] = await pool.query('SELECT bahan, nilai_gizi FROM menus WHERE id_menu=?', [id_menu])
       if (menuRows.length === 0) return res.status(404).json({ error: 'Menu tidak ditemukan.' })
@@ -944,17 +1032,104 @@ app.post('/api/validasi-log', async (req, res) => {
       const nilaiGizi = typeof menuRows[0].nilai_gizi === 'string' ? JSON.parse(menuRows[0].nilai_gizi) : menuRows[0].nilai_gizi
       const isCalculated = !!nilaiGizi?.calculated
       const hasLinkedIngredients = Array.isArray(bahan) && bahan.length > 0 && bahan.every(item => item.id_nutrition)
-      if (!isCalculated || !hasLinkedIngredients) {
+      if ((!isCalculated || !hasLinkedIngredients) && !force_override) {
         return res.status(400).json({ error: 'Menu belum memiliki data nutrisi terhitung dari bahan terverifikasi.' })
       }
     }
+    const finalNote = force_override && aksi === 'approved'
+      ? `[OVERRIDE APPROVAL] ${catatan || 'Menu disahkan melalui override ahli gizi setelah konfirmasi manual.'}`
+      : catatan
     // Also update menu status
     await pool.query('UPDATE menus SET status_validasi=? WHERE id_menu=?', [aksi, id_menu])
     const [result] = await pool.query(
       'INSERT INTO validasi_log (id_menu, id_user, aksi, catatan) VALUES (?,?,?,?)',
-      [id_menu, id_user, aksi, catatan]
+      [id_menu, id_user, aksi, finalNote]
     )
     res.status(201).json({ id_validasi: result.insertId })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.post('/api/reports/ahli-gizi/menu-review', async (req, res) => {
+  try {
+    const { id_menu, id_user, notes } = req.body
+    if (!id_menu || !id_user) return res.status(400).json({ error: 'id_menu dan id_user wajib diisi.' })
+
+    const [[menuRows], [standardsRows], [reviewerRows], [logRows]] = await Promise.all([
+      pool.query(`
+        SELECT m.*, v.id_vendor, v.nama_vendor, v.region
+        FROM menus m
+        LEFT JOIN vendors v ON m.id_vendor = v.id_vendor
+        WHERE m.id_menu = ?
+        LIMIT 1
+      `, [id_menu]),
+      pool.query('SELECT * FROM standar_gizi ORDER BY id_standar'),
+      pool.query('SELECT id_user, name, role, email FROM users WHERE id_user = ? LIMIT 1', [id_user]),
+      pool.query('SELECT aksi, catatan, created_at FROM validasi_log WHERE id_menu = ? ORDER BY created_at DESC LIMIT 5', [id_menu])
+    ])
+
+    if (menuRows.length === 0) return res.status(404).json({ error: 'Menu tidak ditemukan.' })
+    if (reviewerRows.length === 0) return res.status(404).json({ error: 'Reviewer tidak ditemukan.' })
+
+    const menu = menuRows[0]
+    if (!menu.nilai_gizi) {
+      return res.status(400).json({ error: 'Menu belum memiliki nilai gizi terhitung.' })
+    }
+
+    const nilaiGizi = typeof menu.nilai_gizi === 'string' ? JSON.parse(menu.nilai_gizi) : menu.nilai_gizi
+    const bahan = parseBahanList(menu.bahan)
+    const standards = standardsRows.map((standard) => {
+      const nutrientKey = getStandardNutrientKey(standard.title)
+      if (!nutrientKey) return null
+      const { min, max } = parseRequirementBounds(standard.requirement)
+      const actualValue = parseNutritionNumber(nilaiGizi?.[nutrientKey])
+      const pass = (min === null || actualValue >= min) && (max === null || actualValue <= max)
+      return {
+        id_standar: standard.id_standar,
+        title: standard.title,
+        requirement: standard.requirement,
+        nutrient_key: nutrientKey,
+        actual_value: actualValue,
+        min,
+        max,
+        pass
+      }
+    }).filter(Boolean)
+
+    const payload = {
+      report_type: 'ahli_gizi_menu_review',
+      generated_at: new Date().toISOString(),
+      menu: {
+        id_menu: menu.id_menu,
+        nama_menu: menu.nama_menu,
+        tanggal: menu.tanggal,
+        status_validasi: menu.status_validasi,
+        bahan,
+        nilai_gizi: nilaiGizi,
+        vendor: {
+          id_vendor: menu.id_vendor,
+          nama_vendor: menu.nama_vendor,
+          region: menu.region
+        }
+      },
+      standards_comparison: standards,
+      summary: {
+        total_standards_checked: standards.length,
+        passed_standards: standards.filter((item) => item.pass).length,
+        failed_standards: standards.filter((item) => !item.pass).length
+      },
+      reviewer: reviewerRows[0],
+      notes: {
+        request_note: notes || null,
+        latest_menu_notes: typeof menu.notes === 'string' ? JSON.parse(menu.notes || '[]') : (menu.notes || []),
+        validation_log: logRows.map((item) => ({
+          aksi: item.aksi,
+          catatan: item.catatan,
+          created_at: item.created_at
+        }))
+      }
+    }
+
+    res.json(payload)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

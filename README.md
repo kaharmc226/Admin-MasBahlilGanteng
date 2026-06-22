@@ -33,7 +33,7 @@ TRAKSI adalah platform pelacakan dan transparansi distribusi makanan bergizi unt
 
 ```text
 .
-|-- database/               # SQL schema dan data demo
+|-- database/               # SQL schema, baseline bootstrap, dan data demo opsional
 |-- public/                 # Aset statis
 |-- scripts/                # Script utilitas terminal
 |-- server/                 # Backend Express + koneksi MySQL
@@ -50,11 +50,12 @@ TRAKSI adalah platform pelacakan dan transparansi distribusi makanan bergizi unt
 
 - Node.js 18 atau lebih baru
 - MySQL lokal
-- Windows + Laragon/XAMPP direkomendasikan untuk setup tercepat
+- MySQL atau MariaDB lokal yang sudah berjalan
+- Laragon/XAMPP opsional bila Anda memakainya untuk menyediakan service MySQL
 
 ## Konfigurasi Database
 
-Secara default backend membaca konfigurasi berikut dari [server/db.js](C:/Users/Administrator/Documents/GitHub/Admin-MasBahlilGanteng/server/db.js:1):
+Secara default backend membaca konfigurasi berikut dari [server/dbConfig.js](C:/Users/Administrator/Documents/GitHub/Admin-MasBahlilGanteng/server/dbConfig.js:1):
 
 - Host: `localhost`
 - Port: `3306`
@@ -62,7 +63,7 @@ Secara default backend membaca konfigurasi berikut dari [server/db.js](C:/Users/
 - Password: kosong
 - Database: `traksi_db`
 
-Jika Anda ingin memakai kredensial lain, ubah file `server/db.js` terlebih dahulu.
+Jika Anda ingin memakai kredensial lain, ubah file `server/dbConfig.js` terlebih dahulu.
 
 ## Instalasi
 
@@ -81,12 +82,14 @@ npm start
 Perintah ini akan:
 
 - memeriksa koneksi MySQL,
+- gagal cepat bila MySQL belum berjalan,
 - membuat atau menginisialisasi `traksi_db` bila database kosong,
-- mengimpor SQL dasar dari `database/traksi_db.sql`,
-- mengimpor data tambahan dari `database/dummy_data_extension.sql` bila tersedia,
+- mengimpor schema dari `database/schema.sql`,
+- mengimpor baseline minimal dari `database/bootstrap_minimal.sql`,
+- menampilkan instruksi seed demo opsional `npm run seed:demo -- --merge`,
 - menjalankan backend dan frontend secara bersamaan.
 
-Untuk reset penuh:
+Untuk reset schema + baseline minimal:
 
 ```bash
 npm start -- --reset
@@ -135,13 +138,13 @@ npm run seed:demo -- --overwrite --yes
 
 Penjelasan mode:
 
-- `--merge`: menambahkan data demo yang belum ada dan menyegarkan record demo utama.
-- `--overwrite`: membuat ulang database dari SQL bawaan proyek.
+- `--merge`: menambahkan atau menyegarkan data demo di atas schema + baseline minimal yang sudah ada.
+- `--overwrite`: membuat ulang schema, baseline minimal, lalu menambahkan seluruh data demo opsional.
 - `--yes`: melewati prompt konfirmasi.
 
 Catatan:
 
-- `npm start` cocok untuk bootstrap cepat.
+- `npm start` cocok untuk bootstrap cepat setelah service MySQL lokal aktif.
 - `npm run seed:demo` cocok saat Anda ingin menyiapkan ulang data demo sebelum sidang tanpa menebak kondisi database saat ini.
 - `npm run server` saja tidak melakukan bootstrap database.
 

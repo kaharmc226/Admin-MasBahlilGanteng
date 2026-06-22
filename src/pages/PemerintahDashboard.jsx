@@ -373,7 +373,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
           api.getWilayah(),
           api.getAlerts(),
           api.getMapping(),
-          api.getSekolah(),
+          api.getSekolah({ includeInactive: true }),
           api.getPemerintahStats(),
           api.getDapur(),
           api.getVendorRegistrations()
@@ -394,16 +394,18 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   }, [])
 
   const refreshGovernmentData = async () => {
-    const [vendors, registrations, mapping, alertRows] = await Promise.all([
+    const [vendors, registrations, mapping, alertRows, schools] = await Promise.all([
       api.getVendors(),
       api.getVendorRegistrations(),
       api.getMapping(),
-      api.getAlerts()
+      api.getAlerts(),
+      api.getSekolah({ includeInactive: true })
     ])
     setActiveVendors(vendors.filter(x => ['approved', 'suspended'].includes(x.status_verifikasi)))
     setRegQueue(registrations.filter(x => ['pending', 'revision'].includes(x.status)))
     setMappingData(mapping)
     setAlerts(alertRows)
+    setSekolahList(schools)
   }
 
   const handleApproveVendor = async (vendor) => {
@@ -521,6 +523,71 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
     }
   }
 
+  const handleEditVendor = async (vendor) => {
+    const nama_vendor = window.prompt('Nama vendor:', vendor.nama_vendor)
+    if (nama_vendor === null) return
+    const region = window.prompt('Region vendor:', vendor.region || '')
+    if (region === null) return
+    const izin_usaha = window.prompt('Izin usaha:', vendor.izin_usaha || '')
+    if (izin_usaha === null) return
+    try {
+      await api.updateVendor(vendor.id_vendor, { ...vendor, nama_vendor, region, izin_usaha })
+      await refreshGovernmentData()
+      if (selectedVendorAudit?.id_vendor === vendor.id_vendor) {
+        setSelectedVendorAudit(prev => prev ? { ...prev, nama_vendor, region, izin_usaha } : prev)
+      }
+      triggerToast('Data vendor diperbarui.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal memperbarui vendor: ' + err.message)
+    }
+  }
+
+  const handleEditSchool = async (school) => {
+    const nama_sekolah = window.prompt('Nama sekolah:', school.nama_sekolah)
+    if (nama_sekolah === null) return
+    const alamat = window.prompt('Alamat sekolah:', school.alamat || '')
+    if (alamat === null) return
+    const jumlah_siswa = window.prompt('Jumlah siswa:', String(school.jumlah_siswa || 0))
+    if (jumlah_siswa === null) return
+    try {
+      await api.updateSekolah(school.id_sekolah, {
+        ...school,
+        nama_sekolah,
+        alamat,
+        jumlah_siswa: parseInt(jumlah_siswa, 10) || 0
+      })
+      await refreshGovernmentData()
+      triggerToast('Data sekolah diperbarui.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal memperbarui sekolah: ' + err.message)
+    }
+  }
+
+  const handleDeactivateSchool = async (school) => {
+    if (!window.confirm(`Nonaktifkan ${school.nama_sekolah}?`)) return
+    try {
+      await api.deleteSekolah(school.id_sekolah)
+      await refreshGovernmentData()
+      triggerToast('Sekolah dinonaktifkan.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menonaktifkan sekolah: ' + err.message)
+    }
+  }
+
+  const handleReactivateSchool = async (school) => {
+    try {
+      await api.reactivateSekolah(school.id_sekolah)
+      await refreshGovernmentData()
+      triggerToast('Sekolah diaktifkan kembali.')
+    } catch (err) {
+      console.error(err)
+      alert('Gagal mengaktifkan sekolah: ' + err.message)
+    }
+  }
+
   const handleOpenVendorAudit = async (vendor) => {
     try {
       const docs = await api.getDokumen(vendor.id_vendor)
@@ -621,6 +688,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
                   <td style={{ padding: '1.5rem', borderRadius: '0 20px 20px 0' }}>
                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                        <button onClick={() => handleOpenVendorAudit(v)} style={{ color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Detail Audit</button>
+                       <button onClick={() => handleEditVendor(v)} style={{ color: 'var(--text-main)', background: 'white', border: '1px solid var(--border)', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Edit</button>
                        {v.status_verifikasi === 'suspended' ? (
                          <button onClick={() => handleReinstateVendor(v)} style={{ color: 'var(--primary)', background: 'white', border: '1px solid var(--primary)', fontWeight: '900', padding: '8px 16px', borderRadius: '15px', cursor: 'pointer' }}>Aktifkan</button>
                        ) : (
@@ -673,6 +741,33 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
                    </div>
                  )
                })}
+             </div>
+          </div>
+          <div className="card" style={{ borderRadius: '16px', background: 'white', padding: '1.5rem' }}>
+             <h3 style={{ marginBottom: '1rem', fontWeight: '900' }}>Manajemen Sekolah</h3>
+             <div style={{ display: 'grid', gap: '0.75rem' }}>
+               {sekolahList.map((school) => (
+                 <div key={school.id_sekolah} style={{ padding: '1rem', borderRadius: '12px', background: 'var(--bg)', display: 'grid', gap: '0.6rem' }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'start' }}>
+                     <div>
+                       <p style={{ fontWeight: '900' }}>{school.nama_sekolah}</p>
+                       <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>{school.jenjang} • {school.jumlah_siswa} siswa</p>
+                     </div>
+                     <span className="badge" style={{ background: school.status === 'inactive' ? '#fee2e2' : 'var(--primary-light)', color: school.status === 'inactive' ? '#b91c1c' : 'var(--primary)', fontWeight: '900' }}>
+                       {(school.status || 'active').toUpperCase()}
+                     </span>
+                   </div>
+                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600', margin: 0 }}>{school.alamat}</p>
+                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                     <button onClick={() => handleEditSchool(school)} style={{ border: 'none', borderRadius: '10px', padding: '0.55rem 0.8rem', background: 'white', color: 'var(--text-main)', fontWeight: '900', cursor: 'pointer' }}>Edit</button>
+                     {school.status === 'inactive' ? (
+                       <button onClick={() => handleReactivateSchool(school)} style={{ border: 'none', borderRadius: '10px', padding: '0.55rem 0.8rem', background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: '900', cursor: 'pointer' }}>Aktifkan</button>
+                     ) : (
+                       <button onClick={() => handleDeactivateSchool(school)} style={{ border: 'none', borderRadius: '10px', padding: '0.55rem 0.8rem', background: '#fee2e2', color: '#b91c1c', fontWeight: '900', cursor: 'pointer' }}>Nonaktifkan</button>
+                     )}
+                   </div>
+                 </div>
+               ))}
              </div>
           </div>
         </div>

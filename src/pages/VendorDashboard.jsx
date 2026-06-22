@@ -38,6 +38,57 @@ import DashboardLayout from "../components/DashboardLayout"
 import { AddDapurForm } from "../components/forms/AddDapurForm"
 import { AddMenuForm } from "../components/forms/AddMenuForm"
 
+const produksiStatusMeta = {
+  pending: {
+    label: "PENDING",
+    badgeBackground: "var(--banana-light)",
+    badgeColor: "var(--banana)",
+    nextStatus: "persiapan",
+    actionLabel: "Mulai Persiapan (Potong Stok)",
+    actionBackground: "var(--primary)",
+    toast: "Status dipindah ke Persiapan. Stok bahan baku dipotong otomatis."
+  },
+  persiapan: {
+    label: "PERSIAPAN",
+    badgeBackground: "var(--primary-light)",
+    badgeColor: "var(--primary)",
+    nextStatus: "memasak",
+    actionLabel: "Masuk Tahap Memasak",
+    actionBackground: "var(--secondary)",
+    toast: "Batch masuk tahap Memasak."
+  },
+  memasak: {
+    label: "MEMASAK",
+    badgeBackground: "rgba(14, 165, 233, 0.12)",
+    badgeColor: "var(--secondary)",
+    nextStatus: "siap_kirim",
+    actionLabel: "Tandai Siap Kirim",
+    actionBackground: "var(--banana)",
+    toast: "Batch siap dikirim ke armada distribusi."
+  },
+  siap_kirim: {
+    label: "SIAP KIRIM",
+    badgeBackground: "rgba(249, 115, 22, 0.12)",
+    badgeColor: "var(--carrot)",
+    nextStatus: "selesai",
+    actionLabel: "Tutup Batch Produksi",
+    actionBackground: "var(--role-primary)",
+    toast: "Batch produksi ditutup. Status distribusi ikut diperbarui."
+  },
+  selesai: {
+    label: "SELESAI",
+    badgeBackground: "#e2e8f0",
+    badgeColor: "#64748b"
+  }
+}
+
+const distribusiStatusMeta = {
+  DIJADWALKAN: { background: "var(--banana-light)", color: "var(--banana)" },
+  DISTRIBUSI: { background: "var(--primary-light)", color: "var(--primary)" },
+  TIBA: { background: "rgba(14, 165, 233, 0.12)", color: "var(--secondary)" },
+  SELESAI: { background: "#e2e8f0", color: "#64748b" }
+}
+
 const Header = ({ title }) => (
   <div className="card dashboard-card-vibrant" style={{ 
     marginBottom: '1.5rem', 
@@ -533,7 +584,7 @@ const VisualAuditModal = ({ menu, onClose, onRevise }) => {
 }
 
 
-const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah }) => {
+const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah, onNotify }) => {
   const validMenus = menus.filter(m => m.status_validasi === 'approved')
   const [formData, setFormData] = useState({
     id_dapur: dapurs[0]?.id_dapur || dapurs[0]?.id || '',
@@ -557,17 +608,21 @@ const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah }) => {
     }
   }, [formData.id_dapur, availableSekolah, formData.id_sekolah])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.id_dapur || !formData.id_menu || !formData.id_sekolah || !formData.jumlah_porsi) {
       alert("Lengkapi semua data tiket produksi.")
       return
     }
-    onSave({
-      ...formData,
-      jumlah_porsi: parseInt(formData.jumlah_porsi)
-    })
-    alert("✅ Tiket Produksi berhasil dibuat dan masuk antrian Pending!")
-    onClose()
+    try {
+      await onSave({
+        ...formData,
+        jumlah_porsi: parseInt(formData.jumlah_porsi)
+      })
+      onNotify?.('Tiket produksi berhasil dibuat.')
+      onClose()
+    } catch (err) {
+      onNotify?.(err.message || 'Gagal membuat tiket produksi.', 'warning')
+    }
   }
 
   return (
@@ -690,6 +745,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [selectedAuditMenu, setSelectedAuditMenu] = useState(null)
   const [selectedDapurForStok, setSelectedDapurForStok] = useState(() => localStorage.getItem('selectedDapurForStok') || null)
   const [currentVendor, setCurrentVendor] = useState(null)
+  const [showToast, setShowToast] = useState({ show: false, message: '', type: 'success' })
   const [documentForm, setDocumentForm] = useState({ nama_dokumen: '', jenis: 'izin_usaha', tanggal_berlaku: '' })
   const [documentUpload, setDocumentUpload] = useState(null)
   const [isUploadingDocument, setIsUploadingDocument] = useState(false)
@@ -699,6 +755,11 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [prodError, setProdError] = useState(null)
   const [statusFilter, setStatusFilter] = useState(null) // 'persiapan' | 'memasak' | 'siap_kirim' | null
   const [stokFilter, setStokFilter] = useState(null) // 'all' | 'kritis' | 'ledger' | null
+
+  const triggerToast = (message, type = 'success') => {
+    setShowToast({ show: true, message, type })
+    setTimeout(() => setShowToast({ show: false, message: '', type: 'success' }), 3000)
+  }
   
   // API-driven state
   const [dapurs, setDapurs] = useState([])
@@ -905,11 +966,11 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const handleUploadDocument = async (e) => {
     e.preventDefault()
     if (!currentVendor) {
-      alert('Vendor tidak ditemukan.')
+      triggerToast('Vendor tidak ditemukan.', 'warning')
       return
     }
     if (!documentUpload) {
-      alert('Pilih file dokumen terlebih dahulu.')
+      triggerToast('Pilih file dokumen terlebih dahulu.', 'warning')
       return
     }
     setIsUploadingDocument(true)
@@ -930,10 +991,10 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
       setDokumen(refreshed)
       setDocumentForm({ nama_dokumen: '', jenis: 'izin_usaha', tanggal_berlaku: '' })
       setDocumentUpload(null)
-      alert('Dokumen berhasil diunggah untuk review Pemerintah.')
+      triggerToast('Dokumen berhasil diunggah untuk review Pemerintah.')
     } catch (err) {
       console.error(err)
-      alert('Gagal upload dokumen: ' + err.message)
+      triggerToast(`Gagal upload dokumen: ${err.message}`, 'warning')
     } finally {
       setIsUploadingDocument(false)
     }
@@ -946,7 +1007,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
       setDokumen(prev => prev.filter(item => item.id_dokumen !== doc.id_dokumen))
     } catch (err) {
       console.error(err)
-      alert('Gagal mengarsipkan dokumen: ' + err.message)
+      triggerToast(`Gagal mengarsipkan dokumen: ${err.message}`, 'warning')
     }
   }
 
@@ -1001,24 +1062,25 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
           setDistribusi(distRows.filter(item => produksiIds.has(item.id_produksi)))
         }).catch(console.error)
       }).catch(console.error)
-    } catch (err) { alert(`❌ Gagal membuat tiket:\n${err.message}`) }
+    } catch (err) {
+      triggerToast(`Gagal membuat tiket: ${err.message}`, 'warning')
+      throw err
+    }
   }
 
   const handleUpdateProduksiStatus = async (id_produksi, status) => {
     try {
       setProdError(null)
       await api.updateProduksi(id_produksi, { status })
-      alert(status === 'persiapan' ? '✅ Status dipindah ke Persiapan. Stok bahan baku telah otomatis dipotong!' : '✅ Status dipindah ke Selesai & Dikirim!')
+      triggerToast(produksiStatusMeta[status]?.toast || 'Status produksi berhasil diperbarui.')
       const dapurIds = new Set(dapurs.map(item => item.id_dapur || item.id))
       api.getProduksi().then(rows => {
         const filteredProduksi = rows.filter(item => dapurIds.has(item.id_dapur))
         setProduksi(filteredProduksi)
         const produksiIds = new Set(filteredProduksi.map(item => item.id_produksi))
-        if (status === 'selesai') {
-          api.getDistribusi().then(distRows => {
-            setDistribusi(distRows.filter(item => produksiIds.has(item.id_produksi)))
-          }).catch(console.error)
-        }
+        api.getDistribusi().then(distRows => {
+          setDistribusi(distRows.filter(item => produksiIds.has(item.id_produksi)))
+        }).catch(console.error)
       }).catch(console.error)
       // Refresh stok silently
       if (selectedDapurForStok) {
@@ -1777,11 +1839,13 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
     if (isProduksi) {
       const activeProduksi = produksi.filter(p => p.status !== 'selesai')
       const totalTickets = activeProduksi.length || 1
-      const prepCount = activeProduksi.filter(p => p.status === 'persiapan').length
+      const prepCount = activeProduksi.filter(p => p.status === 'pending' || p.status === 'persiapan').length
+      const cookCount = activeProduksi.filter(p => p.status === 'memasak').length
+      const packCount = activeProduksi.filter(p => p.status === 'siap_kirim').length
       
       const prepVal = Math.min(100, Math.round((prepCount / totalTickets) * 100));
-      const cookVal = prepCount > 0 ? 50 : 0;
-      const packVal = 0;
+      const cookVal = Math.min(100, Math.round((cookCount / totalTickets) * 100));
+      const packVal = Math.min(100, Math.round((packCount / totalTickets) * 100));
 
       return (
         <div className="grid" style={{ gap: '1rem' }}>
@@ -1863,6 +1927,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                 dapurs={dapurs} 
                 menus={menus} 
                 sekolah={sekolah} 
+                onNotify={triggerToast}
               />
             )}
           </AnimatePresence>
@@ -1953,8 +2018,8 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                       }
                       return p.status === statusFilter;
                     })
-                    .map((p, i) => (
-                   <tr key={i} style={{ background: 'var(--bg)', opacity: p.status === 'selesai' ? 0.6 : 1 }}>
+                    .map((p) => (
+                   <tr key={p.id_produksi} style={{ background: 'var(--bg)', opacity: p.status === 'selesai' ? 0.6 : 1 }}>
                      <td style={{ padding: '1.5rem', fontWeight: '900', borderRadius: '15px 0 0 15px', color: 'var(--primary)' }}>#PRD-{p.id_produksi}</td>
                      <td style={{ padding: '1.5rem' }}>
                        <p style={{ fontWeight: '900', margin: 0 }}>{p.nama_menu}</p>
@@ -1965,26 +2030,21 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700', margin: 0 }}>➡ {p.target_sekolah || 'Tidak ditentukan'}</p>
                      </td>
                      <td style={{ padding: '1.5rem' }}>
-                       {p.status === 'pending' && <span className="badge" style={{ background: 'var(--banana-light)', color: 'var(--banana)', fontWeight: '900' }}>PENDING</span>}
-                       {p.status === 'persiapan' && <span className="badge" style={{ background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: '900' }}>PROSES MASAK</span>}
-                       {p.status === 'selesai' && <span className="badge" style={{ background: '#e2e8f0', color: '#64748b', fontWeight: '900' }}>SELESAI KELUAR</span>}
+                       <span className="badge" style={{ background: produksiStatusMeta[p.status]?.badgeBackground || '#e2e8f0', color: produksiStatusMeta[p.status]?.badgeColor || '#64748b', fontWeight: '900' }}>
+                         {produksiStatusMeta[p.status]?.label || String(p.status || '-').toUpperCase()}
+                       </span>
                      </td>
                      <td style={{ padding: '1.5rem', borderRadius: '0 15px 15px 0' }}>
-                       {p.status === 'pending' && (
+                       {produksiStatusMeta[p.status]?.nextStatus && (
                          <button 
-                           onClick={() => handleUpdateProduksiStatus(p.id_produksi, 'persiapan')}
-                           style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '24px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(16,185,129,0.2)' }}
+                           onClick={() => handleUpdateProduksiStatus(p.id_produksi, produksiStatusMeta[p.status].nextStatus)}
+                           style={{ background: produksiStatusMeta[p.status].actionBackground, color: 'white', border: 'none', padding: '10px 15px', borderRadius: '24px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(15,23,42,0.12)' }}
                          >
-                           Mulai Proses (Potong Stok)
+                           {produksiStatusMeta[p.status].actionLabel}
                          </button>
                        )}
-                       {p.status === 'persiapan' && (
-                         <button 
-                           onClick={() => handleUpdateProduksiStatus(p.id_produksi, 'selesai')}
-                           style={{ background: 'var(--banana)', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '24px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(245,158,11,0.2)' }}
-                         >
-                           Selesai & Serahkan Kurir
-                         </button>
+                       {!produksiStatusMeta[p.status]?.nextStatus && (
+                         <span style={{ color: 'var(--text-muted)', fontWeight: '800', fontSize: '0.85rem' }}>Batch ditutup</span>
                        )}
                      </td>
                    </tr>
@@ -2070,7 +2130,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
 
            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at center, transparent 40%, rgba(6, 78, 59, 0.05) 100%)' }}></div>
            
-           {distribusi.filter(d => d.status !== 'TIBA').map((d, i) => (
+           {distribusi.filter(d => !['TIBA', 'SELESAI'].includes(d.status)).map((d, i) => (
              <motion.div 
                key={i}
                initial={{ x: 100 + (i * 50), y: 150 + (i * 30) }}
@@ -2107,15 +2167,15 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
             </div>
           ) : (
             distribusi.map((d, i) => {
-              const isScheduled = d.status === 'DIJADWALKAN';
-              const isDelivered = d.status === 'TIBA';
+              const isDelivered = d.status === 'SELESAI';
+              const statusTone = distribusiStatusMeta[d.status] || distribusiStatusMeta.DIJADWALKAN
               return (
                 <div key={i} className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px', opacity: isDelivered ? 0.7 : 1 }}>
                    <div className="flex justify-between" style={{ marginBottom: '1.5rem' }}>
                      <p style={{ fontWeight: '950', color: 'var(--primary)', fontSize: '0.9rem' }}>TX KODE: {d.kode_transaksi}</p>
                      <span className="badge" style={{ 
-                       background: isScheduled ? 'var(--banana-light)' : (isDelivered ? '#e2e8f0' : 'var(--primary-light)'), 
-                       color: isScheduled ? 'var(--banana)' : (isDelivered ? '#64748b' : 'var(--primary)'), 
+                       background: statusTone.background, 
+                       color: statusTone.color, 
                        fontWeight: '900' 
                      }}>
                        {d.status}
@@ -2156,6 +2216,32 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
 
   return (
     <DashboardLayout user={user} onLogout={onLogout} onSwitchRole={onSwitchRole}>
+      <AnimatePresence>
+        {showToast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: -40, x: '-50%' }}
+            animate={{ opacity: 1, y: 20, x: '-50%' }}
+            exit={{ opacity: 0, y: -40, x: '-50%' }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: '50%',
+              zIndex: 3000,
+              background: showToast.type === 'warning' ? 'var(--carrot)' : 'var(--primary)',
+              color: 'white',
+              padding: '0.9rem 1.5rem',
+              borderRadius: '20px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}
+          >
+            <ShieldCheck size={18} />
+            <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>{showToast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {isMain ? (
         <>
           <WelcomeBanner name="Vendor Jakarta Timur" />

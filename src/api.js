@@ -23,12 +23,13 @@ const api = {
   getUsers: () => request('/users'),
 
   // Sekolah
-  getSekolah: () => request('/sekolah'),
+  getSekolah: (options = {}) => request(`/sekolah${options.includeInactive ? '?includeInactive=true' : ''}`),
   getSekolahById: (id) => request(`/sekolah/${id}`),
-  getSekolahByUser: (userId) => request(`/sekolah/by-user/${userId}`),
+  getSekolahByUser: (userId, options = {}) => request(`/sekolah/by-user/${userId}${options.includeInactive ? '?includeInactive=true' : ''}`),
   createSekolah: (data) => request('/sekolah', { method: 'POST', body: data }),
   updateSekolah: (id, data) => request(`/sekolah/${id}`, { method: 'PUT', body: data }),
   deleteSekolah: (id) => request(`/sekolah/${id}`, { method: 'DELETE' }),
+  reactivateSekolah: (id) => request(`/sekolah/${id}/reactivate`, { method: 'PUT' }),
 
   // Vendors
   getVendors: () => request('/vendors'),
@@ -85,6 +86,7 @@ const api = {
   // Validasi Log
   getValidasiLog: () => request('/validasi-log'),
   createValidasiLog: (data) => request('/validasi-log', { method: 'POST', body: data }),
+  generateAhliGiziReport: (data) => request('/reports/ahli-gizi/menu-review', { method: 'POST', body: data }),
 
   // Feedback
   getFeedback: () => request('/feedback'),

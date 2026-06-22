@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { 
   School, 
@@ -30,6 +30,20 @@ import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api'
 import DashboardLayout from '../components/DashboardLayout'
 
+const deliveryPriority = {
+  TIBA: 0,
+  DISTRIBUSI: 1,
+  DIJADWALKAN: 2,
+  SELESAI: 3
+}
+
+const deliveryProgress = {
+  DIJADWALKAN: 35,
+  DISTRIBUSI: 80,
+  TIBA: 95,
+  SELESAI: 100
+}
+
 // --- Sub-components (Moved Outside) ---
 
 const Motif = ({ icon: Icon, top, right, bottom, left, color }) => (
@@ -52,7 +66,7 @@ const Header = ({ title, subtitle, showAdd = false, onAdd, isFeedback }) => (
   </div>
 )
 
-const AddFormModal = ({ onClose, isFeedback, activeDelivery, user }) => {
+const AddFormModal = ({ onClose, isFeedback, activeDelivery, user, onNotify }) => {
   const [rating, setRating] = useState(4);
   const [fields, setFields] = useState({
     nama_siswa: '',
@@ -76,7 +90,7 @@ const AddFormModal = ({ onClose, isFeedback, activeDelivery, user }) => {
           komentar: `[${fields.nama_siswa || 'Anonim'}] ${fields.komentar || 'Tidak ada catatan.'}`,
           kategori: 'kualitas'
         })
-        alert("✅ Feedback berhasil dikirim ke Ahli Gizi Pusat!")
+        onNotify?.('Feedback berhasil dikirim ke Ahli Gizi Pusat!', 'success')
       } else {
         await api.createAlert({
           judul: fields.judul || 'Kendala Sekolah',
@@ -84,12 +98,12 @@ const AddFormModal = ({ onClose, isFeedback, activeDelivery, user }) => {
           severity: fields.urgency === 'Tinggi (Segera)' ? 'warning' : (fields.urgency === 'Sedang' ? 'info' : 'info'),
           wilayah: 'Jakarta Timur'
         })
-        alert("⚠️ Kendala berhasil dilaporkan ke Vendor & Pemerintah!")
+        onNotify?.('Kendala berhasil dilaporkan ke Vendor dan Pemerintah!', 'warning')
       }
       onClose();
     } catch (err) {
       console.error(err)
-      alert('Gagal mengirim data: ' + err.message)
+      onNotify?.(`Gagal mengirim data: ${err.message}`, 'warning')
     } finally {
       setIsSaving(false)
     }
@@ -200,6 +214,7 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [showAddForm, setShowAddForm] = useState(false)
   const [feedbackRating, setFeedbackRating] = useState(4)
   const [quickFeedbackNote, setQuickFeedbackNote] = useState('')
+  const [showToast, setShowToast] = useState({ show: false, message: '', type: 'success' })
   
   const path = location.pathname.replace(/\/$/, '')
   const isMain = path === '/sekolah'
@@ -214,12 +229,18 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [proofPreview, setProofPreview] = useState('')
   const [isConfirming, setIsConfirming] = useState(false)
 
+  const triggerToast = (message, type = 'success') => {
+    setShowToast({ show: true, message, type })
+    setTimeout(() => setShowToast({ show: false, message: '', type: 'success' }), 3000)
+  }
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dist, fb, matchedSchool, confirmations] = await Promise.all([api.getDistribusi(), api.getFeedback(), api.getSekolahByUser(user.id_user), api.getKonfirmasi()])
+        const [dist, fb, matchedSchool, confirmations] = await Promise.all([api.getDistribusi(), api.getFeedback(), api.getSekolahByUser(user.id_user, { includeInactive: true }), api.getKonfirmasi()])
         setSchoolProfile(matchedSchool)
-        setDistribusi(matchedSchool ? dist.filter((item) => item.id_sekolah === matchedSchool.id_sekolah) : [])
+        const canOperate = matchedSchool && matchedSchool.status !== 'inactive'
+        setDistribusi(canOperate ? dist.filter((item) => item.id_sekolah === matchedSchool.id_sekolah) : [])
         setKonfirmasiHistory(matchedSchool ? confirmations.filter((item) => item.id_sekolah === matchedSchool.id_sekolah) : [])
         setFeedback(fb)
       } catch (err) {
@@ -232,17 +253,29 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
     fetchData()
   }, [user?.id_user])
 
-  const activeDelivery = distribusi[0] ? {
-    id_distribusi: distribusi[0].id_distribusi,
-    id_sekolah: distribusi[0].id_sekolah,
-    id_menu: distribusi[0].id_menu,
-    jumlah_porsi: distribusi[0].jumlah_porsi,
-    id: distribusi[0].kode_transaksi,
+  const selectedDelivery = useMemo(() => {
+    if (distribusi.length === 0) return null
+    return [...distribusi].sort((a, b) => {
+      const priorityDiff = (deliveryPriority[a.status] ?? 99) - (deliveryPriority[b.status] ?? 99)
+      if (priorityDiff !== 0) return priorityDiff
+      const aTime = new Date(a.waktu_tiba || a.waktu_kirim || a.created_at || 0).getTime()
+      const bTime = new Date(b.waktu_tiba || b.waktu_kirim || b.created_at || 0).getTime()
+      if (bTime !== aTime) return bTime - aTime
+      return (b.id_distribusi || 0) - (a.id_distribusi || 0)
+    })[0]
+  }, [distribusi])
+
+  const activeDelivery = selectedDelivery ? {
+    id_distribusi: selectedDelivery.id_distribusi,
+    id_sekolah: selectedDelivery.id_sekolah,
+    id_menu: selectedDelivery.id_menu,
+    jumlah_porsi: selectedDelivery.jumlah_porsi,
+    id: selectedDelivery.kode_transaksi,
     vendor: 'Dapur Sehat Nusantara',
-    status: distribusi[0].status,
-    time: distribusi[0].waktu_kirim ? new Date(distribusi[0].waktu_kirim).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : '-',
-    menuName: distribusi[0].nama_menu || 'Menu Hari Ini',
-    progress: (distribusi[0].status === 'SELESAI' || distribusi[0].status === 'TIBA') ? 100 : 50
+    status: selectedDelivery.status,
+    time: (selectedDelivery.waktu_tiba || selectedDelivery.waktu_kirim) ? new Date(selectedDelivery.waktu_tiba || selectedDelivery.waktu_kirim).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : '-',
+    menuName: selectedDelivery.nama_menu || 'Menu Hari Ini',
+    progress: deliveryProgress[selectedDelivery.status] ?? 0
   } : {
     id_distribusi: null,
     id_sekolah: null,
@@ -257,11 +290,15 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
 
   const handleConfirmArrival = async () => {
     if (!activeDelivery.id_distribusi) {
-      alert('Tidak ada distribusi aktif saat ini.')
+      triggerToast('Tidak ada distribusi aktif saat ini.', 'warning')
+      return
+    }
+    if (!['DISTRIBUSI', 'TIBA'].includes(activeDelivery.status)) {
+      triggerToast('Konfirmasi kedatangan baru tersedia saat armada sudah berangkat atau tiba.', 'warning')
       return
     }
     if (!proofUpload) {
-      alert('Upload foto bukti serah terima terlebih dahulu.')
+      triggerToast('Upload foto bukti serah terima terlebih dahulu.', 'warning')
       return
     }
     setIsConfirming(true)
@@ -284,10 +321,10 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
       setKonfirmasiHistory(schoolProfile ? confirmations.filter((item) => item.id_sekolah === schoolProfile.id_sekolah) : confirmations)
       setProofUpload(null)
       setProofPreview('')
-      alert("✅ Konfirmasi Berhasil! Data dikunci ke Ledger Nasional.")
+      triggerToast('Konfirmasi berhasil disimpan dengan foto bukti.')
     } catch (err) {
       console.error(err)
-      alert('Gagal konfirmasi: ' + err.message)
+      triggerToast(`Gagal konfirmasi: ${err.message}`, 'warning')
     } finally {
       setIsConfirming(false)
     }
@@ -313,23 +350,19 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
         komentar: quickFeedbackNote.trim() || 'Penilaian cepat dari halaman utama',
         kategori: 'kualitas'
       })
-      alert("✅ Rating siswa dan feedback telah masuk log blockchain gizi nasional.")
+      triggerToast('Rating siswa dan feedback berhasil dikirim.')
       setQuickFeedbackNote('')
       setShowAddForm(true)
     } catch (err) {
       console.error(err)
-      alert('Gagal mengirim feedback cepat: ' + err.message)
+      triggerToast(`Gagal mengirim feedback cepat: ${err.message}`, 'warning')
     }
   }
 
   const renderContent = () => {
     if (isKonfirmasi) return (
       <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '1rem', position: 'relative', zIndex: 1, width: '100%' }}>
-        <div style={{ gridColumn: '1 / -1' }}>
-          <AnimatePresence>
-            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} activeDelivery={activeDelivery} user={user} />}
-          </AnimatePresence>
-        </div>
+        <div style={{ gridColumn: '1 / -1' }} />
         <div className="card dashboard-card-vibrant" style={{ padding: '3.5rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '1rem', letterSpacing: '-1px' }}>Logistik Tiba</h2>
           <div className="animate-pulse-glow" style={{ marginBottom: '1.5rem', padding: '1.5rem', background: 'var(--primary-light)', borderRadius: '12px', border: '2px solid var(--primary)' }}>
@@ -396,9 +429,6 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
     )
     if (isFeedback) return (
       <div className="grid" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
-        <AnimatePresence>
-          {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={true} activeDelivery={activeDelivery} user={user} />}
-        </AnimatePresence>
         <div className="card" style={{ padding: '4.5rem', borderRadius: '16px', maxWidth: '850px', margin: '0 auto', boxShadow: '0 40px 80px rgba(0,0,0,0.05)' }}>
           <h2 style={{ fontSize: '3rem', fontWeight: '950', marginBottom: '1rem', letterSpacing: '-2px' }}>Suara Siswa</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '1.2rem', fontWeight: '500' }}>Feedback ini langsung terhubung ke dashboard ahli gizi nasional.</p>
@@ -428,10 +458,42 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
 
   return (
     <DashboardLayout user={user} onLogout={onLogout} onSwitchRole={onSwitchRole}>
-      {isMain ? (
+      <AnimatePresence>
+        {showToast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: -40, x: '-50%' }}
+            animate={{ opacity: 1, y: 20, x: '-50%' }}
+            exit={{ opacity: 0, y: -40, x: '-50%' }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: '50%',
+              zIndex: 3000,
+              background: showToast.type === 'warning' ? 'var(--carrot)' : 'var(--role-primary)',
+              color: 'white',
+              padding: '0.9rem 1.5rem',
+              borderRadius: '20px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}
+          >
+            <ShieldCheck size={18} />
+            <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>{showToast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {schoolProfile?.status === 'inactive' ? (
+        <div className="card" style={{ padding: '2rem', borderRadius: '16px', background: '#fff7ed', border: '1px solid #fdba74' }}>
+          <h2 style={{ fontSize: '1.8rem', fontWeight: '950', marginBottom: '0.75rem', color: '#9a3412' }}>Akun sekolah sedang nonaktif</h2>
+          <p style={{ color: '#9a3412', fontWeight: '600', margin: 0 }}>Operasional distribusi, konfirmasi, dan feedback baru dinonaktifkan sampai Pemerintah mengaktifkan kembali sekolah ini.</p>
+        </div>
+      ) : isMain ? (
+      
         <>
           <AnimatePresence>
-            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} activeDelivery={activeDelivery} user={user} />}
+            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} activeDelivery={activeDelivery} user={user} onNotify={triggerToast} />}
           </AnimatePresence>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div>
@@ -490,6 +552,9 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
         <>
           {isKonfirmasi && <Header title="Konfirmasi Kedatangan" subtitle="Manajemen bukti serah terima logistik gizi nasional." showAdd onAdd={() => setShowAddForm(true)} />}
           {isFeedback && <Header title="Pusat Feedback Sekolah" subtitle="Suara institusi untuk standar gizi masa depan." />}
+          <AnimatePresence>
+            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={isFeedback} activeDelivery={activeDelivery} user={user} onNotify={triggerToast} />}
+          </AnimatePresence>
           {renderContent()}
         </>
       )}

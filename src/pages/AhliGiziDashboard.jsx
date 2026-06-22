@@ -22,6 +22,7 @@ import {
   Edit3,
   Save,
   MessageCircle,
+  Info,
   LayoutDashboard,
   ShieldCheck,
   Microscope,
@@ -108,6 +109,67 @@ const groupNutritionItems = (items) => items.reduce((acc, item) => {
   acc[key].push(item)
   return acc
 }, {})
+
+const InlineInfoHint = ({ isOpen, onToggle, onHoverStart, onHoverEnd, text, label, tone = 'info' }) => (
+  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+    <button
+      type="button"
+      onClick={onToggle}
+      onMouseEnter={onHoverStart}
+      onMouseLeave={onHoverEnd}
+      onFocus={onHoverStart}
+      onBlur={onHoverEnd}
+      aria-label={label}
+      aria-expanded={isOpen}
+      style={{
+        width: '24px',
+        height: '24px',
+        borderRadius: '999px',
+        border: tone === 'warning' ? '1px solid #fed7aa' : '1px solid #cbd5e1',
+        background: tone === 'warning'
+          ? (isOpen ? '#fff7ed' : '#fffbeb')
+          : (isOpen ? '#eff6ff' : '#f8fafc'),
+        color: tone === 'warning'
+          ? (isOpen ? '#c2410c' : '#ea580c')
+          : (isOpen ? '#2563eb' : '#64748b'),
+        display: 'grid',
+        placeItems: 'center',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      }}
+    >
+      {tone === 'warning' ? <AlertTriangle size={13} /> : <Info size={13} />}
+    </button>
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: -4, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -4, scale: 0.98 }}
+          transition={{ duration: 0.16 }}
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 8px)',
+            right: 0,
+            width: 'min(240px, calc(100vw - 4rem))',
+            padding: '0.75rem 0.85rem',
+            borderRadius: '12px',
+            border: tone === 'warning' ? '1px solid #fde68a' : '1px solid #dbeafe',
+            background: 'white',
+            boxShadow: '0 14px 30px rgba(15, 23, 42, 0.12)',
+            color: tone === 'warning' ? '#92400e' : '#475569',
+            fontSize: '0.78rem',
+            fontWeight: '700',
+            lineHeight: '1.45',
+            zIndex: 10
+          }}
+        >
+          {text}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </div>
+)
 
 const emptyNutritionForm = {
   id: null,
@@ -451,6 +513,10 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
 
   const [formStandard, setFormStandard] = useState({ title: '', requirement: '', color: 'var(--primary)', desc: '', details: '' })
   const [ahliSuggestion, setAhliSuggestion] = useState('')
+  const [isQueueOpen, setIsQueueOpen] = useState(false)
+  const [queueSearch, setQueueSearch] = useState('')
+  const [pinnedInfoHint, setPinnedInfoHint] = useState(null)
+  const [hoveredInfoHint, setHoveredInfoHint] = useState(null)
 
   const path = location.pathname.replace(/\/$/, '') 
   const isMain = path === '/ahli-gizi'
@@ -461,10 +527,17 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
   const selectedMenu = menus[selectedMenuIdx] || menus[0] || {}
   const nutritionDb = groupNutritionItems(nutritionItems.length > 0 ? nutritionItems : flattenDefaultNutrition())
   const selectedBahan = Array.isArray(selectedMenu.bahan) ? selectedMenu.bahan : []
-  const selectedLeftBahan = selectedBahan.slice(0, 3)
-  const selectedRightBahan = selectedBahan.slice(3, 5)
   const selectedPhotoUrl = api.assetUrl(selectedMenu.foto_url)
   const selectedNotes = Array.isArray(selectedMenu.notes) ? selectedMenu.notes : []
+  const normalizedQueueSearch = queueSearch.trim().toLowerCase()
+  const filteredMenuEntries = menus
+    .map((menu, idx) => ({ menu, idx }))
+    .filter(({ menu }) => {
+      if (!normalizedQueueSearch) return true
+      const vendor = String(menu.nama_vendor || '').toLowerCase()
+      const title = String(menu.nama_menu || '').toLowerCase()
+      return vendor.includes(normalizedQueueSearch) || title.includes(normalizedQueueSearch)
+    })
   const canApproveSelectedMenu = !!selectedMenu.nilai_gizi?.calculated && selectedBahan.length > 0 && selectedBahan.every(item => item.id_nutrition)
   const nutritionRows = [
     { l: 'Energi', v: selectedMenu.nilai_gizi?.energi || '-' },
@@ -524,6 +597,8 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
 
     fetchNutritionProof()
     setAhliSuggestion('')
+    setPinnedInfoHint(null)
+    setHoveredInfoHint(null)
   }, [selectedMenuIdx, selectedMenu?.bahan])
 
   const triggerToast = (message, type = 'success') => {
@@ -531,12 +606,38 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
     setTimeout(() => setShowToast({ show: false, message: '', type: 'success' }), 4000)
   }
 
-  const handleGenerateReport = () => {
+  const handleSelectMenu = (idx) => {
+    setSelectedMenuIdx(idx)
+  }
+
+  const handleGenerateReport = async () => {
+    if (!selectedMenu?.id_menu) {
+      triggerToast('Pilih menu yang ingin dicatat terlebih dahulu.', 'warning')
+      return
+    }
     setIsGenerating(true)
-    setTimeout(() => {
+    try {
+      const report = await api.generateAhliGiziReport({
+        id_menu: selectedMenu.id_menu,
+        id_user: user.id_user,
+        notes: ahliSuggestion || null
+      })
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `laporan-gizi-menu-${selectedMenu.id_menu}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      triggerToast('Laporan gizi berhasil dibuat dan diunduh.')
+    } catch (err) {
+      console.error(err)
+      triggerToast(err.message, 'warning')
+    } finally {
       setIsGenerating(false)
-      triggerToast('Laporan Gizi Tersimpan!', 'success')
-    }, 3000)
+    }
   }
 
   const handleDownloadNutritionData = () => {
@@ -552,12 +653,30 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
     triggerToast('Database referensi nutrisi berhasil diunduh.')
   }
 
-  const handleApprove = async (id) => {
+  const handleApprove = async (id, options = {}) => {
+    const { forceOverride = false } = options
+    if (forceOverride) {
+      const confirmed = window.confirm(
+        'Menu ini belum memenuhi syarat validasi otomatis. Lanjutkan override dan sahkan menu secara manual?'
+      )
+      if (!confirmed) return
+    }
     try {
-      await api.createValidasiLog({ id_menu: id, id_user: user.id_user, aksi: 'approved', catatan: ahliSuggestion || null })
+      await api.createValidasiLog({
+        id_menu: id,
+        id_user: user.id_user,
+        aksi: 'approved',
+        catatan: ahliSuggestion || null,
+        force_override: forceOverride
+      })
       setMenus(prev => prev.map(m => (m.id_menu || m.id) === id ? { ...m, status_validasi: 'approved' } : m))
-      triggerToast('Menu berhasil disahkan untuk distribusi nasional.')
-    } catch (err) { console.error(err) }
+      triggerToast(forceOverride
+        ? 'Menu berhasil disahkan melalui override manual.'
+        : 'Menu berhasil disahkan untuk distribusi nasional.')
+    } catch (err) {
+      console.error(err)
+      triggerToast(err.message, 'warning')
+    }
   }
 
   const handleReject = async (id) => {
@@ -679,48 +798,110 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
     if (isValidasi) return (
       <div className="grid" style={{ gap: '1rem' }}>
         <Header title="Validasi & Audit Menu Nasional" />
-        <div className="grid" style={{ gridTemplateColumns: '1fr 2.2fr', gap: '2.5rem', position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: '900', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '12px', letterSpacing: '-1px' }}>
-            <ClipboardList size={26} color="var(--primary)" /> Antrian Validasi
-          </h3>
-          <div style={{ padding: '1.25rem', background: 'white', border: '1.5px solid var(--border)', borderRadius: '8px', display: 'flex', gap: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
-            <Search size={20} color="var(--text-muted)" />
-            <input placeholder="Cari Vendor atau Menu..." style={{ border: 'none', width: '100%', outline: 'none', fontWeight: '600', fontSize: '1rem' }} />
-          </div>
-          {menus.map((m, idx) => (
-            <motion.div 
-              whileHover={{ x: 5 }}
-              whileTap={{ scale: 0.98 }}
-              key={idx} 
-              onClick={() => setSelectedMenuIdx(idx)}
-              className="card" 
-              style={{ 
-                padding: '1.75rem', 
-                cursor: 'pointer', 
-                borderRadius: '26px',
-                border: selectedMenuIdx === idx ? '3px solid var(--primary)' : '1.5px solid var(--border)', 
-                background: selectedMenuIdx === idx ? 'var(--primary-light)' : 'white',
-                boxShadow: selectedMenuIdx === idx ? '0 15px 40px rgba(16, 185, 129, 0.15)' : 'none',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-              }}
+        <div style={{ display: 'grid', gap: '1rem', position: 'relative', zIndex: 1 }}>
+        <motion.div
+          layout
+          className={`ahligizi-queue-section ${isQueueOpen ? 'is-open' : ''}`}
+          style={{ overflow: 'hidden' }}
+          transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
+        >
+        <div className="ahligizi-queue-bar card" style={{ padding: '1rem 1.1rem', borderRadius: isQueueOpen ? '16px 16px 0 0' : '16px', border: '1.5px solid var(--border)', background: 'white', display: 'grid', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: 'var(--primary-light)', display: 'grid', placeItems: 'center' }}>
+                <ClipboardList size={18} color="var(--primary)" />
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.74rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Antrian Validasi</p>
+                <p style={{ margin: '2px 0 0', fontSize: '0.95rem', fontWeight: '850', color: '#0f172a' }}>{menus.length} menu menunggu tinjauan</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsQueueOpen(prev => !prev)}
+              style={{ padding: '0.8rem 1rem', borderRadius: '14px', border: '1.5px solid var(--border)', background: isQueueOpen ? 'var(--primary-light)' : 'white', color: isQueueOpen ? 'var(--primary)' : '#334155', fontWeight: '850', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '8px' }}
             >
-              <div className="flex justify-between" style={{ marginBottom: '10px' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: '900', color: selectedMenuIdx === idx ? 'var(--primary)' : 'var(--text-muted)', textTransform: 'uppercase' }}>{m.nama_vendor || 'Vendor Terdaftar'}</span>
-                {m.status_validasi === 'approved' ? (
-                  <CheckCircle size={18} color="var(--primary)" />
-                ) : m.status_validasi === 'rejected' ? (
-                  <AlertCircle size={18} color="var(--error)" />
-                ) : null}
+              {isQueueOpen ? <X size={16} /> : <Search size={16} />}
+              {isQueueOpen ? 'Tutup Antrian' : 'Lihat Antrian'}
+            </button>
+          </div>
+          <div className="ahligizi-queue-summary" style={{ display: 'grid', gap: '0.75rem', alignItems: 'center' }}>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Menu Terpilih</p>
+              <p style={{ margin: '4px 0 0', fontSize: '1rem', fontWeight: '900', color: '#0f172a', lineHeight: '1.3' }}>{selectedMenu.nama_menu || 'Belum ada menu terpilih'}</p>
+              <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: '700' }}>{selectedMenu.nama_vendor || 'Vendor terdaftar'}</p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <div style={{ padding: '0.65rem 0.85rem', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.8rem', fontWeight: '800', color: '#475569' }}>
+                {filteredMenuEntries.length} dari {menus.length} menu ditampilkan
               </div>
-              <h4 style={{ fontWeight: '900', fontSize: '1.1rem' }}>{m.nama_menu}</h4>
-              <div className="flex justify-between" style={{ marginTop: '12px', alignItems: 'center' }}>
-                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>Input: {m.tanggal || m.date}</p>
-                 <ChevronRight size={16} color={selectedMenuIdx === idx ? 'var(--primary)' : 'var(--text-muted)'} />
-              </div>
-            </motion.div>
-          ))}
+            </div>
+          </div>
         </div>
+        <motion.div
+          layout
+          initial={false}
+          animate={{
+            maxHeight: isQueueOpen ? 640 : 0,
+            opacity: isQueueOpen ? 1 : 0,
+            y: isQueueOpen ? 0 : -8
+          }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          className="ahligizi-queue-panel"
+          style={{ overflow: 'hidden', pointerEvents: isQueueOpen ? 'auto' : 'none' }}
+        >
+          <div className="card" style={{ padding: '1rem', borderRadius: '0 0 16px 16px', border: '1.5px solid var(--border)', borderTop: '0', background: 'white', overflow: 'hidden' }}>
+            <div style={{ padding: '0.9rem 1rem', background: '#f8fafc', border: '1.5px solid var(--border)', borderRadius: '12px', display: 'flex', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.02)', marginBottom: '1rem' }}>
+              <Search size={18} color="var(--text-muted)" />
+              <input
+                value={queueSearch}
+                onChange={(e) => setQueueSearch(e.target.value)}
+                placeholder="Cari Vendor atau Menu..."
+                style={{ border: 'none', width: '100%', outline: 'none', fontWeight: '600', fontSize: '0.95rem', background: 'transparent' }}
+              />
+            </div>
+            <div className="ahligizi-queue-drawer-grid" style={{ display: 'grid', gap: '0.8rem' }}>
+              {filteredMenuEntries.map(({ menu: m, idx }) => (
+                <motion.div
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  key={m.id_menu || m.id || idx}
+                  onClick={() => handleSelectMenu(idx)}
+                  className="card"
+                  style={{
+                    padding: '1rem 1.05rem',
+                    cursor: 'pointer',
+                    borderRadius: '18px',
+                    border: selectedMenuIdx === idx ? '2px solid var(--primary)' : '1.5px solid var(--border)',
+                    background: selectedMenuIdx === idx ? 'var(--primary-light)' : 'white',
+                    boxShadow: selectedMenuIdx === idx ? '0 8px 22px rgba(16, 185, 129, 0.1)' : 'none',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
+                >
+                  <div className="flex justify-between" style={{ marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.66rem', fontWeight: '900', color: selectedMenuIdx === idx ? 'var(--primary)' : 'var(--text-muted)', textTransform: 'uppercase' }}>{m.nama_vendor || 'Vendor Terdaftar'}</span>
+                    {m.status_validasi === 'approved' ? (
+                      <CheckCircle size={16} color="var(--primary)" />
+                    ) : m.status_validasi === 'rejected' ? (
+                      <AlertCircle size={16} color="var(--error)" />
+                    ) : null}
+                  </div>
+                  <h4 style={{ fontWeight: '900', fontSize: '0.96rem', lineHeight: '1.35' }}>{m.nama_menu}</h4>
+                  <div className="flex justify-between" style={{ marginTop: '10px', alignItems: 'center' }}>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Input: {m.tanggal || m.date}</p>
+                    <ChevronRight size={14} color={selectedMenuIdx === idx ? 'var(--primary)' : 'var(--text-muted)'} />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+            {filteredMenuEntries.length === 0 && (
+              <div style={{ padding: '1rem 0.25rem 0.5rem', color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>
+                Tidak ada menu yang cocok dengan pencarian.
+              </div>
+            )}
+          </div>
+        </motion.div>
+        </motion.div>
 
         <AnimatePresence mode="wait">
           <motion.div 
@@ -730,101 +911,107 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             className="dashboard-card-vibrant" 
-            style={{ padding: '3.5rem', borderRadius: '16px', background: 'white', position: 'relative', overflow: 'hidden' }}
+            style={{ padding: '2.25rem', borderRadius: '16px', background: 'white', position: 'relative', overflow: 'hidden' }}
           >
-            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '10px', background: 'linear-gradient(to right, var(--primary), var(--secondary))' }} />
+            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '8px', background: 'linear-gradient(to right, var(--primary), var(--secondary))' }} />
             
-            <div className="flex justify-between" style={{ marginBottom: '1.5rem', alignItems: 'flex-start' }}>
+            <div className="flex justify-between" style={{ marginBottom: '1.1rem', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
-                <h2 style={{ fontSize: '2.8rem', fontWeight: '950', letterSpacing: '-1px', color: 'var(--text-main)' }}>{selectedMenu.nama_menu}</h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', fontWeight: '600', marginTop: '5px' }}>Audit Komposisi & Kelayakan Gizi Program MBG</p>
+                <h2 style={{ fontSize: '2.15rem', fontWeight: '950', letterSpacing: '-0.8px', color: 'var(--text-main)', lineHeight: '1.1' }}>{selectedMenu.nama_menu}</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: '600', marginTop: '4px' }}>Audit Komposisi & Kelayakan Gizi Program MBG</p>
               </div>
-              <div style={{ marginLeft: '20px' }}>
+              <div style={{ marginLeft: '16px' }}>
                  {selectedMenu?.status_validasi === 'approved' ? (
-                   <div style={{ background: 'var(--primary-light)', padding: '12px 25px', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid var(--primary)' }}>
-                      <CheckCircle2 color="var(--primary)" size={20} />
-                      <span style={{ color: 'var(--primary)', fontWeight: '900', fontSize: '0.9rem' }}>MENU DISAHKAN</span>
+                   <div style={{ background: 'var(--primary-light)', padding: '9px 18px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px', border: '1.5px solid var(--primary)' }}>
+                      <CheckCircle2 color="var(--primary)" size={17} />
+                      <span style={{ color: 'var(--primary)', fontWeight: '900', fontSize: '0.8rem' }}>MENU DISAHKAN</span>
                    </div>
                  ) : selectedMenu?.status_validasi === 'rejected' ? (
-                   <div style={{ background: 'var(--error-light)', padding: '12px 25px', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid var(--error)' }}>
-                      <AlertTriangle color="var(--error)" size={20} />
-                      <span style={{ color: 'var(--error)', fontWeight: '900', fontSize: '0.9rem' }}>BUTUH REVISI</span>
+                   <div style={{ background: 'var(--error-light)', padding: '9px 18px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px', border: '1.5px solid var(--error)' }}>
+                      <AlertTriangle color="var(--error)" size={17} />
+                      <span style={{ color: 'var(--error)', fontWeight: '900', fontSize: '0.8rem' }}>BUTUH REVISI</span>
                    </div>
                  ) : (
-                   <div style={{ background: 'var(--banana-light)', padding: '12px 25px', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '10px', border: '2px solid var(--banana)' }}>
-                      <Clock color="var(--banana)" size={20} />
-                      <span style={{ color: 'var(--banana)', fontWeight: '900', fontSize: '0.9rem' }}>PENDING REVIEW</span>
+                   <div style={{ background: 'var(--banana-light)', padding: '9px 18px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px', border: '1.5px solid var(--banana)' }}>
+                      <Clock color="var(--banana)" size={17} />
+                      <span style={{ color: 'var(--banana)', fontWeight: '900', fontSize: '0.8rem' }}>PENDING REVIEW</span>
                    </div>
                  )}
               </div>
             </div>
 
-            <div className="grid" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: '2.5rem', marginBottom: '1rem' }}>
+            <div className="ahligizi-review-layout grid" style={{ gap: '1.5rem', marginBottom: '0.75rem' }}>
                {/* Left Section: Visual Feedback Report Preview */}
-               <div className="card shadow-md" style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', border: '1.5px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+               <div className="card shadow-md" style={{ background: 'white', borderRadius: '14px', padding: '1.15rem', border: '1.5px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
                   <div style={{ position: 'absolute', inset: 0, opacity: 0.03, pointerEvents: 'none', background: 'radial-gradient(circle at 50% 50%, var(--primary) 0%, transparent 60%)' }}></div>
                   
-                  <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                     <h2 style={{ fontSize: '2.2rem', fontWeight: '950', color: 'var(--text-main)', marginBottom: '8px' }}>Informasi Nilai Gizi</h2>
-                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontWeight: '900', fontSize: '1.4rem', color: '#1e293b' }}>Menu MBG</span>
-                        <div style={{ background: '#E11D48', color: 'white', padding: '8px 25px', borderRadius: '12px', fontWeight: '950', fontSize: '1.4rem' }}>Makanan Bergizi Gratis</div>
+                  <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                     <h2 style={{ fontSize: '1.7rem', fontWeight: '950', color: 'var(--text-main)', marginBottom: '6px' }}>Informasi Nilai Gizi</h2>
+                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontWeight: '900', fontSize: '1.1rem', color: '#1e293b' }}>Menu MBG</span>
+                        <div style={{ background: '#E11D48', color: 'white', padding: '6px 16px', borderRadius: '10px', fontWeight: '950', fontSize: '1rem' }}>Makanan Bergizi Gratis</div>
                      </div>
                   </div>
 
                   {/* Tray Visual Section */}
-                  <div style={{ height: '350px', width: '100%', display: 'grid', gridTemplateColumns: '1fr 350px 1fr', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-                     {/* Annotations Left */}
-                     <div>
-                        {selectedLeftBahan.map((b, i) => (
-                          <motion.div key={i} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.1 }} style={{ textAlign: 'right', marginBottom: '30px', position: 'relative' }}>
-                             <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.1rem', margin: 0, lineHeight: '1.1' }}>{b.nama}</p>
-                             <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1rem', margin: 0 }}>{b.takaran}</p>
-                             <div style={{ width: '35px', height: '2.5px', background: '#334155', position: 'relative', marginTop: '6px', marginLeft: 'auto', opacity: 0.6 }}>
-                                <div style={{ position: 'absolute', left: '100%', top: '-4px', borderLeft: '10px solid #334155', borderTop: '5px solid transparent', borderBottom: '5px solid transparent' }}></div>
-                             </div>
-                          </motion.div>
-                        ))}
-                     </div>
-
-                     {/* Main Tray Image Container */}
-                     <div style={{ position: 'relative', width: '100%', height: '300px', display: 'grid', placeItems: 'center' }}>
-                        <div style={{ width: '100%', height: '100%', border: '12px solid #cbd5e1', borderRadius: '16px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 30px 60px -12px rgba(0,0,0,0.25)', position: 'relative' }}>
+                  <div className="ahligizi-tray-layout" style={{ minHeight: '265px', width: '100%', display: 'grid', gap: '0.9rem', alignItems: 'stretch', marginBottom: '0.75rem' }}>
+                     <div style={{ position: 'relative', width: '100%', minHeight: '230px', display: 'grid', placeItems: 'center' }}>
+                        <div style={{ width: '100%', height: '100%', border: '10px solid #cbd5e1', borderRadius: '14px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 20px 40px -14px rgba(0,0,0,0.22)', position: 'relative' }}>
                            {selectedPhotoUrl ? (
                              <img src={selectedPhotoUrl} alt={`Foto ${selectedMenu.nama_menu}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                            ) : (
-                             <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', textAlign: 'center', padding: '1.25rem', color: '#64748b', fontWeight: '850', background: '#f8fafc' }}>
+                             <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', textAlign: 'center', padding: '1rem', color: '#64748b', fontWeight: '850', background: '#f8fafc', fontSize: '0.92rem' }}>
                                Vendor belum mengunggah foto menu.
                              </div>
                            )}
                         </div>
                      </div>
 
-                     {/* Annotations Right */}
-                     <div>
-                        {selectedRightBahan.map((b, i) => (
-                          <motion.div key={i} initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: (i+3) * 0.1 }} style={{ textAlign: 'left', marginBottom: '35px' }}>
-                             <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.1rem', margin: 0, lineHeight: '1.1' }}>{b.nama}</p>
-                             <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1rem', margin: 0 }}>{b.takaran}</p>
-                             <div style={{ width: '35px', height: '2.5px', background: '#334155', position: 'relative', marginTop: '6px', opacity: 0.6 }}>
-                                <div style={{ position: 'absolute', right: '100%', top: '-4px', borderRight: '10px solid #334155', borderTop: '5px solid transparent', borderBottom: '5px solid transparent' }}></div>
-                             </div>
-                          </motion.div>
-                        ))}
+                     <div className="ahligizi-bahan-card">
+                        <div style={{ padding: '1rem 1rem 0.85rem', borderBottom: '1px solid #dbe5f0', background: 'rgba(255,255,255,0.88)' }}>
+                           <p style={{ margin: 0, fontSize: '0.74rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                             Komposisi Menu
+                           </p>
+                           <p style={{ margin: '0.25rem 0 0', fontSize: '1rem', fontWeight: '900', color: '#0f172a' }}>
+                             Daftar Bahan
+                           </p>
+                        </div>
+                        <div className="ahligizi-bahan-scroll">
+                          {selectedBahan.length > 0 ? (
+                            selectedBahan.map((b, i) => (
+                              <motion.div
+                                key={`${b.nama}-${i}`}
+                                initial={{ x: 16, opacity: 0 }}
+                                animate={{ x: 0, opacity: 1 }}
+                                transition={{ delay: i * 0.06 }}
+                                className="ahligizi-bahan-item"
+                              >
+                                <div style={{ minWidth: 0 }}>
+                                  <p style={{ margin: 0, fontWeight: '900', color: '#0f172a', fontSize: '0.92rem', lineHeight: '1.3' }}>{b.nama}</p>
+                                  <p style={{ margin: '0.2rem 0 0', fontWeight: '750', color: '#64748b', fontSize: '0.82rem' }}>{b.takaran || '-'}</p>
+                                </div>
+                              </motion.div>
+                            ))
+                          ) : (
+                            <div className="ahligizi-bahan-empty">
+                              Belum ada daftar bahan untuk menu ini.
+                            </div>
+                          )}
+                        </div>
                      </div>
                   </div>
 
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', marginBottom: '1.5rem', fontWeight: '700' }}>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', textAlign: 'center', marginBottom: '1rem', fontWeight: '700' }}>
                      {selectedMenu.nama_vendor || 'Vendor Terdaftar'}<br/>
                      <span style={{ fontWeight: '600', opacity: 0.8 }}>Sumber: unggahan vendor TRAKSI</span>
                   </div>
 
                   {/* Bottom Grid: Notes & Table Side-by-side */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 250px', gap: '1rem', alignItems: 'start' }}>
+                  <div className="ahligizi-summary-grid" style={{ display: 'grid', gap: '0.85rem', alignItems: 'start' }}>
                      {/* Notes Box */}
-                     <div style={{ border: '2.5px solid #ef4444', borderRadius: '25px', padding: '1.5rem', background: 'white', position: 'relative' }}>
-                        <p style={{ fontWeight: '950', color: '#ef4444', fontSize: '1.2rem', marginBottom: '12px', marginTop: '-5px' }}>*Notes</p>
-                        <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#334155', fontWeight: '750', fontSize: '0.95rem', lineHeight: '1.6' }}>
+                     <div style={{ border: '2px solid #ef4444', borderRadius: '18px', padding: '1rem 1.1rem', background: 'white', position: 'relative' }}>
+                        <p style={{ fontWeight: '950', color: '#ef4444', fontSize: '1rem', marginBottom: '10px', marginTop: 0 }}>*Notes</p>
+                        <ul style={{ margin: 0, paddingLeft: '1rem', color: '#334155', fontWeight: '750', fontSize: '0.85rem', lineHeight: '1.55' }}>
                            {selectedNotes.length > 0 ? (
                              selectedNotes.map((note, i) => <li key={i}>{note}</li>)
                            ) : (
@@ -834,87 +1021,168 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                      </div>
 
                      {/* Nutrition Table Box */}
-                     <div style={{ border: '2.5px solid #1e293b', borderRadius: '25px', overflow: 'hidden', background: 'white' }}>
+                     <div style={{ border: '2px solid #1e293b', borderRadius: '18px', overflow: 'hidden', background: 'white' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                            <tbody>
                               {nutritionRows.map((row, i) => (
                                 <tr key={i} style={{ borderBottom: i === 5 ? 'none' : '1px solid #e2e8f0' }}>
-                                   <td style={{ padding: '10px 15px', fontWeight: '850', color: '#475569', fontSize: '0.95rem' }}>{row.l}</td>
-                                   <td style={{ padding: '10px 15px', fontWeight: '950', color: '#1e293b', textAlign: 'right', fontSize: '1.05rem' }}>{row.v}</td>
+                                   <td style={{ padding: '9px 12px', fontWeight: '850', color: '#475569', fontSize: '0.85rem' }}>{row.l}</td>
+                                   <td style={{ padding: '9px 12px', fontWeight: '950', color: '#1e293b', textAlign: 'right', fontSize: '0.95rem' }}>{row.v}</td>
                                 </tr>
                               ))}
                            </tbody>
                         </table>
                      </div>
                   </div>
-                  <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
-                    {standardComparisons.map((item) => (
-                      <div key={item.id_standar || item.title} style={{ padding: '12px', borderRadius: '14px', border: `1.5px solid ${item.pass ? '#bbf7d0' : '#fed7aa'}`, background: item.pass ? '#f0fdf4' : '#fff7ed' }}>
-                        <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: '900', color: item.pass ? '#16a34a' : '#ea580c', textTransform: 'uppercase' }}>
-                          {item.pass ? 'Memenuhi' : 'Perlu Cek'}
-                        </p>
-                        <p style={{ margin: '4px 0 0', fontWeight: '900', color: '#0f172a' }}>{item.title}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: '700' }}>
-                          {item.value.toFixed(item.nutrientKey === 'energi' || item.nutrientKey === 'natrium' ? 0 : 1)} / {item.requirement}
-                        </p>
-                      </div>
-                    ))}
+                  <div style={{ marginTop: '0.85rem', border: '1.5px solid #e2e8f0', borderRadius: '18px', background: '#f8fafc', overflow: 'hidden' }}>
+                    <div style={{ padding: '0.9rem 1rem', borderBottom: '1px solid #e2e8f0', background: 'white' }}>
+                      <p style={{ margin: 0, fontSize: '0.74rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Cek Terhadap Standar
+                      </p>
+                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', fontWeight: '800', color: '#0f172a' }}>
+                        Ringkasan kelayakan gizi menu
+                      </p>
+                    </div>
+                    <div className="ahligizi-standard-grid" style={{ display: 'grid', gap: '1px', background: '#e2e8f0' }}>
+                      {standardComparisons.map((item) => (
+                        <div key={item.id_standar || item.title} style={{ padding: '0.85rem 1rem', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: '900', color: '#0f172a' }}>{item.title}</p>
+                            <p style={{ margin: '3px 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: '700' }}>
+                              {item.value.toFixed(item.nutrientKey === 'energi' || item.nutrientKey === 'natrium' ? 0 : 1)} / {item.requirement}
+                            </p>
+                          </div>
+                          <span style={{
+                            flexShrink: 0,
+                            padding: '5px 10px',
+                            borderRadius: '999px',
+                            fontSize: '0.68rem',
+                            fontWeight: '900',
+                            textTransform: 'uppercase',
+                            color: item.pass ? '#15803d' : '#c2410c',
+                            background: item.pass ? '#dcfce7' : '#ffedd5'
+                          }}>
+                            {item.pass ? 'Memenuhi' : 'Perlu Cek'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                </div>
 
                {/* Right Section: Ahli Gizi Input */}
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div className="card shadow-sm" style={{ padding: '1.5rem', borderRadius: '16px', border: '1.5px solid var(--border)', background: 'white' }}>
-                     <h4 style={{ fontWeight: '950', marginBottom: '1.5rem', fontSize: '1.2rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                       <div style={{ background: 'var(--secondary-light)', width: '40px', height: '40px', borderRadius: '12px', display: 'grid', placeItems: 'center' }}>
-                         <MessageCircle size={22} color="var(--secondary)" />
+               <div className="ahligizi-review-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div className="card shadow-sm" style={{ padding: '1.1rem', borderRadius: '14px', border: '1.5px solid var(--border)', background: 'white' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '0.9rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                       <div style={{ background: 'var(--secondary-light)', width: '34px', height: '34px', borderRadius: '10px', display: 'grid', placeItems: 'center' }}>
+                         <MessageCircle size={18} color="var(--secondary)" />
                        </div>
-                       Rekomendasi Ahli Gizi
-                     </h4>
+                       <h4 style={{ fontWeight: '950', fontSize: '1rem', color: '#1e293b', margin: 0, lineHeight: '1.2' }}>
+                         Rekomendasi Ahli Gizi
+                       </h4>
+                      </div>
+                      <InlineInfoHint
+                        isOpen={pinnedInfoHint === 'recommendation' || hoveredInfoHint === 'recommendation'}
+                        onToggle={() => setPinnedInfoHint((current) => current === 'recommendation' ? null : 'recommendation')}
+                        onHoverStart={() => setHoveredInfoHint('recommendation')}
+                        onHoverEnd={() => setHoveredInfoHint((current) => current === 'recommendation' ? null : current)}
+                        text="Catatan ini akan ikut tersimpan pada log saat menu disahkan, dioverride, atau dikirim revisi."
+                        label="Info rekomendasi ahli gizi"
+                      />
+                     </div>
                      <textarea 
                        value={ahliSuggestion}
                        onChange={(e) => setAhliSuggestion(e.target.value)}
                        placeholder="Contoh: Tambah porsi serat, kurangi penggunaan minyak goreng berlebih..."
                        style={{ 
-                         width: '100%', height: '220px', padding: '1.5rem', borderRadius: '25px', 
+                         width: '100%', height: '140px', padding: '1rem', borderRadius: '14px', 
                          border: '1.5px solid #e2e8f0', background: '#f8fafc', 
-                         outline: 'none', fontSize: '1.05rem', fontWeight: '700', color: '#334155',
+                         outline: 'none', fontSize: '0.92rem', fontWeight: '700', color: '#334155',
                          transition: 'all 0.3s', resize: 'none', lineHeight: '1.6'
                        }}
                      />
-                     
-                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '2.5rem' }}>
+                  </div>
+
+                  <div className="card shadow-sm" style={{ padding: '1.1rem', borderRadius: '14px', border: '1.5px solid var(--border)', background: 'white' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '0.85rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                        <div style={{
+                          background: canApproveSelectedMenu ? 'var(--primary-light)' : '#fff7ed',
+                          width: '34px',
+                          height: '34px',
+                          borderRadius: '10px',
+                          display: 'grid',
+                          placeItems: 'center',
+                          border: canApproveSelectedMenu ? 'none' : '1px solid #fed7aa'
+                        }}>
+                          <ShieldCheck size={18} color={canApproveSelectedMenu ? 'var(--primary)' : '#ea580c'} />
+                        </div>
+                       <h4 style={{ fontWeight: '950', fontSize: '1rem', color: '#1e293b', margin: 0, lineHeight: '1.2' }}>
+                         Keputusan Validasi
+                       </h4>
+                      </div>
+                      <InlineInfoHint
+                        isOpen={
+                          canApproveSelectedMenu
+                            ? pinnedInfoHint === 'decision' || hoveredInfoHint === 'decision'
+                            : pinnedInfoHint === 'decision-warning' || hoveredInfoHint === 'decision-warning'
+                        }
+                        onToggle={() => setPinnedInfoHint((current) => {
+                          const key = canApproveSelectedMenu ? 'decision' : 'decision-warning'
+                          return current === key ? null : key
+                        })}
+                        onHoverStart={() => setHoveredInfoHint(canApproveSelectedMenu ? 'decision' : 'decision-warning')}
+                        onHoverEnd={() => setHoveredInfoHint((current) => {
+                          const key = canApproveSelectedMenu ? 'decision' : 'decision-warning'
+                          return current === key ? null : current
+                        })}
+                        text={canApproveSelectedMenu
+                          ? 'Bagian ini dipakai untuk menyetujui menu yang lolos audit gizi atau meminta vendor melakukan revisi bila komposisinya belum siap.'
+                          : 'Perhitungan gizi otomatis belum lengkap. Bagian ini butuh verifikasi manual sebelum override digunakan.'}
+                        label={canApproveSelectedMenu ? 'Info keputusan validasi' : 'Info peringatan keputusan validasi'}
+                        tone={canApproveSelectedMenu ? 'info' : 'warning'}
+                      />
+                     </div>
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: !canApproveSelectedMenu ? '2rem' : '0.2rem' }}>
                         <motion.button 
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => handleApprove(selectedMenu.id_menu)} 
                           disabled={!canApproveSelectedMenu}
-                          style={{ width: '100%', padding: '1.4rem', borderRadius: '24px', background: canApproveSelectedMenu ? 'var(--primary)' : '#94a3b8', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.1rem', cursor: canApproveSelectedMenu ? 'pointer' : 'not-allowed', boxShadow: '0 15px 35px rgba(16, 185, 129, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
+                          style={{ width: '100%', padding: '1rem', borderRadius: '18px', background: canApproveSelectedMenu ? 'var(--primary)' : '#94a3b8', border: 'none', color: 'white', fontWeight: '950', fontSize: '0.95rem', cursor: canApproveSelectedMenu ? 'pointer' : 'not-allowed', boxShadow: '0 10px 22px rgba(16, 185, 129, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
                         >
-                          <CheckCircle2 size={24} /> Sahkan Menu
+                          <CheckCircle2 size={20} /> Sahkan Menu
                         </motion.button>
                         {!canApproveSelectedMenu && (
-                          <p style={{ margin: '-0.5rem 0 0', color: '#64748b', fontWeight: '750', fontSize: '0.82rem', lineHeight: '1.4' }}>
-                            Menu hanya bisa disahkan setelah nutrisi dihitung dari bahan terverifikasi.
-                          </p>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleApprove(selectedMenu.id_menu, { forceOverride: true })}
+                              style={{ width: 'fit-content', alignSelf: 'center', padding: 0, background: 'transparent', border: 'none', color: '#c2410c', fontWeight: '800', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+                            >
+                              Override & Sahkan Menu
+                            </button>
+                          </>
                         )}
+                        <div style={{ height: !canApproveSelectedMenu ? '0.75rem' : '0.35rem' }} />
                         <motion.button 
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => handleReject(selectedMenu.id_menu)} 
-                          style={{ width: '100%', padding: '1.4rem', borderRadius: '24px', background: 'white', border: '2.5px solid var(--error)', color: 'var(--error)', fontWeight: '950', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
+                          style={{ width: '100%', padding: '1rem', borderRadius: '18px', background: 'white', border: '2px solid var(--error)', color: 'var(--error)', fontWeight: '950', fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
                         >
-                          <AlertTriangle size={24} /> Minta Revisi
+                          <AlertTriangle size={20} /> Minta Revisi
                         </motion.button>
                      </div>
                   </div>
 
-                  <div className="card" style={{ padding: '1rem', borderRadius: '16px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '15px' }}>
-                       <Activity size={24} color="#64748b" />
-                       <ShieldCheck size={24} color="#64748b" />
+                  <div className="card" style={{ padding: '0.9rem', borderRadius: '14px', background: '#f8fafc', border: '1px dashed #cbd5e1', textAlign: 'center', opacity: 0.9 }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '10px' }}>
+                       <Activity size={18} color="#64748b" />
+                       <ShieldCheck size={18} color="#64748b" />
                     </div>
-                    <p style={{ fontWeight: '800', color: '#64748b', fontSize: '0.85rem', lineHeight: '1.5' }}>
+                    <p style={{ fontWeight: '800', color: '#64748b', fontSize: '0.76rem', lineHeight: '1.45' }}>
                       Audit gizi diverifikasi secara otomatis menggunakan AI & dijamin integritasnya oleh sistem Blockchain TRAKSI.
                     </p>
                   </div>
@@ -1218,7 +1486,7 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
           </div>
 
           <div className="card dashboard-card-vibrant" style={{ borderRadius: '8px', padding: '1.5rem', position: 'relative', overflow: 'hidden' }}>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '1rem' }}>Pencatatan Gizi ke Ledger</h3>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '1rem' }}>Laporan Review Gizi</h3>
             <p style={{ color: 'var(--text-muted)', lineHeight: '1.7', marginBottom: '1.5rem', maxWidth: '600px' }}>
               Sistem Blockchain mencatat setiap validasi ke Smart Contract immutable. Data terenkripsi AES-256.
             </p>
@@ -1231,9 +1499,9 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
               style={{ padding: '0.9rem 2rem', borderRadius: '14px', background: 'var(--role-primary)', border: 'none', color: 'white', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
             >
               {isGenerating ? (
-                <><Loader2 className="animate-spin" size={20} /> Mencatat...</>
+                <><Loader2 className="animate-spin" size={20} /> Membuat Laporan...</>
               ) : (
-                <><Zap size={20} fill="white" /> Simpan ke Blockchain</>
+                <><Download size={20} /> Unduh Laporan Validasi</>
               )}
             </motion.button>
           </div>

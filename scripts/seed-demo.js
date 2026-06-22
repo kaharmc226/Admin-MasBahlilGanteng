@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 
-import fs from 'fs'
-import path from 'path'
 import readline from 'readline'
-import { fileURLToPath } from 'url'
-import mysql from 'mysql2/promise'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const rootDir = path.resolve(__dirname, '..')
-const dbJsPath = path.join(rootDir, 'server', 'db.js')
-const baseSqlPath = path.join(rootDir, 'database', 'traksi_db.sql')
-const extensionSqlPath = path.join(rootDir, 'database', 'dummy_data_extension.sql')
+import { dbConfig } from '../server/dbConfig.js'
+import {
+  createAdminConnection,
+  databaseState,
+  formatDbTarget,
+  formatRowCounts,
+  initializeDemoDatabase,
+  initializeMinimalDatabase,
+} from './db-utils.js'
 
 const args = process.argv.slice(2)
 const helpRequested = args.includes('--help') || args.includes('-h')
@@ -29,8 +28,8 @@ Usage:
   npm run seed:demo -- --overwrite --yes
 
 Modes:
-  --merge       Insert missing demo records and refresh matching demo rows
-  --overwrite   Rebuild the database from the bundled SQL seed files
+  --merge       Add or refresh optional demo data on top of schema + baseline data
+  --overwrite   Rebuild schema, baseline data, and full demo data
   --yes         Skip confirmation prompts
   --help        Show this help
 `)
@@ -42,21 +41,8 @@ if (mergeMode && overwriteMode) {
   process.exit(1)
 }
 
-function parseDbConfig() {
-  const dbContent = fs.readFileSync(dbJsPath, 'utf8')
-  const hostMatch = dbContent.match(/host:\s*['"`](.*?)['"`]/)
-  const portMatch = dbContent.match(/port:\s*(\d+)/)
-  const userMatch = dbContent.match(/user:\s*['"`](.*?)['"`]/)
-  const passwordMatch = dbContent.match(/password:\s*['"`](.*?)['"`]/)
-  const databaseMatch = dbContent.match(/database:\s*['"`](.*?)['"`]/)
-
-  return {
-    host: hostMatch ? hostMatch[1] : 'localhost',
-    port: portMatch ? Number(portMatch[1]) : 3306,
-    user: userMatch ? userMatch[1] : 'root',
-    password: passwordMatch ? passwordMatch[1] : '',
-    database: databaseMatch ? databaseMatch[1] : 'traksi_db',
-  }
+function formatError(err) {
+  return err?.cause?.message || err?.message || err?.code || String(err)
 }
 
 function createPrompt() {
@@ -72,75 +58,14 @@ function askQuestion(rl, question) {
   })
 }
 
-async function createAdminConnection(config) {
-  return mysql.createConnection({
-    host: config.host,
-    port: config.port,
-    user: config.user,
-    password: config.password,
-    multipleStatements: true,
-  })
-}
-
-async function databaseState(connection, config) {
-  const [databases] = await connection.query('SHOW DATABASES LIKE ?', [config.database])
-  if (databases.length === 0) {
-    return { exists: false, hasTables: false, rowCounts: {}, totalRows: 0 }
-  }
-
-  await connection.query(`USE \`${config.database}\``)
-  const [tables] = await connection.query('SHOW TABLES')
-  if (tables.length === 0) {
-    return { exists: true, hasTables: false, rowCounts: {}, totalRows: 0 }
-  }
-
-  const tablesToCheck = [
-    'users',
-    'sekolah',
-    'vendors',
-    'dapur',
-    'menus',
-    'produksi',
-    'distribusi',
-    'feedback',
-    'alerts',
-    'dokumen_vendor',
-  ]
-
-  const rowCounts = {}
-  let totalRows = 0
-  for (const table of tablesToCheck) {
-    try {
-      const [[row]] = await connection.query(`SELECT COUNT(*) AS total FROM \`${table}\``)
-      rowCounts[table] = row.total
-      totalRows += row.total
-    } catch {
-      rowCounts[table] = 0
-    }
-  }
-
-  return { exists: true, hasTables: true, rowCounts, totalRows }
-}
-
-async function importSqlFile(connection, filePath) {
-  const sql = fs.readFileSync(filePath, 'utf8')
-  await connection.query(sql)
-}
-
-function formatRowCounts(rowCounts) {
-  return Object.entries(rowCounts)
-    .map(([table, total]) => `${table}: ${total}`)
-    .join(', ')
-}
-
 async function chooseMode(state) {
-  if (!state.exists || !state.hasTables || state.totalRows === 0) {
-    return 'overwrite'
-  }
-
   if (overwriteMode) return 'overwrite'
   if (mergeMode) return 'merge'
   if (yesMode) return 'merge'
+
+  if (!state.exists || !state.hasTables || state.totalRows === 0) {
+    return 'merge'
+  }
 
   const rl = createPrompt()
   try {
@@ -162,8 +87,8 @@ async function chooseMode(state) {
 async function ensureBaseSchema(connection) {
   const state = await databaseState(connection, dbConfig)
   if (!state.exists || !state.hasTables) {
-    console.log(`Initializing base schema for "${dbConfig.database}"...`)
-    await importSqlFile(connection, baseSqlPath)
+    console.log(`Initializing schema and minimal baseline for "${dbConfig.database}"...`)
+    await initializeMinimalDatabase(connection, { config: dbConfig })
   }
   await connection.query(`USE \`${dbConfig.database}\``)
 }
@@ -697,12 +622,31 @@ async function upsertNutritionDatabase(connection) {
     [1, 'makanan_pokok', 'Nasi putih', '100 gram', '175 kkal'],
     [2, 'makanan_pokok', 'Nasi merah', '100 gram', '110 kkal'],
     [3, 'makanan_pokok', 'Kentang rebus', '100 gram', '87 kkal'],
-    [4, 'lauk_sayur', 'Dada ayam (kulit)', '100 gram', '216 kkal'],
-    [5, 'lauk_sayur', 'Ikan kembung', '100 gram', '167 kkal'],
-    [6, 'lauk_sayur', 'Telur dadar', '1 btr besar', '93 kkal'],
-    [7, 'buah', 'Apel', '1 buah sedang', '72 kkal'],
-    [8, 'buah', 'Pisang', '1 buah sedang', '105 kkal'],
-    [9, 'buah', 'Jeruk', '1 buah', '62 kkal'],
+    [4, 'makanan_pokok', 'Ubi jalar', '100 gram', '86 kkal'],
+    [5, 'makanan_pokok', 'Singkong', '100 gram', '160 kkal'],
+    [6, 'makanan_pokok', 'Roti putih', '1 iris', '66 kkal'],
+    [7, 'makanan_pokok', 'Roti gandum', '1 iris', '67 kkal'],
+    [8, 'makanan_pokok', 'Mi goreng instan', '80 gram', '350 kkal'],
+    [9, 'lauk_sayur', 'Dada ayam (kulit)', '100 gram', '216 kkal'],
+    [10, 'lauk_sayur', 'Dada ayam (no kulit)', '100 gram', '184 kkal'],
+    [11, 'lauk_sayur', 'Bebek goreng', '100 gram', '286 kkal'],
+    [12, 'lauk_sayur', 'Ikan kembung', '100 gram', '167 kkal'],
+    [13, 'lauk_sayur', 'Udang goreng', '100 gram', '150 kkal'],
+    [14, 'lauk_sayur', 'Bakso sapi', '100 gram', '202 kkal'],
+    [15, 'lauk_sayur', 'Chicken nugget', '100 gram', '297 kkal'],
+    [16, 'lauk_sayur', 'Telur dadar', '1 btr besar', '93 kkal'],
+    [17, 'lauk_sayur', 'Tempe goreng', '1 porsi', '118 kkal'],
+    [18, 'lauk_sayur', 'Tahu isi', '1 porsi', '124 kkal'],
+    [19, 'lauk_sayur', 'Tumis kangkung', '85 gram', '155 kkal'],
+    [20, 'lauk_sayur', 'Perkedel kentang', '75 gram', '117 kkal'],
+    [21, 'buah', 'Apel', '1 buah sedang', '72 kkal'],
+    [22, 'buah', 'Pisang', '1 buah sedang', '105 kkal'],
+    [23, 'buah', 'Jambu biji', '1 buah', '37 kkal'],
+    [24, 'buah', 'Jambu air', '1 buah', '55 kkal'],
+    [25, 'buah', 'Alpukat', '100 gram', '322 kkal'],
+    [26, 'buah', 'Jeruk', '1 buah', '62 kkal'],
+    [27, 'buah', 'Buah naga', '1 buah sedang', '50 kkal'],
+    [28, 'buah', 'Pepaya', '100 gram', '39 kkal'],
   ]
 
   for (const row of nutrition) {
@@ -747,11 +691,8 @@ async function runMergeSeed(connection) {
 }
 
 async function runOverwriteSeed(connection) {
-  console.log(`Rebuilding "${dbConfig.database}" from bundled SQL seed files...`)
-  await importSqlFile(connection, baseSqlPath)
-  if (fs.existsSync(extensionSqlPath)) {
-    await importSqlFile(connection, extensionSqlPath)
-  }
+  console.log(`Rebuilding "${dbConfig.database}" with schema, baseline, and full demo data...`)
+  await initializeDemoDatabase(connection, { reset: true, config: dbConfig })
 }
 
 async function confirmOverwrite() {
@@ -769,12 +710,10 @@ async function confirmOverwrite() {
   }
 }
 
-const dbConfig = parseDbConfig()
-
 ;(async () => {
   let connection
   try {
-    connection = await createAdminConnection(dbConfig)
+    connection = await createAdminConnection()
     const state = await databaseState(connection, dbConfig)
     const mode = await chooseMode(state)
 
@@ -799,7 +738,7 @@ const dbConfig = parseDbConfig()
     console.log('Demo data ready.')
     console.log(formatRowCounts(finalState.rowCounts))
   } catch (error) {
-    console.error('Demo seeding failed:', error.message)
+    console.error(`Demo seeding failed for ${formatDbTarget()}:`, formatError(error))
     process.exitCode = 1
   } finally {
     if (connection) {
