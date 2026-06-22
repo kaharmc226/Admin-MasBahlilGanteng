@@ -719,14 +719,14 @@ const VisualAuditModal = ({ menu, onClose, onRevise, onEditRecipe }) => {
           </button>
           {isRejected ? (
             <button
-              onClick={() => { onRevise(menu); onClose(); }}
+              onClick={(e) => { e.stopPropagation(); onClose(); setTimeout(() => onRevise(menu), 50); }}
               style={{ flex: '1 1 280px', padding: '1rem 1.2rem', borderRadius: '18px', border: 'none', background: '#dc2626', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: '0 10px 25px rgba(220, 38, 38, 0.2)' }}
             >
               Revisi Sekarang
             </button>
           ) : (
             <button
-              onClick={() => { onEditRecipe(menu); onClose(); }}
+              onClick={(e) => { e.stopPropagation(); onClose(); setTimeout(() => onEditRecipe(menu), 50); }}
               style={{ flex: '1 1 280px', padding: '1rem 1.2rem', borderRadius: '18px', border: 'none', background: isApproved ? '#16a34a' : 'var(--primary)', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: isApproved ? '0 10px 25px rgba(22, 163, 74, 0.2)' : '0 10px 25px rgba(14, 165, 233, 0.2)' }}
             >
               {isApproved ? 'Edit Resep Menu' : 'Perbarui Menu'}
@@ -1449,7 +1449,9 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
     setEditingMenu(menu)
     setMenuFormMode('revision')
     setShowMenuForm(true)
-    navigate('/vendor/menu')
+    if (path !== '/vendor/menu') {
+      navigate('/vendor/menu')
+    }
   }
 
 
