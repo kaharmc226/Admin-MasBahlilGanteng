@@ -74,24 +74,66 @@ const Header = ({ title, subtitle, showAdd = false, onAdd, isVendor, isMapping }
   </div>
 )
 
+const dapurReviewMeta = {
+  approved: { label: 'APPROVED', background: 'var(--primary-light)', color: 'var(--primary)' },
+  pending: { label: 'PENDING', background: 'var(--banana-light)', color: 'var(--banana)' },
+  rejected: { label: 'REJECTED', background: '#fee2e2', color: '#b91c1c' },
+}
+
+const vendorDocumentStatusMeta = {
+  valid: { label: 'Valid', background: '#dcfce7', color: '#166534', description: 'Dokumen sudah lolos verifikasi dan bisa dipakai untuk operasional.' },
+  pending_review: { label: 'Perlu Review', background: '#fef3c7', color: '#92400e', description: 'Dokumen menunggu peninjauan atau revisi dari reviewer pemerintah.' },
+  expired: { label: 'Expired', background: '#fee2e2', color: '#b91c1c', description: 'Masa berlaku dokumen habis atau dokumen tidak lagi bisa digunakan.' },
+}
+
+const vendorDocumentTypeLabel = {
+  izin_usaha: 'Izin Usaha', sertifikat_halal: 'Sertifikat Halal', sertifikat_laik_hygiene: 'Sertifikat Laik Hygiene',
+  npwp: 'NPWP', siup: 'SIUP', lainnya: 'Dokumen Lainnya',
+}
+
+const formatShortDate = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+const formatDateTime = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+const getFileLabel = (path = '') => {
+  if (!path) return 'Tanpa file'
+  const normalized = String(path).split('?')[0]
+  const extension = normalized.includes('.') ? normalized.split('.').pop() : ''
+  return extension ? extension.toUpperCase() : 'FILE'
+}
+
 const AddFormModal = ({ onClose, onSave, isVendor, isMapping, dapurs = [] }) => {
   const [isSaving, setIsSaving] = useState(false)
   const [fields, setFields] = useState({
     nama_vendor: '',
     region: '',
     izin_usaha: '',
+    account_name: '',
+    email: '',
+    password: '',
     nama_sekolah: '',
     jumlah_siswa: '',
     alamat: '',
     id_dapur: ''
   })
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true)
-    setTimeout(() => {
+    try {
+      await onSave(isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target', fields)
+    } finally {
       setIsSaving(false)
-      onSave(isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target', fields)
-    }, 1200)
+    }
   }
 
   const getFields = () => {
@@ -107,7 +149,19 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping, dapurs = [] }) => 
         </div>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>WILAYAH OPERASIONAL</label>
-          <input required value={fields.region} onChange={(e) => setFields({ ...fields, region: e.target.value })} placeholder="Contoh: Jakarta Selatan" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+          <input required value={fields.region} onChange={(e) => setFields({ ...fields, region: e.target.value })} placeholder="Contoh: Kecamatan Mandonga, Kota Kendari" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA AKUN VENDOR</label>
+          <input required value={fields.account_name} onChange={(e) => setFields({ ...fields, account_name: e.target.value })} placeholder="Contoh: Admin Dapur Sejahtera" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>EMAIL LOGIN</label>
+          <input required type="email" value={fields.email} onChange={(e) => setFields({ ...fields, email: e.target.value })} placeholder="vendor@traksi.id" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PASSWORD LOGIN</label>
+          <input required type="password" value={fields.password} onChange={(e) => setFields({ ...fields, password: e.target.value })} placeholder="Tetapkan password akun vendor" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
       </>
     )
@@ -115,12 +169,15 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping, dapurs = [] }) => 
       <>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DAPUR PENANGGUNG JAWAB</label>
-          <select required value={fields.id_dapur} onChange={(e) => setFields({ ...fields, id_dapur: e.target.value })} style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', background: 'white' }}>
-            <option value="">Pilih dapur</option>
+          <select required value={fields.id_dapur} onChange={(e) => setFields({ ...fields, id_dapur: e.target.value })} disabled={dapurs.length === 0} style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', background: 'white' }}>
+            <option value="">{dapurs.length === 0 ? 'Belum ada dapur approved' : 'Pilih dapur'}</option>
             {dapurs.map((d) => (
               <option key={d.id_dapur} value={d.id_dapur}>Dapur {d.lokasi} - Vendor #{d.id_vendor}</option>
             ))}
           </select>
+          {dapurs.length === 0 && (
+            <p style={{ marginTop: '0.45rem', fontSize: '0.75rem', color: '#92400e', fontWeight: '700' }}>Mapping sekolah hanya bisa dibuat ke dapur yang sudah disetujui Pemerintah.</p>
+          )}
         </div>
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA SEKOLAH BARU</label>
@@ -133,6 +190,18 @@ const AddFormModal = ({ onClose, onSave, isVendor, isMapping, dapurs = [] }) => 
         <div>
           <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>ALAMAT LENGKAP SEKOLAH</label>
           <textarea required value={fields.alamat} onChange={(e) => setFields({ ...fields, alamat: e.target.value })} placeholder="Jl. Merdeka No. 10..." style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA AKUN SEKOLAH</label>
+          <input required value={fields.account_name} onChange={(e) => setFields({ ...fields, account_name: e.target.value })} placeholder="Contoh: Admin SDN 05 Menteng" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>EMAIL LOGIN</label>
+          <input required type="email" value={fields.email} onChange={(e) => setFields({ ...fields, email: e.target.value })} placeholder="admin@sekolah.traksi.id" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PASSWORD LOGIN</label>
+          <input required type="password" value={fields.password} onChange={(e) => setFields({ ...fields, password: e.target.value })} placeholder="Tetapkan password akun sekolah" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
         </div>
       </>
     )
