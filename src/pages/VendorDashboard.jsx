@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { 
   Plus, 
@@ -225,7 +225,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [nutritionItems, setNutritionItems] = useState([])
   const [validationLogs, setValidationLogs] = useState([])
   const [loading, setLoading] = useState(true)
-  const approvedDapurs = dapurs.filter((d) => d.status_verifikasi === 'approved')
+  const approvedDapurs = useMemo(() => dapurs.filter((d) => d.status_verifikasi === 'approved'), [dapurs])
 
   const buildVendorMenus = (rawMenus = [], activeNutritionItems = [], rawValidationLogs = [], vendorId = null) => {
     const nutritionMap = new Map(activeNutritionItems.map((item) => [String(item.id), item]))
