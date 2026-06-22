@@ -440,8 +440,8 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
     const review_note = window.prompt(`Catatan review untuk status ${status}:`, doc.review_note || '')
     if (review_note === null) return
     try {
-      const updated = await api.updateDokumenStatus(doc.id_dokumen, { status, review_note, reviewed_by: user.id_user })
-      setSelectedVendorDocs(prev => prev.map(item => item.id_dokumen === doc.id_dokumen ? { ...item, ...updated } : item))
+      await api.updateDokumenStatus(doc.id_dokumen, { status, review_note, reviewed_by: user.id_user })
+      setSelectedVendorDocs(prev => prev.map(item => item.id_dokumen === doc.id_dokumen ? { ...item, status, review_note } : item))
       triggerToast('Status dokumen vendor diperbarui.')
     } catch (err) {
       console.error(err)
@@ -931,7 +931,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
             animate={{ opacity: 1, y: 20, x: '-50%' }} 
             exit={{ opacity: 0, y: -50, x: '-50%' }} 
             style={{ 
-              position: 'fixed', top: 0, left: '50%', zIndex: 3000, 
+              position: 'fixed', top: 0, left: '50%', zIndex: 10001, 
               background: 'var(--role-primary)', 
               color: 'white', padding: '0.9rem 2rem', borderRadius: '24px', 
               boxShadow: '0 10px 25px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '10px' 

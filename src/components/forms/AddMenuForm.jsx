@@ -10,14 +10,14 @@ const parseTakaran = (t) => {
   const str = t.replace('~', '').trim();
   const num = parseFloat(str);
   const letters = str.replace(/[0-9.]/g, '').trim().toLowerCase();
-  
+
   let satuan = 'gram';
   if (['kg', 'kilogram'].includes(letters)) satuan = 'kilogram';
   else if (['l', 'liter'].includes(letters)) satuan = 'liter';
   else if (['ml', 'mililiter'].includes(letters)) satuan = 'ml';
   else if (['pcs', 'buah'].includes(letters)) satuan = 'pcs';
-  
-  return { berat: isNaN(num) ? '' : num, satuan };
+
+  return { berat: Number.isNaN(num) ? '' : num, satuan };
 };
 
 const nutrientLabels = {
@@ -38,7 +38,7 @@ const buildInitialBahan = (editData, nutritionItems) => {
   if (!editData?.bahan?.length) return [{ id_nutrition: '', jumlah: '' }];
   return editData.bahan.map((b) => {
     const parsed = parseTakaran(b.takaran);
-    const matched = nutritionItems.find(item => item.id === b.id_nutrition || item.nama?.toLowerCase() === b.nama?.toLowerCase());
+    const matched = nutritionItems.find((item) => item.id === b.id_nutrition || item.nama?.toLowerCase() === b.nama?.toLowerCase());
     return {
       id_nutrition: b.id_nutrition || matched?.id || '',
       jumlah: b.jumlah || parsed.berat || ''
@@ -46,22 +46,46 @@ const buildInitialBahan = (editData, nutritionItems) => {
   });
 };
 
-export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems = [], onRequestIngredient }) => {
+const buildInitialNotes = (editData) => {
+  if (Array.isArray(editData?.notes)) return editData.notes.filter(Boolean).join('\n');
+  if (typeof editData?.notes === 'string') return editData.notes;
+  return '';
+};
+
+const normalizeVendorNotes = (value) => value
+  .split('\n')
+  .map((item) => item.trim())
+  .filter(Boolean);
+
+export const AddMenuForm = ({
+  isOpen,
+  onClose,
+  onSave,
+  editData,
+  nutritionItems = [],
+  onRequestIngredient,
+  mode = 'create',
+  revisionNote = ''
+}) => {
+  const isRevisionMode = mode === 'revision';
+  const isEditMode = mode === 'edit' || isRevisionMode;
   const [formData, setFormData] = useState({
     nama: editData?.nama_menu || '',
-    tanggal: editData?.date || new Date().toISOString().split('T')[0],
+    tanggal: editData?.date || editData?.tanggal || new Date().toISOString().split('T')[0],
     foto_url: editData?.foto_url || '',
     foto_data_url: '',
     foto_file_name: '',
-    bahan: buildInitialBahan(editData, nutritionItems)
+    bahan: buildInitialBahan(editData, nutritionItems),
+    notes: buildInitialNotes(editData)
   });
   const [requestForm, setRequestForm] = useState({ nama: '', kategori: 'lauk_sayur', catatan: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const photoPreview = formData.foto_data_url || api.assetUrl(formData.foto_url);
-  const activeIngredients = nutritionItems.filter(item => item.status !== 'retired');
-  const selectedIds = new Set(formData.bahan.map(b => String(b.id_nutrition)).filter(Boolean));
+  const activeIngredients = nutritionItems.filter((item) => item.status !== 'retired');
+  const selectedIds = new Set(formData.bahan.map((b) => String(b.id_nutrition)).filter(Boolean));
   const nutritionTotals = formData.bahan.reduce((totals, b) => {
-    const item = activeIngredients.find(ingredient => String(ingredient.id) === String(b.id_nutrition));
+    const item = activeIngredients.find((ingredient) => String(ingredient.id) === String(b.id_nutrition));
     const jumlah = parseNutrient(b.jumlah);
     if (!item || !jumlah) return totals;
     const factor = jumlah / 100;
@@ -91,7 +115,7 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
 
     const reader = new FileReader();
     reader.onload = () => {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         foto_data_url: reader.result,
         foto_file_name: file.name
@@ -101,7 +125,7 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
   };
 
   const clearPhoto = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       foto_url: '',
       foto_data_url: '',
@@ -110,35 +134,35 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
   };
 
   const addBahan = () => {
-    setFormData({ ...formData, bahan: [...formData.bahan, { id_nutrition: '', jumlah: '' }] });
+    setFormData((prev) => ({ ...prev, bahan: [...prev.bahan, { id_nutrition: '', jumlah: '' }] }));
   };
 
   const updateBahan = (index, field, value) => {
-    const newBahan = [...formData.bahan];
-    newBahan[index][field] = value;
-    setFormData({ ...formData, bahan: newBahan });
+    const nextBahan = [...formData.bahan];
+    nextBahan[index][field] = value;
+    setFormData((prev) => ({ ...prev, bahan: nextBahan }));
   };
 
   const removeBahan = (index) => {
-    const newBahan = formData.bahan.filter((_, i) => i !== index);
-    setFormData({ ...formData, bahan: newBahan });
+    const nextBahan = formData.bahan.filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, bahan: nextBahan }));
   };
 
-  const handleSubmit = () => {
-    if (!formData.nama || formData.bahan.some(b => !b.id_nutrition || !b.jumlah)) {
-      alert("Mohon lengkapi nama menu dan pilih semua bahan dari database nutrisi!");
+  const handleSubmit = async () => {
+    if (!formData.nama || formData.bahan.some((b) => !b.id_nutrition || !b.jumlah)) {
+      alert('Mohon lengkapi nama menu dan pilih semua bahan dari database nutrisi!');
       return;
     }
 
     const newEntry = {
-      id: editData?.id || Date.now(),
+      id: editData?.id || editData?.id_menu || Date.now(),
       nama_menu: formData.nama,
       date: formData.tanggal,
       foto_url: formData.foto_url,
       foto_data_url: formData.foto_data_url,
       foto_file_name: formData.foto_file_name,
-      bahan: formData.bahan.map(b => {
-        const item = activeIngredients.find(ingredient => String(ingredient.id) === String(b.id_nutrition));
+      bahan: formData.bahan.map((b) => {
+        const item = activeIngredients.find((ingredient) => String(ingredient.id) === String(b.id_nutrition));
         return {
           id_nutrition: item.id,
           nama: item.nama,
@@ -147,12 +171,26 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
           takaran: `~${b.jumlah} g`
         };
       }),
-      status_validasi: editData?.status_validasi || 'pending'
+      notes: normalizeVendorNotes(formData.notes),
+      status_validasi: isRevisionMode ? 'pending' : (editData?.status_validasi || 'pending')
     };
 
-    onSave(newEntry);
-    alert(editData ? "✅ Perubahan Menu Berhasil Disimpan!" : "✅ Menu Berhasil Diajukan ke Ahli Gizi untuk Verifikasi!");
-    onClose();
+    try {
+      setIsSubmitting(true);
+      await onSave(newEntry);
+      alert(
+        isRevisionMode
+          ? 'Perubahan revisi berhasil disimpan dan dikirim ulang ke Ahli Gizi.'
+          : isEditMode
+            ? 'Perubahan menu berhasil disimpan.'
+            : 'Menu berhasil diajukan ke Ahli Gizi untuk verifikasi.'
+      );
+      onClose();
+    } catch (err) {
+      alert(err.message || 'Gagal menyimpan menu.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRequestIngredient = async () => {
@@ -166,49 +204,65 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
   };
 
   return (
-    <Modal 
-      isOpen={isOpen} 
+    <Modal
+      isOpen={isOpen}
       onClose={onClose}
-      title={editData ? 'Edit Resep Menu' : 'Input Menu Baru'}
-      subtitle="Silakan masukkan rincian komposisi menu gizi secara mendetail."
+      title={isRevisionMode ? 'Revisi Menu Ditolak' : isEditMode ? 'Edit Resep Menu' : 'Input Menu Baru'}
+      subtitle={isRevisionMode ? 'Perbarui resep, catatan vendor, dan foto bila perlu lalu kirim ulang ke Ahli Gizi.' : 'Silakan masukkan rincian komposisi menu gizi secara mendetail.'}
       type="slide"
       width="576px"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '8px' }}>
-        {/* Menu Name & Date Section */}
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '16px', 
-          padding: '20px', 
-          background: '#f8fafc', 
-          borderRadius: '16px', 
-          border: '1px solid var(--border, #e2e8f0)' 
+        {isRevisionMode && (
+          <div style={{
+            padding: '18px 20px',
+            borderRadius: '18px',
+            background: '#fff7ed',
+            border: '1.5px solid #fdba74',
+            boxShadow: '0 12px 24px rgba(249, 115, 22, 0.08)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#c2410c', fontWeight: '950', marginBottom: '10px' }}>
+              <AlertCircle size={18} />
+              Permintaan Revisi Terbaru dari Ahli Gizi
+            </div>
+            <p style={{ margin: 0, color: '#9a3412', fontWeight: '750', lineHeight: '1.7', fontSize: '0.92rem' }}>
+              {revisionNote || 'Belum ada catatan revisi yang terekam, tetapi menu ini masih berstatus butuh revisi.'}
+            </p>
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          padding: '20px',
+          background: isRevisionMode ? '#fffaf5' : '#f8fafc',
+          borderRadius: '16px',
+          border: isRevisionMode ? '1px solid #fed7aa' : '1px solid var(--border, #e2e8f0)'
         }}>
-          <Input 
+          <Input
             label="NAMA MENU UTAMA"
             placeholder="Misal: Nasi Ayam Madu Sehat"
             value={formData.nama}
-            onChange={(e) => setFormData({...formData, nama: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
           />
-          <Input 
+          <Input
             label="TANGGAL PENYAJIAN TARGET"
             type="date"
             value={formData.tanggal}
-            onChange={(e) => setFormData({...formData, tanggal: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
           />
         </div>
 
-        {/* Photo Section */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '160px 1fr',
           gap: '16px',
           alignItems: 'stretch',
           padding: '20px',
-          background: '#f8fafc',
+          background: isRevisionMode ? '#fffaf5' : '#f8fafc',
           borderRadius: '16px',
-          border: '1px solid var(--border, #e2e8f0)'
+          border: isRevisionMode ? '1px solid #fed7aa' : '1px solid var(--border, #e2e8f0)'
         }}>
           <div style={{
             minHeight: '120px',
@@ -286,13 +340,53 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
           </div>
         </div>
 
-        {/* Bahan Section */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          padding: '20px',
+          background: isRevisionMode ? '#fffaf5' : '#f8fafc',
+          borderRadius: '16px',
+          border: isRevisionMode ? '1px solid #fed7aa' : '1px solid var(--border, #e2e8f0)'
+        }}>
+          <label style={{
+            fontSize: '0.8rem',
+            fontWeight: '800',
+            color: 'var(--text-muted, #64748b)',
+            letterSpacing: '0.5px'
+          }}>
+            CATATAN VENDOR
+          </label>
+          <textarea
+            placeholder="Tambahkan konteks untuk Ahli Gizi, misalnya teknik masak, bahan pengganti, atau alasan perubahan resep."
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            style={{
+              width: '100%',
+              minHeight: '110px',
+              padding: '14px',
+              borderRadius: '14px',
+              border: isRevisionMode ? '1.5px solid #fdba74' : '1.5px solid #e2e8f0',
+              background: 'white',
+              color: '#0f172a',
+              fontWeight: '650',
+              fontSize: '0.94rem',
+              fontFamily: 'inherit',
+              resize: 'vertical',
+              boxSizing: 'border-box'
+            }}
+          />
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem', fontWeight: '650', lineHeight: '1.5' }}>
+            Satu baris akan disimpan sebagai satu poin catatan vendor.
+          </p>
+        </div>
+
         <div>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: '16px' 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px'
           }}>
             <h3 style={{ fontWeight: '950', fontSize: '1.1rem', color: 'var(--text-main, #0f172a)', margin: 0 }}>
               Komposisi Bahan per Porsi
@@ -304,37 +398,37 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
           <p style={{ margin: '-8px 0 14px', color: '#64748b', fontSize: '0.85rem', fontWeight: '650', lineHeight: '1.45' }}>
             Pilih bahan yang sudah disetujui Ahli Gizi. Jumlah selalu dihitung dalam gram untuk satu porsi siswa.
           </p>
-          
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '12px', 
-            maxHeight: '400px', 
-            overflowY: 'auto', 
-            paddingRight: '8px' 
+
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            paddingRight: '8px'
           }}>
             {formData.bahan.map((b, i) => (
-              <div key={i} style={{ 
-                display: 'flex', 
-                gap: '12px', 
-                alignItems: 'flex-start', 
-                background: 'white', 
-                padding: '16px', 
-                borderRadius: '16px', 
-                border: '1px solid var(--border, #e2e8f0)', 
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)' 
+              <div key={i} style={{
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'flex-start',
+                background: 'white',
+                padding: '16px',
+                borderRadius: '16px',
+                border: '1px solid var(--border, #e2e8f0)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
               }}>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '1fr 120px', 
-                  gap: '12px', 
-                  flex: 1 
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 120px',
+                  gap: '12px',
+                  flex: 1
                 }}>
                   <Select
                     label="BAHAN TERVERIFIKASI"
                     options={[
                       { value: '', label: 'Pilih bahan...' },
-                      ...activeIngredients.map(item => ({
+                      ...activeIngredients.map((item) => ({
                         value: item.id,
                         label: `${item.nama} (${item.kategori})`,
                         disabled: selectedIds.has(String(item.id)) && String(item.id) !== String(b.id_nutrition)
@@ -343,7 +437,7 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
                     value={b.id_nutrition}
                     onChange={(e) => updateBahan(i, 'id_nutrition', e.target.value)}
                   />
-                  <Input 
+                  <Input
                     label="GRAM/PORSI"
                     type="number"
                     step="any"
@@ -353,7 +447,7 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
                   />
                 </div>
                 {formData.bahan.length > 1 && (
-                  <button 
+                  <button
                     onClick={() => removeBahan(i)}
                     style={{
                       marginTop: '28px',
@@ -432,13 +526,24 @@ export const AddMenuForm = ({ isOpen, onClose, onSave, editData, nutritionItems 
       </div>
 
       <div style={{ marginTop: '32px' }}>
-        <Button 
-          variant="primary" 
-          size="lg" 
-          style={{ width: '100%', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.2)' }}
+        <Button
+          variant={isRevisionMode ? 'danger' : 'primary'}
+          size="lg"
+          style={{
+            width: '100%',
+            boxShadow: isRevisionMode ? '0 10px 20px rgba(220, 38, 38, 0.18)' : '0 10px 15px -3px rgba(16, 185, 129, 0.2)',
+            opacity: isSubmitting ? 0.7 : 1
+          }}
           onClick={handleSubmit}
+          disabled={isSubmitting}
         >
-          {editData ? 'Simpan Perubahan Resep' : 'Selesaikan & Ajukan ke Ahli Gizi'}
+          {isSubmitting
+            ? 'Menyimpan...'
+            : isRevisionMode
+              ? 'Simpan Revisi & Kirim Ulang'
+              : isEditMode
+                ? 'Simpan Perubahan Resep'
+                : 'Selesaikan & Ajukan ke Ahli Gizi'}
         </Button>
       </div>
     </Modal>

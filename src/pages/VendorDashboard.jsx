@@ -89,6 +89,89 @@ const distribusiStatusMeta = {
   SELESAI: { background: "#e2e8f0", color: "#64748b" }
 }
 
+const dapurStatusMeta = {
+  approved: {
+    label: 'AKTIF',
+    background: 'var(--primary-light)',
+    color: 'var(--primary)',
+    helper: 'Siap dipakai untuk operasional.',
+  },
+  pending: {
+    label: 'PENDING',
+    background: 'var(--banana-light)',
+    color: 'var(--banana)',
+    helper: 'Menunggu verifikasi Pemerintah.',
+  },
+  rejected: {
+    label: 'DITOLAK',
+    background: '#fee2e2',
+    color: '#b91c1c',
+    helper: 'Belum boleh beroperasi.',
+  },
+}
+
+const parseNutrientValue = (value) => {
+  const parsed = parseFloat(String(value ?? '').replace(',', '.').replace(/[^0-9.-]/g, ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const parseJsonField = (value, fallback) => {
+  if (value === null || value === undefined || value === '') return fallback
+  if (typeof value !== 'string') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return fallback
+  }
+}
+
+const normalizeMenuIngredient = (item, nutritionMap) => {
+  const linkedItem = nutritionMap.get(String(item?.id_nutrition || ''))
+  const jumlah = parseNutrientValue(item?.jumlah ?? item?.berat ?? item?.takaran)
+  return {
+    ...item,
+    id_nutrition: item?.id_nutrition ?? null,
+    nama: linkedItem?.nama || item?.nama || 'Bahan tanpa nama',
+    jumlah,
+    satuan: item?.satuan || 'gram',
+    takaran: item?.takaran || (jumlah > 0 ? `~${jumlah} g` : '-')
+  }
+}
+
+const normalizeValidationLog = (log) => ({
+  ...log,
+  catatan: typeof log?.catatan === 'string' ? log.catatan.trim() : (log?.catatan || ''),
+})
+
+const attachValidationMetadata = (menu, validationLogs = []) => {
+  const menuId = menu.id_menu || menu.id
+  const logs = validationLogs
+    .filter((item) => (item.id_menu || item.id) === menuId)
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+
+  return {
+    ...menu,
+    validationLogs: logs,
+    latestValidationLog: logs[0] || null,
+    latestRejectedLog: logs.find((item) => item.aksi === 'rejected') || null,
+    latestApprovedLog: logs.find((item) => item.aksi === 'approved') || null,
+  }
+}
+
+const normalizeVendorMenu = (menu, nutritionMap, validationLogs = []) => {
+  const bahan = parseJsonField(menu?.bahan, [])
+  const nilaiGizi = parseJsonField(menu?.nilai_gizi, {})
+  const notes = parseJsonField(menu?.notes, [])
+  const normalizedMenu = {
+    ...menu,
+    bahan: Array.isArray(bahan) ? bahan.map((item) => normalizeMenuIngredient(item, nutritionMap)) : [],
+    nilai_gizi: nilaiGizi && typeof nilaiGizi === 'object' ? nilaiGizi : {},
+    notes: Array.isArray(notes) ? notes.filter(Boolean) : (typeof notes === 'string' && notes.trim() ? [notes.trim()] : [])
+  }
+
+  return attachValidationMetadata(normalizedMenu, validationLogs)
+}
+
 const Header = ({ title }) => (
   <div className="card dashboard-card-vibrant" style={{ 
     marginBottom: '1.5rem', 
@@ -428,60 +511,236 @@ const PdfModal = ({ doc, onClose }) => {
   )
 }
 
-const VisualAuditModal = ({ menu, onClose, onRevise }) => {
+const VisualAuditModal = ({ menu, onClose, onRevise, onEditRecipe }) => {
   if (!menu) return null;
 
   const bahan = Array.isArray(menu.bahan) ? menu.bahan : []
-  const leftBahan = bahan.slice(0, 3)
-  const rightBahan = bahan.slice(3, 5)
   const photoUrl = api.assetUrl(menu.foto_url)
+  const vendorNotes = Array.isArray(menu.notes) ? menu.notes : []
+  const latestRejectedLog = menu.latestRejectedLog
+  const latestValidationLog = menu.latestValidationLog
+  const latestApprovedLog = menu.latestApprovedLog
+  const isApproved = menu.status_validasi === 'approved'
+  const isRejected = menu.status_validasi === 'rejected'
+  const statusMeta = isApproved
+    ? { label: 'Menu Disahkan', background: 'var(--primary-light)', color: 'var(--primary)', border: '1.5px solid var(--primary)' }
+    : isRejected
+      ? { label: 'Butuh Revisi', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5' }
+      : { label: 'Menunggu Validasi', background: 'var(--banana-light)', color: 'var(--banana)', border: '1.5px solid var(--banana)' }
+  const validationTimeLabel = latestRejectedLog?.created_at
+    ? new Date(latestRejectedLog.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null
+  const approvalTimeLabel = latestApprovedLog?.created_at
+    ? new Date(latestApprovedLog.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null
+  const latestReviewTimeLabel = latestValidationLog?.created_at
+    ? new Date(latestValidationLog.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null
+  const nutritionRows = [
+    { label: 'Energi', value: menu.nilai_gizi?.energi || '-' },
+    { label: 'Protein', value: menu.nilai_gizi?.protein || '-' },
+    { label: 'Lemak', value: menu.nilai_gizi?.lemak || '-' },
+    { label: 'Karbohidrat', value: menu.nilai_gizi?.karbohidrat || '-' },
+    { label: 'Serat', value: menu.nilai_gizi?.serat || '-' },
+    { label: 'Natrium', value: menu.nilai_gizi?.natrium || '-' }
+  ]
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }} 
-      animate={{ opacity: 1 }} 
-      exit={{ opacity: 0 }} 
-      style={{ 
-        position: 'fixed', 
-        inset: 0, 
-        background: 'rgba(15, 23, 42, 0.95)', 
-        zIndex: 10000, 
-        display: 'grid', 
-        placeItems: 'center', 
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.95)',
+        zIndex: 10000,
+        display: 'grid',
+        placeItems: 'center',
         backdropFilter: 'blur(15px)',
         padding: '1rem',
         overflowY: 'auto'
       }}
     >
-      <motion.div 
-        initial={{ scale: 0.9, y: 30 }} 
+      <motion.div
+        initial={{ scale: 0.9, y: 30 }}
         animate={{ scale: 1, y: 0 }}
-        style={{ 
-          background: 'white', 
-          borderRadius: '16px', 
-          width: '100%', 
-          maxWidth: '700px', 
-          padding: '4rem', 
+        style={{
+          background: 'white',
+          borderRadius: '16px',
+          width: '100%',
+          maxWidth: '1120px',
+          padding: '2rem',
           position: 'relative',
           boxShadow: '0 50px 100px rgba(0,0,0,0.5)',
           border: '1px solid rgba(255,255,255,0.1)'
         }}
       >
-        <button 
-          onClick={onClose} 
-          style={{ position: 'absolute', top: '30px', right: '30px', background: '#f1f5f9', border: 'none', padding: '12px', borderRadius: '50%', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+        <button
+          onClick={onClose}
+          style={{ position: 'absolute', top: '24px', right: '24px', background: '#f1f5f9', border: 'none', padding: '12px', borderRadius: '50%', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
         >
           <X size={24} color="#64748b" />
         </button>
 
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-           <h2 style={{ fontSize: '2.4rem', fontWeight: '950', color: '#1e293b', marginBottom: '10px', letterSpacing: '-1px' }}>Informasi Nilai Gizi</h2>
-           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px' }}>
-              <span style={{ fontWeight: '900', fontSize: '1.4rem', color: '#475569' }}>Menu MBG</span>
-              <div style={{ background: '#E11D48', color: 'white', padding: '8px 25px', borderRadius: '12px', fontWeight: '950', fontSize: '1.4rem' }}>Makanan Bergizi Gratis</div>
-           </div>
+        <div style={{ marginBottom: '1.4rem', paddingRight: '3.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ margin: 0, fontSize: '0.78rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                {isApproved ? 'Detail Menu Disetujui' : isRejected ? 'Laporan Revisi Vendor' : 'Detail Audit Menu'}
+              </p>
+              <h2 style={{ fontSize: '2.1rem', fontWeight: '950', color: '#0f172a', margin: '0.35rem 0 0', letterSpacing: '-0.04em' }}>{menu.nama_menu}</h2>
+              <p style={{ margin: '0.45rem 0 0', color: '#64748b', fontWeight: '700', fontSize: '0.92rem' }}>
+                {menu.nama_vendor || 'Vendor terdaftar'} - {menu.tanggal || menu.date || '-'}
+              </p>
+            </div>
+            <div style={{ padding: '0.7rem 1rem', borderRadius: '999px', background: statusMeta.background, color: statusMeta.color, border: statusMeta.border, fontWeight: '900', fontSize: '0.8rem', textTransform: 'uppercase' }}>
+              {statusMeta.label}
+            </div>
+          </div>
         </div>
 
+        <div className="vendor-audit-modal-layout">
+          <div className="vendor-audit-media-column">
+            <div style={{ minHeight: '430px', height: '100%', borderRadius: '24px', border: '1.5px solid #dbe5f0', background: '#f8fafc', overflow: 'hidden', boxShadow: '0 24px 50px -24px rgba(15, 23, 42, 0.45)' }}>
+              {photoUrl ? (
+                <img src={photoUrl} alt={`Foto ${menu.nama_menu}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', minHeight: '430px', display: 'grid', placeItems: 'center', textAlign: 'center', padding: '2rem', color: '#64748b', fontWeight: '850', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' }}>
+                  Vendor belum mengunggah foto menu.
+                </div>
+              )}
+            </div>
+            <div style={{ padding: '1.1rem', borderRadius: '18px', border: '1.5px solid #e2e8f0', background: 'white' }}>
+              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Catatan Vendor</p>
+              {vendorNotes.length > 0 ? (
+                <ul style={{ margin: '0.65rem 0 0', paddingLeft: '1.15rem', color: '#334155', fontWeight: '750', fontSize: '0.9rem', lineHeight: '1.7' }}>
+                  {vendorNotes.map((note, index) => <li key={index}>{note}</li>)}
+                </ul>
+              ) : (
+                <p style={{ margin: '0.6rem 0 0', color: '#64748b', fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.6' }}>
+                  Belum ada catatan dari vendor.
+                </p>
+              )}
+            </div>
+            <div style={{ padding: '0.95rem 1rem', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <p style={{ margin: 0, color: '#64748b', fontWeight: '800', fontSize: '0.82rem', lineHeight: '1.5' }}>
+                Sumber laporan: unggahan vendor TRAKSI dan hasil validasi Ahli Gizi terbaru.
+              </p>
+            </div>
+          </div>
+
+          <div className="vendor-audit-sidebar">
+            <div style={{ padding: '1rem 1.1rem', borderRadius: '18px', border: '1.5px solid #e2e8f0', background: 'white' }}>
+              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status Review</p>
+              <p style={{ margin: '0.35rem 0 0', fontSize: '1.05rem', fontWeight: '900', color: '#0f172a' }}>
+                {latestReviewTimeLabel ? `Review terakhir ${latestReviewTimeLabel}` : 'Belum ada histori review'}
+              </p>
+            </div>
+
+            <div style={{
+              padding: '1.1rem',
+              borderRadius: '18px',
+              border: isApproved ? '1.5px solid #bbf7d0' : '1.5px solid #fecaca',
+              background: isApproved ? '#f0fdf4' : '#fff7f7'
+            }}>
+              <p style={{
+                margin: 0,
+                fontSize: '0.75rem',
+                fontWeight: '900',
+                color: isApproved ? '#15803d' : '#b91c1c',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                {isApproved ? 'Status Persetujuan Ahli Gizi' : 'Revisi Terakhir Ahli Gizi'}
+              </p>
+              <p style={{
+                margin: '0.55rem 0 0',
+                fontSize: '0.95rem',
+                fontWeight: '800',
+                color: isApproved ? '#166534' : '#7f1d1d',
+                lineHeight: '1.7'
+              }}>
+                {isApproved
+                  ? latestApprovedLog?.catatan || 'Menu ini sudah lolos validasi dan siap digunakan untuk operasional produksi.'
+                  : latestRejectedLog?.catatan || 'Belum ada pesan revisi dari Ahli Gizi untuk menu ini.'}
+              </p>
+              {isApproved && approvalTimeLabel && (
+                <p style={{ margin: '0.7rem 0 0', fontSize: '0.76rem', color: '#15803d', fontWeight: '700' }}>
+                  Disahkan: {approvalTimeLabel}
+                </p>
+              )}
+              {!isApproved && validationTimeLabel && (
+                <p style={{ margin: '0.7rem 0 0', fontSize: '0.76rem', color: '#b91c1c', fontWeight: '700' }}>
+                  Dikirim: {validationTimeLabel}
+                </p>
+              )}
+            </div>
+
+            <div style={{ padding: '1.1rem', borderRadius: '18px', border: '1.5px solid #dbe5f0', background: 'white', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ringkasan Nilai Gizi</p>
+              <div className="vendor-audit-nutrition-grid" style={{ marginTop: '0.2rem' }}>
+                {nutritionRows.map((row) => (
+                  <div key={row.label} style={{ padding: '0.85rem 0', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                    <span style={{ color: '#64748b', fontWeight: '800', fontSize: '0.88rem' }}>{row.label}</span>
+                    <span style={{ color: '#0f172a', fontWeight: '900', fontSize: '0.92rem', textAlign: 'right' }}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ padding: '1.1rem', borderRadius: '18px', border: '1.5px solid #dbe5f0', background: 'white', height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bahan Menu</p>
+              <div style={{ display: 'grid', gap: '0.7rem', marginTop: '0.75rem', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                {bahan.length > 0 ? bahan.map((item, index) => (
+                  <div key={`${item.nama}-${index}`} style={{ padding: '0.8rem 0.9rem', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'center' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: '900', color: '#0f172a', fontSize: '0.9rem', lineHeight: '1.35' }}>{item.nama}</p>
+                      <p style={{ margin: '0.2rem 0 0', fontWeight: '700', color: '#64748b', fontSize: '0.8rem' }}>{item.takaran || '-'}</p>
+                    </div>
+                    <span style={{ flexShrink: 0, padding: '4px 8px', borderRadius: '999px', background: item.id_nutrition ? '#dcfce7' : '#ffedd5', color: item.id_nutrition ? '#15803d' : '#c2410c', fontWeight: '900', fontSize: '0.68rem', textTransform: 'uppercase' }}>
+                      {item.id_nutrition ? 'DB Match' : 'Cek DB'}
+                    </span>
+                  </div>
+                )) : (
+                  <p style={{ margin: 0, color: '#64748b', fontWeight: '700', fontSize: '0.9rem' }}>Belum ada daftar bahan.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={onClose}
+            style={{ flex: '1 1 220px', padding: '1rem 1.2rem', borderRadius: '18px', border: '2px solid #e2e8f0', background: 'white', fontWeight: '900', color: '#64748b', cursor: 'pointer' }}
+          >
+            Tutup Laporan
+          </button>
+          {isRejected ? (
+            <button
+              onClick={() => { onRevise(menu); onClose(); }}
+              style={{ flex: '1 1 280px', padding: '1rem 1.2rem', borderRadius: '18px', border: 'none', background: '#dc2626', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: '0 10px 25px rgba(220, 38, 38, 0.2)' }}
+            >
+              Revisi Sekarang
+            </button>
+          ) : (
+            <button
+              onClick={() => { onEditRecipe(menu); onClose(); }}
+              style={{ flex: '1 1 280px', padding: '1rem 1.2rem', borderRadius: '18px', border: 'none', background: isApproved ? '#16a34a' : 'var(--primary)', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: isApproved ? '0 10px 25px rgba(22, 163, 74, 0.2)' : '0 10px 25px rgba(14, 165, 233, 0.2)' }}
+            >
+              {isApproved ? 'Edit Resep Menu' : 'Perbarui Menu'}
+            </button>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+
+  if (false) return (
+    <>
+      <motion.div>
+        <motion.div>
         {/* Tray Visual Section */}
         <div style={{ position: 'relative', height: '380px', width: '100%', margin: '0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1.5rem' }}>
            {/* Annotations Left */}
@@ -580,6 +839,7 @@ const VisualAuditModal = ({ menu, onClose, onRevise }) => {
         </div>
       </motion.div>
     </motion.div>
+    </>
   )
 }
 
@@ -674,11 +934,17 @@ const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah, onNotify }) =>
               <select 
                 value={formData.id_dapur} 
                 onChange={e => setFormData({...formData, id_dapur: e.target.value})}
+                disabled={dapurs.length === 0}
                 style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
               >
-                <option value="" disabled>Pilih Dapur</option>
+                <option value="" disabled>{dapurs.length === 0 ? 'Belum ada dapur approved' : 'Pilih Dapur'}</option>
                 {dapurs.map(d => <option key={d.id_dapur || d.id} value={d.id_dapur || d.id}>{d.lokasi}</option>)}
               </select>
+              {dapurs.length === 0 && (
+                <p style={{ fontSize: '0.75rem', color: '#92400e', fontWeight: '700', marginTop: '0.45rem' }}>
+                  Produksi baru bisa dibuat setelah ada dapur yang disetujui Pemerintah.
+                </p>
+              )}
             </div>
             <div>
               <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PILIH MENU (APPROVED)</label>
@@ -741,6 +1007,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [showAddForm, setShowAddForm] = useState(false)
   const [showMenuForm, setShowMenuForm] = useState(false)
   const [editingMenu, setEditingMenu] = useState(null)
+  const [menuFormMode, setMenuFormMode] = useState('create')
   const [activeDoc, setActiveDoc] = useState(null)
   const [selectedAuditMenu, setSelectedAuditMenu] = useState(null)
   const [selectedDapurForStok, setSelectedDapurForStok] = useState(() => localStorage.getItem('selectedDapurForStok') || null)
@@ -771,12 +1038,35 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [sekolah, setSekolah] = useState([])
   const [mappingData, setMappingData] = useState([])
   const [nutritionItems, setNutritionItems] = useState([])
+  const [validationLogs, setValidationLogs] = useState([])
   const [loading, setLoading] = useState(true)
+  const approvedDapurs = dapurs.filter((d) => d.status_verifikasi === 'approved')
+
+  const buildVendorMenus = (rawMenus = [], activeNutritionItems = [], rawValidationLogs = [], vendorId = null) => {
+    const nutritionMap = new Map(activeNutritionItems.map((item) => [String(item.id), item]))
+    const normalizedLogs = Array.isArray(rawValidationLogs) ? rawValidationLogs.map(normalizeValidationLog) : []
+    return rawMenus
+      .filter((item) => item.id_vendor === vendorId)
+      .map((item) => normalizeVendorMenu(item, nutritionMap, normalizedLogs))
+  }
+
+  const refreshVendorMenus = async (vendorId = currentVendor?.id_vendor, activeNutritionItems = nutritionItems) => {
+    if (!vendorId) return
+    const [allMenus, logs] = await Promise.all([api.getMenus(), api.getValidasiLog()])
+    const nextLogs = Array.isArray(logs) ? logs.map(normalizeValidationLog) : []
+    const nextMenus = buildVendorMenus(Array.isArray(allMenus) ? allMenus : [], activeNutritionItems, nextLogs, vendorId)
+    setValidationLogs(nextLogs)
+    setMenus(nextMenus)
+    setSelectedAuditMenu((current) => {
+      if (!current) return null
+      return nextMenus.find((item) => (item.id_menu || item.id) === (current.id_menu || current.id)) || null
+    })
+  }
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [vendor, d, m, prod, dist, sek, mappings, nutrition] = await Promise.all([
+        const [vendor, d, m, prod, dist, sek, mappings, nutrition, logs] = await Promise.all([
           api.getVendorByUser(user.id_user),
           api.getDapur(),
           api.getMenus(),
@@ -784,11 +1074,14 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
           api.getDistribusi(),
           api.getSekolah(),
           api.getMapping(),
-          api.getNutrition()
+          api.getNutrition(),
+          api.getValidasiLog()
         ])
         const vendorDapurs = d.filter(item => item.id_vendor === vendor.id_vendor)
         const vendorDapurIds = new Set(vendorDapurs.map(item => item.id_dapur))
-        const vendorMenus = m.filter(item => item.id_vendor === vendor.id_vendor)
+        const activeNutritionItems = Array.isArray(nutrition) ? nutrition.filter(item => item.status !== 'retired') : []
+        const normalizedLogs = Array.isArray(logs) ? logs.map(normalizeValidationLog) : []
+        const vendorMenus = buildVendorMenus(Array.isArray(m) ? m : [], activeNutritionItems, normalizedLogs, vendor.id_vendor)
         const vendorProduksi = prod.filter(item => vendorDapurIds.has(item.id_dapur))
         const vendorProduksiIds = new Set(vendorProduksi.map(item => item.id_produksi))
         const vendorDistribusi = dist.filter(item => vendorProduksiIds.has(item.id_produksi))
@@ -810,7 +1103,8 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
         setDistribusi(vendorDistribusi)
         setSekolah(vendorSekolah)
         setMappingData(vendorMappings)
-        setNutritionItems(Array.isArray(nutrition) ? nutrition.filter(item => item.status !== 'retired') : [])
+        setNutritionItems(activeNutritionItems)
+        setValidationLogs(normalizedLogs)
       } catch (err) {
         console.error('Failed to fetch data:', err)
         setCurrentVendor(null)
@@ -822,6 +1116,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
         setSekolah([])
         setMappingData([])
         setNutritionItems([])
+        setValidationLogs([])
       } finally {
         setLoading(false)
       }
@@ -832,23 +1127,39 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   }, [user?.id_user])
 
   useEffect(() => {
-    if (dapurs.length > 0 && !selectedDapurForStok) {
+    if (approvedDapurs.length > 0 && !selectedDapurForStok) {
       const saved = localStorage.getItem('selectedDapurForStok')
-      if (saved && dapurs.some(d => (d.id_dapur || d.id || '').toString() === saved.toString())) {
+      if (saved && approvedDapurs.some(d => (d.id_dapur || d.id || '').toString() === saved.toString())) {
         setSelectedDapurForStok(saved)
       } else {
-        const firstId = dapurs[0].id_dapur || dapurs[0].id
+        const firstId = approvedDapurs[0].id_dapur || approvedDapurs[0].id
         setSelectedDapurForStok(firstId.toString())
         localStorage.setItem('selectedDapurForStok', firstId.toString())
       }
+      return
     }
-  }, [dapurs, selectedDapurForStok])
+    if (approvedDapurs.length === 0) {
+      setSelectedDapurForStok(null)
+      setStokData([])
+      setStokHistory([])
+      localStorage.removeItem('selectedDapurForStok')
+      return
+    }
+    if (selectedDapurForStok && !approvedDapurs.some((d) => (d.id_dapur || d.id || '').toString() === selectedDapurForStok.toString())) {
+      const firstId = approvedDapurs[0].id_dapur || approvedDapurs[0].id
+      setSelectedDapurForStok(firstId.toString())
+      localStorage.setItem('selectedDapurForStok', firstId.toString())
+    }
+  }, [approvedDapurs, selectedDapurForStok])
 
   useEffect(() => {
     if (selectedDapurForStok) {
       api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
       api.getStokHistory(selectedDapurForStok).then(setStokHistory).catch(console.error)
+      return
     }
+    setStokData([])
+    setStokHistory([])
   }, [selectedDapurForStok])
 
   const [formBahan, setFormBahan] = useState('')
@@ -892,7 +1203,10 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
       if (!currentVendor) throw new Error('Vendor tidak ditemukan untuk user yang sedang login.')
       const created = await api.createDapur({ id_vendor: currentVendor.id_vendor, lokasi: newDapur.lokasi, kapasitas_produksi: newDapur.kapasitas_produksi || newDapur.kapasitas_production })
       setDapurs(prev => [...prev, { ...created, id: created.id_dapur }])
-    } catch (err) { console.error(err) }
+    } catch (err) {
+      console.error(err)
+      throw err
+    }
   }
 
   const handleDeleteDapur = async (id) => {
@@ -908,6 +1222,24 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
     name: 'Kendari',
     url: "https://maps.google.com/maps?q=Kendari&output=embed"
   })
+
+  const closeMenuForm = () => {
+    setShowMenuForm(false)
+    setEditingMenu(null)
+    setMenuFormMode('create')
+  }
+
+  const openCreateMenuForm = () => {
+    setEditingMenu(null)
+    setMenuFormMode('create')
+    setShowMenuForm(true)
+  }
+
+  const openEditMenuForm = (menu) => {
+    setEditingMenu(menu)
+    setMenuFormMode('edit')
+    setShowMenuForm(true)
+  }
 
   const handleAddMenu = async (newMenu) => {
     try {
@@ -925,7 +1257,9 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
           nama_menu: newMenu.nama_menu,
           bahan: newMenu.bahan,
           foto_url: fotoUrl,
-          tanggal: newMenu.date || newMenu.tanggal
+          tanggal: newMenu.date || newMenu.tanggal,
+          notes: newMenu.notes,
+          status_validasi: newMenu.status_validasi
         })
       } else {
         if (!currentVendor) throw new Error('Vendor tidak ditemukan untuk user yang sedang login.')
@@ -934,14 +1268,17 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
           nama_menu: newMenu.nama_menu,
           bahan: newMenu.bahan,
           foto_url: fotoUrl,
-          tanggal: newMenu.date || newMenu.tanggal || new Date().toISOString().split('T')[0]
+          tanggal: newMenu.date || newMenu.tanggal || new Date().toISOString().split('T')[0],
+          notes: newMenu.notes
         })
       }
-      api.getMenus().then(allMenus => {
-        setMenus(allMenus.filter(item => item.id_vendor === currentVendor?.id_vendor))
-      }).catch(console.error)
+      await refreshVendorMenus(currentVendor?.id_vendor, nutritionItems)
       setEditingMenu(null)
-    } catch (err) { console.error(err) }
+      setMenuFormMode('create')
+    } catch (err) {
+      console.error(err)
+      throw err
+    }
   }
 
   const handleRequestIngredient = async (requestData) => {
@@ -1110,6 +1447,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
 
   const handleReviseMenu = (menu) => {
     setEditingMenu(menu)
+    setMenuFormMode('revision')
     setShowMenuForm(true)
     navigate('/vendor/menu')
   }
@@ -1118,14 +1456,17 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   
   const stats = [
     { title: "Dashboard", value: "MBG Centre", icon: <LayoutDashboard />, color: "var(--primary)" },
-    { title: "Dapur Operasional", value: dapurs.length.toString(), icon: <Store />, color: "var(--secondary)" },
+    { title: "Dapur Operasional", value: approvedDapurs.length.toString(), icon: <Store />, color: "var(--secondary)" },
     { title: "Varian Menu Gizi", value: menus.length.toString(), icon: <UtensilsCrossed />, color: "var(--banana)" }
   ]
+  const approvedMenus = menus.filter((menu) => menu.status_validasi === 'approved')
+  const pendingMenus = menus.filter((menu) => menu.status_validasi === 'pending')
+  const rejectedMenus = menus.filter((menu) => menu.status_validasi === 'rejected')
 
   const prodList = [
-    { school: "SDN 01 Menteng", menuName: "Nasi Ayam Bakar", status: "DISTRIBUSI", date: "14 Mar 2026" },
-    { school: "SMPN 02 Jakarta", menuName: "Nasi Goreng Sehat", status: "PRODUKSI", date: "14 Mar 2026" },
-    { school: "SDN 03 Tebet", menuName: "Soto Ayam", status: "SELESAI", date: "13 Mar 2026" }
+    { school: "SDN 02 Mandonga", menuName: "Nasi Ayam Tempe", status: "DISTRIBUSI", date: "14 Mar 2026" },
+    { school: "SMPN 05 Kendari", menuName: "Nasi Ikan Kembung", status: "PRODUKSI", date: "14 Mar 2026" },
+    { school: "SDN 08 Kadia", menuName: "Soto Ayam", status: "SELESAI", date: "13 Mar 2026" }
   ]
 
   const renderContent = () => {
@@ -1151,13 +1492,31 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
             </button>
           </div>
           <div style={{ display: 'grid', gap: '1rem' }}>
-            {dapurs.map((d, i) => (
-              <div key={i} style={{ padding: '1.5rem', background: 'var(--bg)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(0,0,0,0.05)' }}>
+            {dapurs.length === 0 && (
+              <div style={{ padding: '1.5rem', background: 'var(--bg)', borderRadius: '12px', border: '1px dashed var(--border)', color: 'var(--text-muted)', fontWeight: '700', textAlign: 'center' }}>
+                Belum ada dapur terdaftar.
+              </div>
+            )}
+            {dapurs.map((d, i) => {
+              const statusMeta = dapurStatusMeta[d.status_verifikasi || 'pending'] || dapurStatusMeta.pending
+              return (
+              <div key={i} style={{ padding: '1.5rem', background: 'var(--bg)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(0,0,0,0.05)', gap: '1rem' }}>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                   <div style={{ background: 'white', padding: '12px', borderRadius: '15px' }}><Store color="var(--primary)" size={24} /></div>
                   <div>
                     <h4 style={{ fontWeight: '900' }}>Dapur {d.lokasi}</h4>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: D-00{(d.id_dapur || d.id || 0).toString().slice(-3)} | Kapasitas: {d.kapasitas_produksi} Porsi/Hari</p>
+                    <p style={{ fontSize: '0.75rem', color: statusMeta.color, fontWeight: '800', marginTop: '0.35rem' }}>{statusMeta.helper}</p>
+                    {d.review_note && (
+                      <p style={{ fontSize: '0.75rem', color: '#7f1d1d', fontWeight: '700', marginTop: '0.35rem' }}>
+                        Catatan Pemerintah: {d.review_note}
+                      </p>
+                    )}
+                    {d.reviewed_at && (
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '700', marginTop: '0.3rem' }}>
+                        Ditinjau {new Date(d.reviewed_at).toLocaleDateString('id-ID')} {d.reviewed_by_name ? `oleh ${d.reviewed_by_name}` : ''}
+                      </p>
+                    )}
                     {d.hash && (
                       <p style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: '800', fontFamily: 'monospace', marginTop: '4px' }}>
                         🔗 LEDGER HASH: {d.hash}
@@ -1166,12 +1525,14 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <span className="badge" style={{ background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: '900', marginBottom: '5px', display: 'inline-block' }}>AKTIF</span>
-                    <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--primary)' }}>• Monitoring Live</p>
+                  <div style={{ textAlign: 'right', maxWidth: '220px' }}>
+                    <span className="badge" style={{ background: statusMeta.background, color: statusMeta.color, fontWeight: '900', marginBottom: '5px', display: 'inline-block' }}>{statusMeta.label}</span>
+                    <p style={{ fontSize: '0.75rem', fontWeight: '800', color: statusMeta.color }}>
+                      {d.status_verifikasi === 'approved' ? 'Siap untuk stok, mapping, dan produksi' : 'Belum bisa dipakai untuk operasional'}
+                    </p>
                   </div>
                   <button 
-                    onClick={() => handleDeleteDapur(d.id)}
+                    onClick={() => handleDeleteDapur(d.id_dapur || d.id)}
                     style={{ background: '#fff5f5', color: '#ff4d4d', border: '1px solid #ffe3e3', padding: '12px', borderRadius: '15px', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
                     title="Hapus / Non-aktifkan Dapur"
                   >
@@ -1179,7 +1540,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                   </button>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
 
@@ -1246,6 +1607,98 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
             })}
           </div>
         </div>
+
+        <div className="vendor-approved-section">
+          <div className="vendor-approved-header">
+            <div>
+              <div className="vendor-approved-eyebrow">
+                <ClipboardCheck size={16} />
+                Siap Operasional
+              </div>
+              <h3 style={{ fontWeight: '950', fontSize: '1.8rem', color: '#0f172a', margin: '0.45rem 0 0.35rem', letterSpacing: '-0.03em' }}>
+                Menu Siap Diproduksi
+              </h3>
+              <p style={{ margin: 0, color: '#475569', fontWeight: '700', lineHeight: '1.7', maxWidth: '720px' }}>
+                Katalog ini memuat menu yang sudah di-approve Ahli Gizi dan siap dipakai untuk perencanaan batch produksi vendor.
+              </p>
+            </div>
+            <div className="vendor-approved-summary">
+              <span>{approvedMenus.length}</span>
+              menu approved
+            </div>
+          </div>
+
+          {approvedMenus.length > 0 ? (
+            <div className="vendor-approved-grid">
+              {approvedMenus.map((menu, index) => (
+                <motion.div
+                  key={menu.id_menu || menu.id || index}
+                  className="vendor-approved-card"
+                  whileHover={{ y: -4, scale: 1.01 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="vendor-approved-card-top">
+                    <span className="vendor-approved-badge">
+                      <CheckCircle2 size={14} />
+                      APPROVED
+                    </span>
+                    <span className="vendor-approved-date">{menu.tanggal || menu.date || 'Tanggal belum diisi'}</span>
+                  </div>
+
+                  <div>
+                    <h4 className="vendor-approved-title">{menu.nama_menu}</h4>
+                    <p className="vendor-approved-copy">
+                      Sudah lolos validasi gizi dan siap dipakai sebagai referensi menu produksi berikutnya.
+                    </p>
+                  </div>
+
+                  <div className="vendor-approved-ingredients">
+                    {menu.bahan.slice(0, 4).map((bahan, bahanIndex) => (
+                      <span key={`${bahan.nama}-${bahanIndex}`} className="vendor-approved-chip">{bahan.nama}</span>
+                    ))}
+                    {menu.bahan.length > 4 && (
+                      <span className="vendor-approved-more">+{menu.bahan.length - 4} bahan lainnya</span>
+                    )}
+                  </div>
+
+                  <div className="vendor-approved-meta">
+                    <span>
+                      {menu.latestApprovedLog?.created_at
+                        ? `Disahkan ${new Date(menu.latestApprovedLog.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                        : 'Approval tercatat'}
+                    </span>
+                    <span>{menu.nilai_gizi?.energi || '-'} energi</span>
+                  </div>
+
+                  <div className="vendor-approved-actions">
+                    <button
+                      onClick={() => setSelectedAuditMenu(menu)}
+                      className="vendor-approved-primary"
+                    >
+                      Lihat Detail
+                    </button>
+                    <button
+                      onClick={() => openEditMenuForm(menu)}
+                      className="vendor-approved-secondary"
+                    >
+                      Edit Resep
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="vendor-approved-empty">
+              <Archive size={28} color="#94a3b8" />
+              <div>
+                <p style={{ margin: 0, color: '#0f172a', fontWeight: '900' }}>Belum ada menu siap diproduksi.</p>
+                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontWeight: '700', lineHeight: '1.6' }}>
+                  Menu yang sudah lolos validasi Ahli Gizi akan muncul di katalog ini setelah statusnya approved.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     )
 
@@ -1259,11 +1712,17 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
              <select 
                value={selectedDapurForStok || ''} 
                onChange={(e) => setSelectedDapurForStok(e.target.value)}
+               disabled={approvedDapurs.length === 0}
                style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid var(--border)', fontWeight: '700', fontSize: '1.1rem' }}
              >
-               <option value="" disabled>-- Pilih Dapur --</option>
-               {dapurs.map(d => <option key={d.id_dapur || d.id} value={d.id_dapur || d.id}>Dapur {d.lokasi}</option>)}
+               <option value="" disabled>{approvedDapurs.length === 0 ? '-- Belum ada dapur approved --' : '-- Pilih Dapur --'}</option>
+               {approvedDapurs.map(d => <option key={d.id_dapur || d.id} value={d.id_dapur || d.id}>Dapur {d.lokasi}</option>)}
              </select>
+             {approvedDapurs.length === 0 && (
+               <p style={{ marginTop: '0.6rem', fontSize: '0.8rem', color: '#92400e', fontWeight: '700' }}>
+                 Stok hanya bisa dikelola dari dapur yang sudah disetujui Pemerintah.
+               </p>
+             )}
            </div>
            
            {selectedDapurForStok ? (
@@ -1683,11 +2142,13 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
           {showMenuForm && (
             <AddMenuForm
               isOpen={true}
-              onClose={() => { setShowMenuForm(false); setEditingMenu(null); }}
+              onClose={closeMenuForm}
               onSave={handleAddMenu}
               editData={editingMenu}
               nutritionItems={nutritionItems}
               onRequestIngredient={handleRequestIngredient}
+              mode={menuFormMode}
+              revisionNote={menuFormMode === 'revision' ? editingMenu?.latestRejectedLog?.catatan || '' : ''}
             />
           )}
         </AnimatePresence>
@@ -1724,7 +2185,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
             <motion.button 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setShowMenuForm(true)}
+              onClick={openCreateMenuForm}
               style={{ 
                 background: 'white', 
                 color: '#064e3b', 
@@ -1758,7 +2219,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
             </h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {menus.filter(m => m.status_validasi === 'pending').map((m, i) => (
+              {pendingMenus.map((m, i) => (
                 <div key={i} className="card" style={{ padding: '1.5rem', borderRadius: '12px', border: '1.5px solid var(--border)', background: '#f8fafc' }}>
                    <div className="flex justify-between" style={{ marginBottom: '12px', alignItems: 'flex-start' }}>
                       <h4 style={{ fontWeight: '950', fontSize: '1.15rem', color: 'var(--text-main)' }}>{m.nama_menu}</h4>
@@ -1770,7 +2231,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                    </div>
                    <div className="flex justify-end" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
                       <button 
-                        onClick={() => { setEditingMenu(m); setShowMenuForm(true); }}
+                        onClick={() => openEditMenuForm(m)}
                         style={{ color: 'var(--primary)', background: 'var(--primary-light)', padding: '8px 16px', borderRadius: '10px', border: 'none', fontWeight: '900', cursor: 'pointer', transition: '0.2s' }}
                         onMouseOver={(e)=>e.currentTarget.style.filter='brightness(0.95)'} onMouseOut={(e)=>e.currentTarget.style.filter='none'}
                       >
@@ -1779,7 +2240,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                    </div>
                 </div>
               ))}
-              {menus.filter(m => m.status_validasi === 'pending').length === 0 && (
+              {pendingMenus.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '2rem 1rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                   <CheckCircle color="#94a3b8" size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
                   <p style={{ color: '#64748b', fontWeight: '700' }}>Antrian bersih, tidak ada menu pending.</p>
@@ -1798,7 +2259,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
             </h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {menus.filter(m => m.status_validasi === 'rejected').map((m, i) => (
+              {rejectedMenus.map((m, i) => (
                 <motion.div 
                   whileHover={{ scale: 1.01, translateY: -2 }}
                   key={i} 
@@ -1813,8 +2274,11 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                    <p style={{ fontSize: '0.9rem', color: '#7f1d1d', fontWeight: '700', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                      <Search size={14} /> Klik untuk melihat catatan audit Ahli Gizi
                    </p>
+                   <p style={{ fontSize: '0.82rem', color: '#991b1b', fontWeight: '700', margin: '-0.8rem 0 1.1rem', lineHeight: '1.5' }}>
+                     {m.latestRejectedLog?.catatan || 'Belum ada pesan revisi yang terekam.'}
+                   </p>
                    <div className="flex justify-between" style={{ borderTop: '1px solid #fecaca', paddingTop: '1rem', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.8rem', color: '#b91c1c', fontWeight: '800' }}>Terdeteksi: {m.date}</span>
+                      <span style={{ fontSize: '0.8rem', color: '#b91c1c', fontWeight: '800' }}>Terdeteksi: {m.tanggal || m.date || '-'}</span>
                       <button 
                         style={{ color: '#dc2626', background: 'none', border: 'none', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
                       >
@@ -1823,7 +2287,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                    </div>
                 </motion.div>
               ))}
-              {menus.filter(m => m.status_validasi === 'rejected').length === 0 && (
+              {rejectedMenus.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '2rem 1rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                   <CheckCircle2 color="#10b981" size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
                   <p style={{ color: '#64748b', fontWeight: '700' }}>Hebat! Tidak ada menu yang butuh revisi saat ini.</p>
@@ -1924,7 +2388,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
               <AddTicketForm 
                 onClose={() => setShowTicketForm(false)} 
                 onSave={handleCreateProduksiTicket} 
-                dapurs={dapurs} 
+                dapurs={approvedDapurs} 
                 menus={menus} 
                 sekolah={sekolah} 
                 onNotify={triggerToast}
@@ -1994,7 +2458,8 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
               <button 
                 onClick={() => setShowTicketForm(true)}
                 className="btn-primary" 
-                style={{ padding: '0.8rem 1.5rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                disabled={approvedDapurs.length === 0 || approvedMenus.length === 0}
+                style={{ padding: '0.8rem 1.5rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '800', cursor: approvedDapurs.length === 0 || approvedMenus.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: approvedDapurs.length === 0 || approvedMenus.length === 0 ? 0.6 : 1 }}
               >
                 <Plus size={18} /> Buat Tiket Produksi Baru
               </button>
@@ -2069,7 +2534,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
              <MapPin color="var(--primary)" size={18} />
              <span style={{ fontWeight: '950', fontSize: '0.85rem', color: 'var(--text-muted)' }}>QUICK JUMP:</span>
              <div style={{ display: 'flex', gap: '8px' }}>
-               {['Jakarta', 'Kendari', 'Makassar', 'Surabaya'].map(city => (
+               {['Kendari', 'Mandonga', 'Kadia', 'Poasia'].map(city => (
                  <button 
                    key={city}
                    onClick={() => setActiveHub({ name: city, url: `https://maps.google.com/maps?q=${city}&output=embed` })}
@@ -2244,7 +2709,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
       </AnimatePresence>
       {isMain ? (
         <>
-          <WelcomeBanner name="Vendor Jakarta Timur" />
+          <WelcomeBanner name={currentVendor?.nama_vendor || user?.name || 'Vendor MBG'} />
 
           <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: '1rem', marginBottom: '1rem' }}>
             {stats.map((stat, i) => (
@@ -2341,7 +2806,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
         {activeDoc && (
           <PdfModal doc={activeDoc} onClose={() => setActiveDoc(null)} />
         )}
-        {selectedAuditMenu && <VisualAuditModal menu={selectedAuditMenu} onClose={() => setSelectedAuditMenu(null)} onRevise={handleReviseMenu} />}
+        {selectedAuditMenu && <VisualAuditModal menu={selectedAuditMenu} onClose={() => setSelectedAuditMenu(null)} onRevise={handleReviseMenu} onEditRecipe={openEditMenuForm} />}
       </AnimatePresence>
     </DashboardLayout>
   )

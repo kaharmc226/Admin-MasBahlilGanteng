@@ -32,43 +32,6 @@ import {
   Coffee
 } from 'lucide-react'
 
-const NUTRITION_DATABASE = {
-  makanan_pokok: [
-    { nama: 'Nasi putih', satuan: '100 gram', energi: '175 kkal' },
-    { nama: 'Nasi merah', satuan: '100 gram', energi: '110 kkal' },
-    { nama: 'Kentang rebus', satuan: '100 gram', energi: '87 kkal' },
-    { nama: 'Ubi jalar', satuan: '100 gram', energi: '86 kkal' },
-    { nama: 'Singkong', satuan: '100 gram', energi: '160 kkal' },
-    { nama: 'Roti putih', satuan: '1 iris', energi: '66 kkal' },
-    { nama: 'Roti gandum', satuan: '1 iris', energi: '67 kkal' },
-    { nama: 'Mi goreng instan', satuan: '80 gram', energi: '350 kkal' },
-  ],
-  lauk_sayur: [
-    { nama: 'Dada ayam (kulit)', satuan: '100 gram', energi: '216 kkal' },
-    { nama: 'Dada ayam (no kulit)', satuan: '100 gram', energi: '184 kkal' },
-    { nama: 'Bebek goreng', satuan: '100 gram', energi: '286 kkal' },
-    { nama: 'Ikan kembung', satuan: '100 gram', energi: '167 kkal' },
-    { nama: 'Udang goreng', satuan: '100 gram', energi: '150 kkal' },
-    { nama: 'Bakso sapi', satuan: '100 gram', energi: '202 kkal' },
-    { nama: 'Chicken nugget', satuan: '100 gram', energi: '297 kkal' },
-    { nama: 'Telur dadar', satuan: '1 btr besar', energi: '93 kkal' },
-    { nama: 'Tempe goreng', satuan: '1 porsi', energi: '118 kkal' },
-    { nama: 'Tahu isi', satuan: '1 porsi', energi: '124 kkal' },
-    { nama: 'Tumis kangkung', satuan: '85 gram', energi: '155 kkal' },
-    { nama: 'Perkedel kentang', satuan: '75 gram', energi: '117 kkal' },
-  ],
-  buah: [
-    { nama: 'Apel', satuan: '1 buah sedang', energi: '72 kkal' },
-    { nama: 'Pisang', satuan: '1 buah sedang', energi: '105 kkal' },
-    { nama: 'Jambu biji', satuan: '1 buah', energi: '37 kkal' },
-    { nama: 'Jambu air', satuan: '1 buah', energi: '55 kkal' },
-    { nama: 'Alpukat', satuan: '100 gram', energi: '322 kkal' },
-    { nama: 'Jeruk', satuan: '1 buah', energi: '62 kkal' },
-    { nama: 'Buah naga', satuan: '1 buah sedang', energi: '50 kkal' },
-    { nama: 'Pepaya', satuan: '100 gram', energi: '39 kkal' },
-  ]
-}
-
 const nutrientKeys = ['energi', 'protein', 'lemak', 'karbohidrat', 'serat', 'natrium']
 
 const parseNutrientValue = (value) => {
@@ -87,21 +50,61 @@ const normalizeNutritionItem = (item) => ({
   status: item.status || 'active'
 })
 
-const flattenDefaultNutrition = () => Object.entries(NUTRITION_DATABASE).flatMap(([kategori, items], idx) =>
-  items.map((item, itemIdx) => ({
-    id: `default-${idx}-${itemIdx}`,
-    kategori,
-    nama: item.nama,
-    satuan: item.satuan,
-    energi: parseNutrientValue(item.energi),
-    protein: 0,
-    lemak: 0,
-    karbohidrat: 0,
-    serat: 0,
-    natrium: 0,
-    status: 'active'
-  }))
-)
+const parseJsonField = (value, fallback) => {
+  if (value === null || value === undefined || value === '') return fallback
+  if (typeof value !== 'string') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return fallback
+  }
+}
+
+const normalizeMenuIngredient = (item, nutritionMap) => {
+  const linkedItem = nutritionMap.get(String(item?.id_nutrition || ''))
+  const jumlah = parseNutrientValue(item?.jumlah ?? item?.berat ?? item?.takaran)
+  return {
+    ...item,
+    id_nutrition: item?.id_nutrition ?? null,
+    nama: linkedItem?.nama || item?.nama || 'Bahan tanpa nama',
+    jumlah,
+    satuan: item?.satuan || linkedItem?.satuan || 'gram',
+    takaran: item?.takaran || (jumlah > 0 ? `~${jumlah} g` : '-'),
+    nutritionItem: linkedItem || null
+  }
+}
+
+const normalizeMenu = (menu, nutritionMap) => {
+  const bahan = parseJsonField(menu?.bahan, [])
+  const nilaiGizi = parseJsonField(menu?.nilai_gizi, {})
+  const notes = parseJsonField(menu?.notes, [])
+  return {
+    ...menu,
+    bahan: Array.isArray(bahan) ? bahan.map((item) => normalizeMenuIngredient(item, nutritionMap)) : [],
+    nilai_gizi: nilaiGizi && typeof nilaiGizi === 'object' ? nilaiGizi : {},
+    notes: Array.isArray(notes) ? notes : []
+  }
+}
+
+const normalizeValidationLog = (log) => ({
+  ...log,
+  catatan: typeof log?.catatan === 'string' ? log.catatan.trim() : (log?.catatan || ''),
+})
+
+const attachValidationMetadata = (menu, validationLogs = []) => {
+  const menuId = menu.id_menu || menu.id
+  const logs = validationLogs
+    .filter((item) => (item.id_menu || item.id) === menuId)
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+
+  return {
+    ...menu,
+    validationLogs: logs,
+    latestValidationLog: logs[0] || null,
+    latestRejectedLog: logs.find((item) => item.aksi === 'rejected') || null,
+    latestApprovedLog: logs.find((item) => item.aksi === 'approved') || null,
+  }
+}
 
 const groupNutritionItems = (items) => items.reduce((acc, item) => {
   const key = item.kategori || 'lainnya'
@@ -508,11 +511,14 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [standards, setStandards] = useState([])
   const [nutritionItems, setNutritionItems] = useState([])
   const [nutritionRequests, setNutritionRequests] = useState([])
+  const [validationLogs, setValidationLogs] = useState([])
   const [nutritionForm, setNutritionForm] = useState(emptyNutritionForm)
   const [requestReviewForms, setRequestReviewForms] = useState({})
+  const [nutritionLoadMessage, setNutritionLoadMessage] = useState('')
 
   const [formStandard, setFormStandard] = useState({ title: '', requirement: '', color: 'var(--primary)', desc: '', details: '' })
   const [ahliSuggestion, setAhliSuggestion] = useState('')
+  const [validationAction, setValidationAction] = useState(null)
   const [isQueueOpen, setIsQueueOpen] = useState(false)
   const [queueSearch, setQueueSearch] = useState('')
   const [pinnedInfoHint, setPinnedInfoHint] = useState(null)
@@ -524,11 +530,14 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
   const isStandar = path === '/ahli-gizi/standar'
 
   const [menus, setMenus] = useState([])
+  const nutritionItemMap = new Map(nutritionItems.map((item) => [String(item.id), item]))
   const selectedMenu = menus[selectedMenuIdx] || menus[0] || {}
-  const nutritionDb = groupNutritionItems(nutritionItems.length > 0 ? nutritionItems : flattenDefaultNutrition())
-  const selectedBahan = Array.isArray(selectedMenu.bahan) ? selectedMenu.bahan : []
+  const nutritionDb = groupNutritionItems(nutritionItems)
+  const selectedBahan = Array.isArray(selectedMenu.bahan) ? selectedMenu.bahan.map((item) => normalizeMenuIngredient(item, nutritionItemMap)) : []
   const selectedPhotoUrl = api.assetUrl(selectedMenu.foto_url)
-  const selectedNotes = Array.isArray(selectedMenu.notes) ? selectedMenu.notes : []
+  const selectedVendorNotes = Array.isArray(selectedMenu.notes) ? selectedMenu.notes : []
+  const selectedLatestValidationLog = selectedMenu.latestValidationLog || null
+  const selectedLatestValidationNote = selectedLatestValidationLog?.catatan || ''
   const normalizedQueueSearch = queueSearch.trim().toLowerCase()
   const filteredMenuEntries = menus
     .map((menu, idx) => ({ menu, idx }))
@@ -538,7 +547,6 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
       const title = String(menu.nama_menu || '').toLowerCase()
       return vendor.includes(normalizedQueueSearch) || title.includes(normalizedQueueSearch)
     })
-  const canApproveSelectedMenu = !!selectedMenu.nilai_gizi?.calculated && selectedBahan.length > 0 && selectedBahan.every(item => item.id_nutrition)
   const nutritionRows = [
     { l: 'Energi', v: selectedMenu.nilai_gizi?.energi || '-' },
     { l: 'Protein', v: selectedMenu.nilai_gizi?.protein || '-' },
@@ -563,17 +571,91 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
     const pass = nutrientKey && (min === null || value >= min) && (max === null || value <= max)
     return { ...standard, nutrientKey, value, pass, min, max }
   }).filter(item => item.nutrientKey)
+  const failedStandards = standardComparisons.filter((item) => !item.pass)
+  const hasMappedStandards = standardComparisons.length > 0
+  const hasCalculatedNutrition = selectedMenu.nilai_gizi?.calculated === true
+  const hasLinkedIngredients = selectedBahan.length > 0 && selectedBahan.every((item) => item.id_nutrition)
+  const isNutritionDatabaseReady = nutritionItems.length > 0 && !nutritionLoadMessage
+  const canApproveSelectedMenu = hasMappedStandards && failedStandards.length === 0 && hasCalculatedNutrition && hasLinkedIngredients && isNutritionDatabaseReady
+  const validationWarnings = [
+    !hasMappedStandards ? 'Belum ada standar gizi terpetakan ke nutrien terhitung pada menu ini.' : null,
+    failedStandards.length > 0 ? `Standar yang belum terpenuhi: ${failedStandards.map((item) => item.title).join(', ')}.` : null,
+    !hasCalculatedNutrition ? 'Nilai gizi menu belum berasal dari perhitungan otomatis bahan terverifikasi.' : null,
+    !hasLinkedIngredients ? 'Masih ada bahan menu yang belum terhubung ke database nutrisi.' : null,
+    !isNutritionDatabaseReady ? (nutritionLoadMessage || 'Database nutrisi belum berhasil dimuat sehingga verifikasi bahan belum bisa dipastikan.') : null
+  ].filter(Boolean)
+
+  const buildNormalizedMenus = (rawMenus = [], activeNutritionItems = [], rawValidationLogs = []) => {
+    const nutritionMap = new Map(activeNutritionItems.map((item) => [String(item.id), item]))
+    const normalizedLogs = Array.isArray(rawValidationLogs) ? rawValidationLogs.map(normalizeValidationLog) : []
+    return (Array.isArray(rawMenus) ? rawMenus : []).map((menu) => {
+      const normalizedMenu = normalizeMenu(menu, nutritionMap)
+      return attachValidationMetadata(normalizedMenu, normalizedLogs)
+    })
+  }
+
+  const refreshValidationMetadata = async (targetId, nextStatus) => {
+    const logs = await api.getValidasiLog()
+    const normalizedLogs = Array.isArray(logs) ? logs.map(normalizeValidationLog) : []
+    setValidationLogs(normalizedLogs)
+    setMenus((prev) => prev.map((menu) => {
+      const menuId = menu.id_menu || menu.id
+      const baseMenu = targetId && menuId === targetId
+        ? { ...menu, status_validasi: nextStatus || menu.status_validasi }
+        : menu
+      return attachValidationMetadata(baseMenu, normalizedLogs)
+    }))
+  }
 
   // Fetch data from API
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [m, s, nut, requests] = await Promise.all([api.getMenus(), api.getStandarGizi(), api.getNutrition(), api.getNutritionRequests()])
-        setMenus(m)
-        setStandards(s.map(st => ({ ...st, desc: st.deskripsi, details: st.detail })))
-        setNutritionItems(Array.isArray(nut) ? nut.map(normalizeNutritionItem) : flattenDefaultNutrition())
-        setNutritionRequests(Array.isArray(requests) ? requests : [])
-      } catch (err) { console.error('Failed to fetch:', err) }
+        const [menusResult, standardsResult, nutritionResult, requestsResult, logsResult] = await Promise.allSettled([
+          api.getMenus({ ahliGiziUserId: user?.id_user }),
+          api.getStandarGizi(),
+          api.getNutrition(),
+          api.getNutritionRequests(),
+          api.getValidasiLog()
+        ])
+
+        const normalizedNutritionItems = nutritionResult.status === 'fulfilled' && Array.isArray(nutritionResult.value)
+          ? nutritionResult.value.map(normalizeNutritionItem)
+          : []
+        const normalizedValidationLogs = logsResult.status === 'fulfilled' && Array.isArray(logsResult.value)
+          ? logsResult.value.map(normalizeValidationLog)
+          : []
+
+        setNutritionItems(normalizedNutritionItems)
+        setValidationLogs(normalizedValidationLogs)
+        setNutritionLoadMessage(
+          nutritionResult.status === 'rejected'
+            ? 'Database nutrisi gagal dimuat dari server.'
+            : normalizedNutritionItems.length === 0
+              ? 'Database nutrisi masih kosong.'
+              : ''
+        )
+
+        if (menusResult.status === 'fulfilled') {
+          setMenus(buildNormalizedMenus(menusResult.value, normalizedNutritionItems, normalizedValidationLogs))
+        } else {
+          setMenus([])
+        }
+
+        if (standardsResult.status === 'fulfilled') {
+          setStandards(standardsResult.value.map(st => ({ ...st, desc: st.deskripsi, details: st.detail })))
+        } else {
+          setStandards([])
+        }
+
+        if (requestsResult.status === 'fulfilled') {
+          setNutritionRequests(Array.isArray(requestsResult.value) ? requestsResult.value : [])
+        } else {
+          setNutritionRequests([])
+        }
+      } catch (err) {
+        console.error('Failed to fetch:', err)
+      }
     }
     fetchData()
   }, [])
@@ -661,6 +743,7 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
       )
       if (!confirmed) return
     }
+    setValidationAction(forceOverride ? 'override' : 'approved')
     try {
       await api.createValidasiLog({
         id_menu: id,
@@ -669,22 +752,35 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
         catatan: ahliSuggestion || null,
         force_override: forceOverride
       })
-      setMenus(prev => prev.map(m => (m.id_menu || m.id) === id ? { ...m, status_validasi: 'approved' } : m))
+      await refreshValidationMetadata(id, 'approved')
       triggerToast(forceOverride
         ? 'Menu berhasil disahkan melalui override manual.'
         : 'Menu berhasil disahkan untuk distribusi nasional.')
     } catch (err) {
       console.error(err)
       triggerToast(err.message, 'warning')
+    } finally {
+      setValidationAction(null)
     }
   }
 
   const handleReject = async (id) => {
+    const revisionNote = ahliSuggestion.trim()
+    if (!revisionNote) {
+      triggerToast('Isi catatan revisi Ahli Gizi terlebih dahulu sebelum mengirim permintaan revisi.', 'warning')
+      return
+    }
+    setValidationAction('rejected')
     try {
-      await api.createValidasiLog({ id_menu: id, id_user: user.id_user, aksi: 'rejected', catatan: ahliSuggestion || null })
-      setMenus(prev => prev.map(m => (m.id_menu || m.id) === id ? { ...m, status_validasi: 'rejected' } : m))
+      await api.createValidasiLog({ id_menu: id, id_user: user.id_user, aksi: 'rejected', catatan: revisionNote })
+      await refreshValidationMetadata(id, 'rejected')
       triggerToast('Permintaan revisi dikirim ke vendor.', 'warning')
-    } catch (err) { console.error(err) }
+    } catch (err) {
+      console.error(err)
+      triggerToast(err.message, 'warning')
+    } finally {
+      setValidationAction(null)
+    }
   }
 
   const handleSaveStandard = async () => {
@@ -713,8 +809,11 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
 
   const refreshNutrition = async () => {
     const [nut, requests] = await Promise.all([api.getNutrition(), api.getNutritionRequests()])
-    setNutritionItems(Array.isArray(nut) ? nut.map(normalizeNutritionItem) : [])
+    const normalizedNutritionItems = Array.isArray(nut) ? nut.map(normalizeNutritionItem) : []
+    setNutritionItems(normalizedNutritionItems)
+    setNutritionLoadMessage(normalizedNutritionItems.length === 0 ? 'Database nutrisi masih kosong.' : '')
     setNutritionRequests(Array.isArray(requests) ? requests : [])
+    setMenus((prev) => buildNormalizedMenus(prev, normalizedNutritionItems, validationLogs))
   }
 
   const handleSaveNutrition = async () => {
@@ -816,25 +915,22 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                 <p style={{ margin: '2px 0 0', fontSize: '0.95rem', fontWeight: '850', color: '#0f172a' }}>{menus.length} menu menunggu tinjauan</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsQueueOpen(prev => !prev)}
-              style={{ padding: '0.8rem 1rem', borderRadius: '14px', border: '1.5px solid var(--border)', background: isQueueOpen ? 'var(--primary-light)' : 'white', color: isQueueOpen ? 'var(--primary)' : '#334155', fontWeight: '850', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              {isQueueOpen ? <X size={16} /> : <Search size={16} />}
-              {isQueueOpen ? 'Tutup Antrian' : 'Lihat Antrian'}
-            </button>
           </div>
-          <div className="ahligizi-queue-summary" style={{ display: 'grid', gap: '0.75rem', alignItems: 'center' }}>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Menu Terpilih</p>
-              <p style={{ margin: '4px 0 0', fontSize: '1rem', fontWeight: '900', color: '#0f172a', lineHeight: '1.3' }}>{selectedMenu.nama_menu || 'Belum ada menu terpilih'}</p>
-              <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: '700' }}>{selectedMenu.nama_vendor || 'Vendor terdaftar'}</p>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-              <div style={{ padding: '0.65rem 0.85rem', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.8rem', fontWeight: '800', color: '#475569' }}>
-                {filteredMenuEntries.length} dari {menus.length} menu ditampilkan
+          <div className="ahligizi-queue-summary" style={{ display: 'grid', gap: '0.75rem', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '0.95rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.9rem', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Menu Terpilih</p>
+                <p style={{ margin: '4px 0 0', fontSize: '1rem', fontWeight: '900', color: '#0f172a', lineHeight: '1.3' }}>{selectedMenu.nama_menu || 'Belum ada menu terpilih'}</p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: '700' }}>{selectedMenu.nama_vendor || 'Vendor terdaftar'}</p>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsQueueOpen(prev => !prev)}
+                style={{ padding: '0.8rem 1rem', borderRadius: '14px', border: '1.5px solid var(--border)', background: isQueueOpen ? 'var(--primary-light)' : 'white', color: isQueueOpen ? 'var(--primary)' : '#334155', fontWeight: '850', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
+              >
+                {isQueueOpen ? <X size={16} /> : <Search size={16} />}
+                {isQueueOpen ? 'Tutup Antrian' : 'Lihat Antrian'}
+              </button>
             </div>
           </div>
         </div>
@@ -954,8 +1050,8 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                   </div>
 
                   {/* Tray Visual Section */}
-                  <div className="ahligizi-tray-layout" style={{ minHeight: '265px', width: '100%', display: 'grid', gap: '0.9rem', alignItems: 'stretch', marginBottom: '0.75rem' }}>
-                     <div style={{ position: 'relative', width: '100%', minHeight: '230px', display: 'grid', placeItems: 'center' }}>
+                  <div className="ahligizi-tray-layout" style={{ width: '100%', display: 'grid', gap: '0.9rem', alignItems: 'stretch', marginBottom: '0.75rem' }}>
+                     <div className="ahligizi-tray-media" style={{ position: 'relative', width: '100%', display: 'grid', placeItems: 'center' }}>
                         <div style={{ width: '100%', height: '100%', border: '10px solid #cbd5e1', borderRadius: '14px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 20px 40px -14px rgba(0,0,0,0.22)', position: 'relative' }}>
                            {selectedPhotoUrl ? (
                              <img src={selectedPhotoUrl} alt={`Foto ${selectedMenu.nama_menu}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -990,6 +1086,18 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                                   <p style={{ margin: 0, fontWeight: '900', color: '#0f172a', fontSize: '0.92rem', lineHeight: '1.3' }}>{b.nama}</p>
                                   <p style={{ margin: '0.2rem 0 0', fontWeight: '750', color: '#64748b', fontSize: '0.82rem' }}>{b.takaran || '-'}</p>
                                 </div>
+                                <span style={{
+                                  flexShrink: 0,
+                                  padding: '5px 9px',
+                                  borderRadius: '999px',
+                                  background: b.id_nutrition ? '#dcfce7' : '#ffedd5',
+                                  color: b.id_nutrition ? '#15803d' : '#c2410c',
+                                  fontSize: '0.68rem',
+                                  fontWeight: '900',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {b.id_nutrition ? 'DB Match' : 'Belum Match'}
+                                </span>
                               </motion.div>
                             ))
                           ) : (
@@ -1008,16 +1116,37 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
 
                   {/* Bottom Grid: Notes & Table Side-by-side */}
                   <div className="ahligizi-summary-grid" style={{ display: 'grid', gap: '0.85rem', alignItems: 'start' }}>
-                     {/* Notes Box */}
-                     <div style={{ border: '2px solid #ef4444', borderRadius: '18px', padding: '1rem 1.1rem', background: 'white', position: 'relative' }}>
-                        <p style={{ fontWeight: '950', color: '#ef4444', fontSize: '1rem', marginBottom: '10px', marginTop: 0 }}>*Notes</p>
-                        <ul style={{ margin: 0, paddingLeft: '1rem', color: '#334155', fontWeight: '750', fontSize: '0.85rem', lineHeight: '1.55' }}>
-                           {selectedNotes.length > 0 ? (
-                             selectedNotes.map((note, i) => <li key={i}>{note}</li>)
+                     <div style={{ display: 'grid', gap: '0.85rem' }}>
+                        <div style={{ border: '2px solid #e2e8f0', borderRadius: '18px', padding: '1rem 1.1rem', background: 'white', position: 'relative' }}>
+                           <p style={{ fontWeight: '950', color: '#1e293b', fontSize: '0.95rem', marginBottom: '10px', marginTop: 0 }}>Catatan Vendor</p>
+                           <ul style={{ margin: 0, paddingLeft: '1rem', color: '#334155', fontWeight: '750', fontSize: '0.85rem', lineHeight: '1.55' }}>
+                              {selectedVendorNotes.length > 0 ? (
+                                selectedVendorNotes.map((note, i) => <li key={i}>{note}</li>)
+                              ) : (
+                                <li>Belum ada catatan dari vendor.</li>
+                              )}
+                           </ul>
+                        </div>
+
+                        <div style={{ border: '2px solid #ef4444', borderRadius: '18px', padding: '1rem 1.1rem', background: 'white', position: 'relative' }}>
+                           <p style={{ fontWeight: '950', color: '#ef4444', fontSize: '0.95rem', marginBottom: '10px', marginTop: 0 }}>Catatan Validasi Terakhir</p>
+                           {selectedLatestValidationNote ? (
+                             <>
+                               <p style={{ margin: 0, color: '#334155', fontWeight: '800', fontSize: '0.85rem', lineHeight: '1.6' }}>
+                                 {selectedLatestValidationNote}
+                               </p>
+                               {selectedLatestValidationLog?.created_at && (
+                                 <p style={{ margin: '0.7rem 0 0', color: '#64748b', fontWeight: '700', fontSize: '0.78rem' }}>
+                                   {new Date(selectedLatestValidationLog.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                 </p>
+                               )}
+                             </>
                            ) : (
-                             <li>Belum ada catatan validasi untuk menu ini.</li>
+                             <p style={{ margin: 0, color: '#64748b', fontWeight: '750', fontSize: '0.85rem', lineHeight: '1.55' }}>
+                               Belum ada catatan validasi.
+                             </p>
                            )}
-                        </ul>
+                        </div>
                      </div>
 
                      {/* Nutrition Table Box */}
@@ -1081,8 +1210,8 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                        <h4 style={{ fontWeight: '950', fontSize: '1rem', color: '#1e293b', margin: 0, lineHeight: '1.2' }}>
                          Rekomendasi Ahli Gizi
                        </h4>
-                      </div>
-                      <InlineInfoHint
+                     </div>
+                     <InlineInfoHint
                         isOpen={pinnedInfoHint === 'recommendation' || hoveredInfoHint === 'recommendation'}
                         onToggle={() => setPinnedInfoHint((current) => current === 'recommendation' ? null : 'recommendation')}
                         onHoverStart={() => setHoveredInfoHint('recommendation')}
@@ -1094,12 +1223,13 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                      <textarea 
                        value={ahliSuggestion}
                        onChange={(e) => setAhliSuggestion(e.target.value)}
+                       disabled={!!validationAction}
                        placeholder="Contoh: Tambah porsi serat, kurangi penggunaan minyak goreng berlebih..."
                        style={{ 
                          width: '100%', height: '140px', padding: '1rem', borderRadius: '14px', 
                          border: '1.5px solid #e2e8f0', background: '#f8fafc', 
                          outline: 'none', fontSize: '0.92rem', fontWeight: '700', color: '#334155',
-                         transition: 'all 0.3s', resize: 'none', lineHeight: '1.6'
+                         transition: 'all 0.3s', resize: 'none', lineHeight: '1.6', opacity: validationAction ? 0.7 : 1
                        }}
                      />
                   </div>
@@ -1138,8 +1268,8 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                           return current === key ? null : current
                         })}
                         text={canApproveSelectedMenu
-                          ? 'Bagian ini dipakai untuk menyetujui menu yang lolos audit gizi atau meminta vendor melakukan revisi bila komposisinya belum siap.'
-                          : 'Perhitungan gizi otomatis belum lengkap. Bagian ini butuh verifikasi manual sebelum override digunakan.'}
+                          ? 'Bagian ini dipakai untuk menyetujui menu yang lolos audit gizi dan sudah terhubung penuh ke database nutrisi.'
+                          : (validationWarnings[0] || 'Menu ini masih memerlukan verifikasi manual sebelum override digunakan.')}
                         label={canApproveSelectedMenu ? 'Info keputusan validasi' : 'Info peringatan keputusan validasi'}
                         tone={canApproveSelectedMenu ? 'info' : 'warning'}
                       />
@@ -1149,19 +1279,27 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => handleApprove(selectedMenu.id_menu)} 
-                          disabled={!canApproveSelectedMenu}
-                          style={{ width: '100%', padding: '1rem', borderRadius: '18px', background: canApproveSelectedMenu ? 'var(--primary)' : '#94a3b8', border: 'none', color: 'white', fontWeight: '950', fontSize: '0.95rem', cursor: canApproveSelectedMenu ? 'pointer' : 'not-allowed', boxShadow: '0 10px 22px rgba(16, 185, 129, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                          disabled={!canApproveSelectedMenu || !!validationAction}
+                          style={{ width: '100%', padding: '1rem', borderRadius: '18px', background: canApproveSelectedMenu && !validationAction ? 'var(--primary)' : '#94a3b8', border: 'none', color: 'white', fontWeight: '950', fontSize: '0.95rem', cursor: canApproveSelectedMenu && !validationAction ? 'pointer' : 'not-allowed', boxShadow: '0 10px 22px rgba(16, 185, 129, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
                         >
-                          <CheckCircle2 size={20} /> Sahkan Menu
+                          <CheckCircle2 size={20} /> {validationAction === 'approved' ? 'Mengesahkan...' : 'Sahkan Menu'}
                         </motion.button>
                         {!canApproveSelectedMenu && (
                           <>
+                            <div style={{ padding: '0.85rem 0.95rem', borderRadius: '14px', background: '#fff7ed', border: '1px solid #fed7aa', display: 'grid', gap: '0.45rem' }}>
+                              {validationWarnings.map((warning, index) => (
+                                <p key={index} style={{ margin: 0, color: '#9a3412', fontWeight: '800', fontSize: '0.78rem', lineHeight: '1.45' }}>
+                                  {warning}
+                                </p>
+                              ))}
+                            </div>
                             <button
                               type="button"
                               onClick={() => handleApprove(selectedMenu.id_menu, { forceOverride: true })}
-                              style={{ width: 'fit-content', alignSelf: 'center', padding: 0, background: 'transparent', border: 'none', color: '#c2410c', fontWeight: '800', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+                              disabled={!!validationAction}
+                              style={{ width: 'fit-content', alignSelf: 'center', padding: 0, background: 'transparent', border: 'none', color: '#c2410c', fontWeight: '800', fontSize: '0.8rem', cursor: validationAction ? 'not-allowed' : 'pointer', textDecoration: 'underline', textUnderlineOffset: '3px', opacity: validationAction ? 0.6 : 1 }}
                             >
-                              Override & Sahkan Menu
+                              {validationAction === 'override' ? 'Mengirim Override...' : 'Override & Sahkan Menu'}
                             </button>
                           </>
                         )}
@@ -1170,9 +1308,10 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                           whileHover={{ scale: 1.02, translateY: -2 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => handleReject(selectedMenu.id_menu)} 
-                          style={{ width: '100%', padding: '1rem', borderRadius: '18px', background: 'white', border: '2px solid var(--error)', color: 'var(--error)', fontWeight: '950', fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                          disabled={!!validationAction}
+                          style={{ width: '100%', padding: '1rem', borderRadius: '18px', background: 'white', border: '2px solid var(--error)', color: 'var(--error)', fontWeight: '950', fontSize: '0.95rem', cursor: validationAction ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', opacity: validationAction ? 0.6 : 1 }}
                         >
-                          <AlertTriangle size={20} /> Minta Revisi
+                          <AlertTriangle size={20} /> {validationAction === 'rejected' ? 'Mengirim Revisi...' : 'Minta Revisi'}
                         </motion.button>
                      </div>
                   </div>
@@ -1375,6 +1514,13 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
               </tr>
             </thead>
             <tbody>
+              {Object.entries(nutritionDb).length === 0 && (
+                <tr>
+                  <td colSpan={10} style={{ padding: '1.8rem', textAlign: 'center', color: '#64748b', fontWeight: '800', background: 'white' }}>
+                    {nutritionLoadMessage || 'Belum ada data nutrisi di database.'}
+                  </td>
+                </tr>
+              )}
               {Object.entries(nutritionDb).map(([key, items], catIdx) => (
                 <React.Fragment key={key}>
                   {items.map((item, i) => (
@@ -1415,7 +1561,7 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
                       </td>
                       <td style={{ padding: '1.4rem 1rem', textAlign: 'center' }}>
                         <button onClick={() => handleEditNutrition(item)} style={{ border: '1.5px solid #e2e8f0', background: 'white', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', fontWeight: '800', marginRight: '6px' }}>Edit</button>
-                        {item.status !== 'retired' && !String(item.id).startsWith('default-') && (
+                        {item.status !== 'retired' && (
                           <button onClick={() => handleRetireNutrition(item.id)} style={{ border: 'none', background: '#fef2f2', color: '#dc2626', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', fontWeight: '800' }}>Nonaktif</button>
                         )}
                       </td>
@@ -1465,7 +1611,7 @@ const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
 
       {isMain ? (
         <>
-          <WelcomeBanner name="Ahli Gizi Jakarta Timur" />
+          <WelcomeBanner name={user?.name || 'Ahli Gizi MBG'} />
 
           <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
             <div className="card dashboard-card-vibrant" style={{ borderRadius: '8px', textAlign: 'center', padding: '1rem' }}>

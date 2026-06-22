@@ -1,10 +1,8 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ShieldCheck, Building, GraduationCap, Microscope, Zap, ArrowRight, LogIn } from 'lucide-react'
+import { ShieldCheck, Building, GraduationCap, Microscope, Zap, ArrowRight, KeyRound, UserRound } from 'lucide-react'
 import api from '../api'
-
-const ENABLE_QUICK_LOGIN = false
 
 const roleColors = {
   vendor: { primary: '#f97316', light: '#fff7ed', label: 'Vendor Dapur' },
@@ -13,49 +11,63 @@ const roleColors = {
   pemerintah: { primary: '#3b82f6', light: '#eff6ff', label: 'Pemerintah' }
 }
 
+const roles = [
+  { id: 'vendor', icon: <Building size={22} />, title: 'Vendor Dapur', desc: 'Akun vendor aktif yang sudah disahkan pemerintah.' },
+  { id: 'ahli_gizi', icon: <Microscope size={22} />, title: 'Ahli Gizi', desc: 'Validator gizi aktif yang terhubung ke wilayah.' },
+  { id: 'sekolah', icon: <GraduationCap size={22} />, title: 'Sekolah', desc: 'Akun sekolah aktif yang sudah ditambahkan pemerintah.' },
+  { id: 'pemerintah', icon: <ShieldCheck size={22} />, title: 'Pemerintah', desc: 'Admin pengawas dan pengelola ekosistem daerah.' }
+]
+
 const Login = ({ onLogin }) => {
-  const [email, setEmail] = useState('v.jaktim@traksi.id')
-  const [password, setPassword] = useState('vendor123')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [role, setRole] = useState('vendor')
-  const [quickLoginMode, setQuickLoginMode] = useState(true)
+  const [accountsByRole, setAccountsByRole] = useState([])
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
   const navigate = useNavigate()
 
-  const roles = [
-    { id: 'vendor', icon: <Building size={22}/>, title: 'Vendor Dapur', desc: 'Pemilik dapur produksi & distribusi.' },
-    { id: 'ahli_gizi', icon: <Microscope size={22}/>, title: 'Ahli Gizi', desc: 'Validator standar gizi & menu.' },
-    { id: 'sekolah', icon: <GraduationCap size={22}/>, title: 'Sekolah', desc: 'Penerima manfaat & feedback.' },
-    { id: 'pemerintah', icon: <ShieldCheck size={22}/>, title: 'Pemerintah', desc: 'Dinas/Kementerian pengawas.' }
-  ]
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      setIsLoadingAccounts(true)
+      try {
+        const groups = await api.getLoginAccounts()
+        setAccountsByRole(Array.isArray(groups) ? groups : [])
+        const firstRoleWithAccounts = (Array.isArray(groups) ? groups : []).find((item) => item.accounts?.length > 0)?.role
+        if (firstRoleWithAccounts) {
+          setRole(firstRoleWithAccounts)
+          const firstAccount = (Array.isArray(groups) ? groups : []).find((item) => item.role === firstRoleWithAccounts)?.accounts?.[0]
+          setEmail(firstAccount?.email || '')
+          setPassword(firstAccount?.password || '')
+        }
+      } catch (err) {
+        setErrorMsg(`Gagal memuat daftar akun: ${err.message}`)
+      } finally {
+        setIsLoadingAccounts(false)
+      }
+    }
+    fetchAccounts()
+  }, [])
 
-  const validUsers = {
-    vendor: { email: 'v.jaktim@traksi.id', pass: 'vendor123', name: 'Vendor Jakarta Timur' },
-    ahli_gizi: { email: 'nutri.jaktim@traksi.id', pass: 'nutri123', name: 'Ahli Gizi Jakarta Timur' },
-    sekolah: { email: 'sdn06@sekolah.traksi.id', pass: 'sekolah123', name: 'Admin SDN 06 Baru' },
-    pemerintah: { email: 'gov.dki@traksi.id', pass: 'gov123', name: 'Gov DKI Jakarta' }
-  }
+  const currentGroup = useMemo(
+    () => accountsByRole.find((item) => item.role === role) || { role, accounts: [] },
+    [accountsByRole, role]
+  )
+
+  const activeColor = roleColors[role]
 
   const handleRoleSelect = (selectedRole) => {
     setRole(selectedRole)
     setErrorMsg('')
-    const creds = validUsers[selectedRole]
-    if (creds) {
-      setEmail(creds.email)
-      setPassword(creds.pass)
-    }
+    const firstAccount = accountsByRole.find((item) => item.role === selectedRole)?.accounts?.[0]
+    setEmail(firstAccount?.email || '')
+    setPassword(firstAccount?.password || '')
   }
 
-  const handleQuickLogin = async (selectedRole) => {
+  const handleAccountPick = (account) => {
+    setEmail(account.email)
+    setPassword(account.password || '')
     setErrorMsg('')
-    const expected = validUsers[selectedRole]
-    try {
-      const userData = await api.login(expected.email, expected.pass)
-      onLogin(userData)
-      const targetPath = selectedRole.replace('_', '-')
-      navigate(`/${targetPath}`)
-    } catch (err) {
-      setErrorMsg(`Gagal Masuk Cepat: ${err.error || err.message || 'Error login backend'}`)
-    }
   }
 
   const handleSubmit = async (e) => {
@@ -67,284 +79,217 @@ const Login = ({ onLogin }) => {
       const targetPath = userData.role.replace('_', '-')
       navigate(`/${targetPath}`)
     } catch (err) {
-      setErrorMsg(`Gagal Masuk: ${err.error || err.message || 'Kredensial salah atau server offline'}`)
+      setErrorMsg(`Gagal Masuk: ${err.message || 'Kredensial salah atau server offline'}`)
     }
   }
 
-  const activeColor = roleColors[role]
-
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'stretch', background: '#f8fafc' }}>
-      {/* Left Panel — Brand */}
-      <div style={{
-        flex: '0 0 420px',
-        background: `linear-gradient(135deg, ${activeColor.primary}, ${activeColor.primary}dd)`,
-        padding: '1.5rem',
-        color: 'white',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        position: 'relative',
-        overflow: 'hidden',
-        transition: 'background 0.4s ease'
-      }}>
-        {/* Decorative shapes */}
-        <div style={{
-          position: 'absolute', top: '-80px', right: '-80px',
-          width: '300px', height: '300px',
-          background: 'rgba(255,255,255,0.08)', borderRadius: '50%'
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '-60px', left: '-60px',
-          width: '200px', height: '200px',
-          background: 'rgba(255,255,255,0.06)', borderRadius: '50%'
-        }} />
+      <div
+        style={{
+          flex: '0 0 420px',
+          background: `linear-gradient(135deg, ${activeColor.primary}, ${activeColor.primary}dd)`,
+          padding: '1.5rem',
+          color: 'white',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          position: 'relative',
+          overflow: 'hidden',
+          transition: 'background 0.4s ease'
+        }}
+      >
+        <div style={{ position: 'absolute', top: '-80px', right: '-80px', width: '300px', height: '300px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', bottom: '-60px', left: '-60px', width: '200px', height: '200px', background: 'rgba(255,255,255,0.06)', borderRadius: '50%' }} />
 
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
-            <div style={{
-              width: '40px', height: '40px', background: 'rgba(255,255,255,0.2)',
-              borderRadius: '12px', display: 'grid', placeItems: 'center',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <Zap size={22} fill="white" color="white"/>
+            <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', display: 'grid', placeItems: 'center', backdropFilter: 'blur(10px)' }}>
+              <Zap size={22} fill="white" color="white" />
             </div>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: '900', letterSpacing: '-1px', color: 'white' }}>
-              TRAKSI
-            </h1>
+            <h1 style={{ fontSize: '1.6rem', fontWeight: '900', letterSpacing: '-1px', color: 'white' }}>TRAKSI</h1>
           </div>
 
-          <h2 style={{
-            fontSize: '2.5rem', fontWeight: '900', lineHeight: '1.1',
-            letterSpacing: '-2px', color: 'white', marginBottom: '1.5rem'
-          }}>
-            Transparansi<br/>Gizi Nasional
+          <h2 style={{ fontSize: '2.5rem', fontWeight: '900', lineHeight: '1.1', letterSpacing: '-2px', color: 'white', marginBottom: '1.5rem' }}>
+            Pilih Portal
+            <br />
+            & Masuk
           </h2>
-          <p style={{
-            fontSize: '1.05rem', fontWeight: '500', lineHeight: '1.6',
-            opacity: 0.9, maxWidth: '340px'
-          }}>
-            Platform monitoring & audit distribusi makanan bergizi gratis untuk seluruh Indonesia.
+          <p style={{ fontSize: '1.05rem', fontWeight: '500', lineHeight: '1.6', opacity: 0.9, maxWidth: '340px' }}>
+            Semua akun aktif per role ditampilkan dari data backend. Pemerintah mengelola aktivasi akun vendor dan sekolah dari dashboard.
           </p>
         </div>
 
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <p style={{ fontSize: '0.8rem', fontWeight: '600', opacity: 0.7 }}>
-            © 2026 TRAKSI TEAM UHO
-          </p>
+          <p style={{ fontSize: '0.8rem', fontWeight: '600', opacity: 0.7 }}>© 2026 TRAKSI TEAM UHO</p>
         </div>
       </div>
 
-      {/* Right Panel — Login Form */}
       <div style={{ flex: 1, padding: '1.5rem', display: 'grid', placeItems: 'center', overflowY: 'auto' }}>
-        <div style={{ width: '100%', maxWidth: '520px' }}>
+        <div style={{ width: '100%', maxWidth: '760px' }}>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-
             <div style={{ marginBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '0.5rem', color: '#0f172a', letterSpacing: '-0.5px' }}>
                 Masuk ke Portal
               </h2>
               <p style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: '500' }}>
-                Pilih peran lalu masuk ke dashboard Anda.
+                Pilih role, lihat akun yang tersedia, lalu login dengan password akun tersebut.
               </p>
             </div>
 
-            {ENABLE_QUICK_LOGIN && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f1f5f9', padding: '10px 20px', borderRadius: '12px', marginBottom: '20px' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Zap size={16} color="var(--primary)" fill="var(--primary)" /> Mode Masuk Cepat (Dev)
-                </span>
-                <button 
-                  type="button"
-                  onClick={() => setQuickLoginMode(!quickLoginMode)}
-                  style={{
-                    background: quickLoginMode ? activeColor.primary : '#cbd5e1',
-                    color: 'white',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    fontWeight: '800',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {quickLoginMode ? 'ON' : 'OFF'}
-                </button>
-              </div>
-            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+              {roles.map((item) => {
+                const isSelected = role === item.id
+                const color = roleColors[item.id]
+                const accountCount = accountsByRole.find((group) => group.role === item.id)?.accounts?.length || 0
+                return (
+                  <motion.button
+                    key={item.id}
+                    type="button"
+                    whileHover={{ y: -3 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleRoleSelect(item.id)}
+                    style={{
+                      padding: '1.25rem',
+                      border: '2px solid',
+                      borderColor: isSelected ? color.primary : '#e2e8f0',
+                      borderRadius: '16px',
+                      background: isSelected ? color.light : 'white',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ marginBottom: '0.75rem', width: '40px', height: '40px', borderRadius: '10px', display: 'grid', placeItems: 'center', background: isSelected ? color.primary : '#f1f5f9', color: isSelected ? 'white' : '#64748b' }}>
+                      {item.icon}
+                    </div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: '700', marginBottom: '2px', color: isSelected ? color.primary : '#0f172a' }}>{item.title}</h4>
+                    <p style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: '500', lineHeight: '1.35', marginBottom: '0.6rem' }}>{item.desc}</p>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '800', color: isSelected ? color.primary : '#475569' }}>
+                      {accountCount} akun tersedia
+                    </span>
+                  </motion.button>
+                )
+              })}
+            </div>
 
-            {ENABLE_QUICK_LOGIN && quickLoginMode && (
-              <>
-                {/* Role Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
-                  {roles.map((r) => {
-                    const isSelected = role === r.id
-                    const color = roleColors[r.id]
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', alignItems: 'start' }}>
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '18px', background: 'white', padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.85rem' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.78rem', fontWeight: '900', letterSpacing: '0.06em', textTransform: 'uppercase', color: activeColor.primary }}>
+                      Daftar Akun {roleColors[role].label}
+                    </p>
+                    <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem' }}>
+                      {currentGroup.accounts.length > 0 ? 'Pilih akun untuk mengisi email login.' : 'Belum ada akun aktif pada role ini.'}
+                    </p>
+                  </div>
+                  <div style={{ background: activeColor.light, color: activeColor.primary, borderRadius: '999px', padding: '0.4rem 0.7rem', fontWeight: '800', fontSize: '0.75rem' }}>
+                    {currentGroup.accounts.length} akun
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gap: '0.75rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.2rem' }}>
+                  {isLoadingAccounts ? (
+                    <div style={{ padding: '1rem', borderRadius: '14px', background: '#f8fafc', color: '#64748b', fontWeight: '700' }}>
+                      Memuat daftar akun...
+                    </div>
+                  ) : currentGroup.accounts.length === 0 ? (
+                    <div style={{ padding: '1rem', borderRadius: '14px', background: '#f8fafc', color: '#64748b', fontWeight: '700' }}>
+                      Tidak ada akun aktif yang bisa dipakai login.
+                    </div>
+                  ) : currentGroup.accounts.map((account) => {
+                    const isPicked = account.email === email
                     return (
-                      <motion.div
-                        whileHover={{ y: -3 }}
-                        whileTap={{ scale: 0.98 }}
-                        key={r.id}
-                        onClick={() => handleRoleSelect(r.id)}
+                      <button
+                        key={account.id_user}
+                        type="button"
+                        onClick={() => handleAccountPick(account)}
                         style={{
-                          padding: '1.25rem',
-                          border: '2px solid',
-                          borderColor: isSelected ? color.primary : '#e2e8f0',
-                          borderRadius: '16px',
-                          background: isSelected ? color.light : 'white',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          position: 'relative',
-                          overflow: 'hidden'
+                          padding: '0.95rem',
+                          borderRadius: '14px',
+                          border: `1.5px solid ${isPicked ? activeColor.primary : '#e2e8f0'}`,
+                          background: isPicked ? activeColor.light : '#fff',
+                          textAlign: 'left',
+                          cursor: 'pointer'
                         }}
                       >
-                        <div style={{
-                          marginBottom: '0.75rem',
-                          width: '40px', height: '40px', borderRadius: '10px',
-                          display: 'grid', placeItems: 'center',
-                          background: isSelected ? color.primary : '#f1f5f9',
-                          color: isSelected ? 'white' : '#64748b',
-                          transition: 'all 0.2s'
-                        }}>
-                          {r.icon}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'start' }}>
+                          <div>
+                            <p style={{ margin: 0, fontWeight: '800', color: '#0f172a' }}>{account.entityName || account.name}</p>
+                            <p style={{ margin: '0.25rem 0 0', color: '#475569', fontWeight: '600', fontSize: '0.83rem' }}>{account.name}</p>
+                            <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontWeight: '600', fontSize: '0.8rem' }}>{account.email}</p>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', fontWeight: '900', color: activeColor.primary }}>Pilih</span>
                         </div>
-                        <h4 style={{
-                          fontSize: '0.9rem', fontWeight: '700',
-                          marginBottom: '2px',
-                          color: isSelected ? color.primary : '#0f172a'
-                        }}>
-                          {r.title}
-                        </h4>
-                        <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '500', lineHeight: '1.3' }}>
-                          {r.desc}
-                        </p>
-
-                        {/* Quick Login Button */}
-                        {isSelected && (
-                          <motion.button
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            onClick={(e) => { e.stopPropagation(); handleQuickLogin(r.id) }}
-                            style={{
-                              marginTop: '0.75rem',
-                              width: '100%',
-                              padding: '0.5rem',
-                              borderRadius: '8px',
-                              border: 'none',
-                              background: color.primary,
-                              color: 'white',
-                              fontSize: '0.75rem',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <LogIn size={14} /> Masuk Cepat
-                          </motion.button>
-                        )}
-                      </motion.div>
+                      </button>
                     )
                   })}
                 </div>
-
-                {/* Separator */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '1rem',
-                  marginBottom: '1.5rem', color: '#cbd5e1'
-                }}>
-                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>
-                    atau masuk manual
-                  </span>
-                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-                </div>
-              </>
-            )}
-
-            {/* Manual Form */}
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '0.85rem', color: '#374151' }}>
-                  Email Institusi
-                </label>
-                <input
-                  type="email"
-                  placeholder="Masukkan email..."
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{
-                    width: '100%', padding: '0.85rem 1rem', borderRadius: '12px',
-                    border: '1.5px solid #e2e8f0', outline: 'none', background: 'white',
-                    fontSize: '0.9rem', fontWeight: '500', transition: 'border-color 0.2s',
-                    fontFamily: 'var(--font-body)'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = activeColor.primary}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                />
               </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '0.85rem', color: '#374151' }}>
-                  Kata Sandi
-                </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{
-                    width: '100%', padding: '0.85rem 1rem', borderRadius: '12px',
-                    border: '1.5px solid #e2e8f0', outline: 'none', background: 'white',
-                    fontSize: '0.9rem', fontWeight: '500', transition: 'border-color 0.2s',
-                    fontFamily: 'var(--font-body)'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = activeColor.primary}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                />
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '18px', background: 'white', padding: '1rem' }}>
+                <form onSubmit={handleSubmit}>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '0.85rem', color: '#374151' }}>
+                      Email Institusi
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="Pilih akun atau ketik email..."
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', background: 'white', fontSize: '0.9rem', fontWeight: '500', fontFamily: 'var(--font-body)' }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '0.85rem', color: '#374151' }}>
+                      Kata Sandi
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Masukkan password akun"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', background: 'white', fontSize: '0.9rem', fontWeight: '500', fontFamily: 'var(--font-body)' }}
+                    />
+                  </div>
+
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '0.85rem', display: 'grid', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', color: '#475569', fontWeight: '700', fontSize: '0.82rem' }}>
+                      <UserRound size={15} color={activeColor.primary} />
+                      Role dipilih: {roleColors[role].label}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', color: '#64748b', fontWeight: '600', fontSize: '0.8rem' }}>
+                      <KeyRound size={15} color={activeColor.primary} />
+                      Email dan password akan terisi otomatis saat role atau akun dipilih.
+                    </div>
+                  </div>
+
+                  {errorMsg && (
+                    <div style={{ background: '#fef2f2', color: '#dc2626', padding: '0.75rem 1rem', borderRadius: '10px', marginBottom: '1rem', fontWeight: '600', border: '1px solid #fecaca', fontSize: '0.85rem' }}>
+                      {errorMsg}
+                    </div>
+                  )}
+
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    type="submit"
+                    style={{ width: '100%', padding: '0.9rem', fontSize: '0.95rem', borderRadius: '12px', fontWeight: '700', background: activeColor.primary, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  >
+                    Masuk ke Dashboard <ArrowRight size={18} />
+                  </motion.button>
+                </form>
               </div>
-
-              {errorMsg && (
-                <div style={{
-                  background: '#fef2f2', color: '#dc2626',
-                  padding: '0.75rem 1rem', borderRadius: '10px',
-                  marginBottom: '1rem', fontWeight: '600',
-                  border: '1px solid #fecaca', fontSize: '0.85rem'
-                }}>
-                  {errorMsg}
-                </div>
-              )}
-
-              <motion.button
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                type="submit"
-                style={{
-                  width: '100%', padding: '0.9rem', fontSize: '0.95rem',
-                  borderRadius: '12px', fontWeight: '700',
-                  background: activeColor.primary,
-                  border: 'none', color: 'white',
-                  cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  transition: 'background 0.3s'
-                }}
-              >
-                Masuk ke Dashboard <ArrowRight size={18} />
-              </motion.button>
-            </form>
+            </div>
 
             <p style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-              <Link to="/" style={{
-                color: '#64748b', fontSize: '0.85rem', fontWeight: '600',
-                textDecoration: 'none'
-              }}>
+              <Link to="/" style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none' }}>
                 ← Kembali ke Beranda
               </Link>
             </p>
-
           </motion.div>
         </div>
       </div>

@@ -18,20 +18,13 @@ const roleLabelMap = {
   pemerintah: 'Pemerintah'
 }
 
-const roleOptions = [
-  { id: 'vendor', label: 'Vendor Dapur', path: '/vendor' },
-  { id: 'ahli_gizi', label: 'Ahli Gizi', path: '/ahli-gizi' },
-  { id: 'sekolah', label: 'Sekolah', path: '/sekolah' },
-  { id: 'pemerintah', label: 'Pemerintah', path: '/pemerintah' }
-]
-
 const pageTitleMap = {
   '/vendor': 'Dashboard',
-  '/vendor/dokumen': 'Dokumen & Izin',
-  '/vendor/dapur': 'Manajemen Dapur',
+  '/vendor/informasi': 'Dapur Operasional',
   '/vendor/menu': 'Input Menu',
   '/vendor/produksi': 'Status Produksi',
   '/vendor/distribusi': 'Distribusi',
+  '/vendor/stok': 'Stok & Gudang',
   '/ahli-gizi': 'Dashboard',
   '/ahli-gizi/validasi': 'Validasi Menu',
   '/ahli-gizi/standar': 'Standar Gizi',
@@ -66,21 +59,7 @@ const DashboardLayout = ({ user, onLogout, onSwitchRole, children }) => {
 
   const handleLogout = () => {
     onLogout()
-    navigate('/')
-  }
-
-  const handleRoleSwitch = (role) => {
-    if (role === user?.role) {
-      setAccountMenuOpen(false)
-      return
-    }
-
-    const switchedUser = onSwitchRole?.(role)
-    if (!switchedUser) return
-
-    const target = roleOptions.find((item) => item.id === role)?.path || '/'
-    navigate(target)
-    setAccountMenuOpen(false)
+    navigate('/login')
   }
 
   return (
@@ -184,22 +163,15 @@ const DashboardLayout = ({ user, onLogout, onSwitchRole, children }) => {
                   </div>
 
                   <div className="account-menu-section">
-                    <p>Ganti akun / peran</p>
-                    {roleOptions.map((role) => {
-                      const isActive = role.id === user?.role
-                      return (
-                        <button
-                          key={role.id}
-                          type="button"
-                          className={`account-role-option ${isActive ? 'active' : ''}`}
-                          onClick={() => handleRoleSwitch(role.id)}
-                          disabled={isActive}
-                        >
-                          <span>{role.label}</span>
-                          {isActive && <small>Aktif</small>}
-                        </button>
-                      )
-                    })}
+                    <p>Akun aktif</p>
+                    <button
+                      type="button"
+                      className="account-role-option active"
+                      disabled
+                    >
+                      <span>{roleLabel || user?.role || 'Akun'}</span>
+                      <small>Aktif</small>
+                    </button>
                   </div>
 
                   <button type="button" className="account-logout" onClick={handleLogout}>

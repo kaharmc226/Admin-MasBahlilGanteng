@@ -39,9 +39,11 @@ CREATE TABLE vendors (
   status_verifikasi ENUM('pending','approved','rejected','suspended') DEFAULT 'pending',
   izin_usaha VARCHAR(50) NOT NULL,
   id_user INT NULL,
+  id_ahli_gizi_pengawas INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (id_user) REFERENCES users(id_user) ON DELETE SET NULL
+  FOREIGN KEY (id_user) REFERENCES users(id_user) ON DELETE SET NULL,
+  FOREIGN KEY (id_ahli_gizi_pengawas) REFERENCES users(id_user) ON DELETE SET NULL
 );
 
 CREATE TABLE vendor_registrations (
@@ -69,9 +71,14 @@ CREATE TABLE dapur (
   id_vendor INT NOT NULL,
   lokasi VARCHAR(150) NOT NULL,
   kapasitas_produksi INT NOT NULL DEFAULT 0,
+  status_verifikasi ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  review_note TEXT NULL,
+  reviewed_by INT NULL,
+  reviewed_at DATETIME NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (id_vendor) REFERENCES vendors(id_vendor) ON DELETE CASCADE
+  FOREIGN KEY (id_vendor) REFERENCES vendors(id_vendor) ON DELETE CASCADE,
+  FOREIGN KEY (reviewed_by) REFERENCES users(id_user) ON DELETE SET NULL
 );
 
 CREATE TABLE dapur_stok (

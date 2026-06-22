@@ -197,6 +197,100 @@ function getDistribusiStatusForProduksi(status, currentDistribusiStatus) {
   return 'DIJADWALKAN'
 }
 
+async function getDapurStatusRecord(executor, idDapur) {
+  const [rows] = await executor.query(
+    'SELECT id_dapur, status_verifikasi, review_note FROM dapur WHERE id_dapur = ? LIMIT 1',
+    [idDapur]
+  )
+  return rows[0] || null
+}
+
+async function assertDapurApproved(executor, idDapur) {
+  const dapur = await getDapurStatusRecord(executor, idDapur)
+  if (!dapur) {
+    throw new Error('Dapur tidak ditemukan.')
+  }
+  if (dapur.status_verifikasi !== 'approved') {
+    throw new Error(`Dapur ini belum disetujui Pemerintah dan belum bisa beroperasi. Status saat ini: ${dapur.status_verifikasi}.`)
+  }
+  return dapur
+}
+
+function getOperationalErrorStatus(message = '') {
+  if (message.includes('tidak ditemukan')) return 404
+  if (
+    message.includes('belum disetujui Pemerintah') ||
+    message.includes('nonaktif') ||
+    message.includes('tidak mencukupi') ||
+    message.includes('belum terdaftar') ||
+    message.includes('wajib diisi') ||
+    message.includes('sudah digunakan') ||
+    message.includes('wajib diatur')
+  ) {
+    return 400
+  }
+  return 500
+}
+
+async function ensureEmailAvailable(executor, email, exceptUserId = null) {
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+  if (!normalizedEmail) throw new Error('Email wajib diisi.')
+  const [rows] = await executor.query(
+    'SELECT id_user FROM users WHERE email = ? LIMIT 1',
+    [normalizedEmail]
+  )
+  if (rows.length > 0 && Number(rows[0].id_user) !== Number(exceptUserId || 0)) {
+    throw new Error('Email sudah digunakan oleh akun lain.')
+  }
+  return normalizedEmail
+}
+
+async function getActiveAhliGizi(executor) {
+  const [rows] = await executor.query(
+    'SELECT id_user, name, email, status FROM users WHERE role = "ahli_gizi" AND status = "active" ORDER BY id_user ASC LIMIT 1'
+  )
+  return rows[0] || null
+}
+
+async function createUserAccount(executor, { name, email, password, role, status = 'active' }) {
+  const normalizedName = String(name || '').trim()
+  const normalizedPassword = String(password || '').trim()
+  if (!normalizedName) throw new Error('Nama akun wajib diisi.')
+  if (!normalizedPassword) throw new Error('Password wajib diisi.')
+  const normalizedEmail = await ensureEmailAvailable(executor, email)
+  const [result] = await executor.query(
+    'INSERT INTO users (name, email, password, role, status) VALUES (?,?,?,?,?)',
+    [normalizedName, normalizedEmail, normalizedPassword, role, status]
+  )
+  return {
+    id_user: result.insertId,
+    name: normalizedName,
+    email: normalizedEmail,
+    role,
+    status
+  }
+}
+
+async function updateUserStatusForVendor(executor, vendorId, status) {
+  await executor.query(
+    `UPDATE users u
+     JOIN vendors v ON v.id_user = u.id_user
+     SET u.status = ?
+     WHERE v.id_vendor = ?`,
+    [status, vendorId]
+  )
+}
+
+async function updateUserStatusForSchool(executor, schoolId, status) {
+  await executor.query(
+    `UPDATE users u
+     JOIN sekolah s ON s.id_user = u.id_user
+     SET u.status = ?
+     WHERE s.id_sekolah = ?`,
+    [status, schoolId]
+  )
+}
+
 // Auto-migrate: create dapur_stok_history table
 pool.query(`
   CREATE TABLE IF NOT EXISTS dapur_stok_history (
@@ -217,6 +311,39 @@ pool.query(`
   `)
 }).then(() => {
   console.log('✅ Table produksi status column updated to include pending.')
+  return pool.query('SHOW COLUMNS FROM dapur')
+}).then(([columns]) => {
+  const existing = new Set(columns.map(col => col.Field))
+  const migrations = []
+  if (!existing.has('status_verifikasi')) {
+    migrations.push(pool.query(`ALTER TABLE dapur ADD COLUMN status_verifikasi ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending' AFTER kapasitas_produksi`))
+  }
+  if (!existing.has('review_note')) {
+    migrations.push(pool.query('ALTER TABLE dapur ADD COLUMN review_note TEXT NULL AFTER status_verifikasi'))
+  }
+  if (!existing.has('reviewed_by')) {
+    migrations.push(pool.query('ALTER TABLE dapur ADD COLUMN reviewed_by INT NULL AFTER review_note'))
+  }
+  if (!existing.has('reviewed_at')) {
+    migrations.push(pool.query('ALTER TABLE dapur ADD COLUMN reviewed_at DATETIME NULL AFTER reviewed_by'))
+  }
+  return Promise.all(migrations)
+}).then(() => {
+  return pool.query('SHOW INDEX FROM dapur WHERE Key_name = "idx_dapur_reviewed_by"')
+}).then(([rows]) => {
+  if (rows.length > 0) return null
+  return pool.query('ALTER TABLE dapur ADD INDEX idx_dapur_reviewed_by (reviewed_by)')
+}).then(() => {
+  return pool.query('SHOW CREATE TABLE dapur')
+}).then(async ([rows]) => {
+  const createSql = rows?.[0]?.['Create Table'] || ''
+  if (!createSql.includes('FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id_user`)')) {
+    try {
+      await pool.query('ALTER TABLE dapur ADD CONSTRAINT fk_dapur_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users(id_user) ON DELETE SET NULL')
+    } catch (err) {
+      if (!String(err.message || '').includes('Duplicate foreign key constraint name')) throw err
+    }
+  }
   return pool.query('SHOW COLUMNS FROM menus LIKE "foto_url"')
 }).then(([columns]) => {
   if (columns.length > 0) return null
@@ -266,6 +393,23 @@ pool.query(`
   return pool.query(`
     ALTER TABLE vendors MODIFY COLUMN status_verifikasi ENUM('pending','approved','rejected','suspended') DEFAULT 'pending'
   `)
+}).then(() => {
+  return pool.query('SHOW COLUMNS FROM vendors')
+}).then(([columns]) => {
+  const existing = new Set(columns.map(col => col.Field))
+  if (existing.has('id_ahli_gizi_pengawas')) return null
+  return pool.query('ALTER TABLE vendors ADD COLUMN id_ahli_gizi_pengawas INT NULL AFTER id_user')
+}).then(async () => {
+  try {
+    await pool.query('ALTER TABLE vendors ADD CONSTRAINT fk_vendors_ahli_gizi_pengawas FOREIGN KEY (id_ahli_gizi_pengawas) REFERENCES users(id_user) ON DELETE SET NULL')
+  } catch (err) {
+    if (!String(err.message || '').includes('Duplicate foreign key constraint name')) throw err
+  }
+  try {
+    await pool.query('ALTER TABLE vendors ADD INDEX idx_vendors_ahli_gizi_pengawas (id_ahli_gizi_pengawas)')
+  } catch (err) {
+    if (!String(err.message || '').includes('Duplicate key name')) throw err
+  }
 }).then(() => {
   return pool.query(`
     CREATE TABLE IF NOT EXISTS vendor_registrations (
@@ -329,8 +473,62 @@ app.post('/api/auth/login', async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND password = ?', [email, password])
     if (rows.length === 0) return res.status(401).json({ error: 'Email atau password salah' })
     const user = rows[0]
+    if (user.status !== 'active') {
+      return res.status(403).json({ error: 'Akun ini belum aktif atau sedang dinonaktifkan.' })
+    }
     delete user.password
     res.json(user)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/auth/accounts', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        u.id_user,
+        u.name,
+        u.email,
+        u.password,
+        u.role,
+        u.status,
+        CASE
+          WHEN u.role = 'vendor' THEN v.id_vendor
+          WHEN u.role = 'sekolah' THEN s.id_sekolah
+          ELSE NULL
+        END AS entityId,
+        CASE
+          WHEN u.role = 'vendor' THEN v.nama_vendor
+          WHEN u.role = 'sekolah' THEN s.nama_sekolah
+          ELSE u.name
+        END AS entityName
+      FROM users u
+      LEFT JOIN vendors v ON u.id_user = v.id_user
+      LEFT JOIN sekolah s ON u.id_user = s.id_user
+      WHERE u.status = 'active'
+        AND (
+          u.role IN ('pemerintah', 'ahli_gizi')
+          OR (u.role = 'vendor' AND v.status_verifikasi = 'approved')
+          OR (u.role = 'sekolah' AND s.status = 'active')
+        )
+      ORDER BY FIELD(u.role, 'pemerintah', 'ahli_gizi', 'vendor', 'sekolah'), entityName, u.name
+    `)
+    const roleOrder = ['pemerintah', 'ahli_gizi', 'vendor', 'sekolah']
+    const labelMap = {
+      pemerintah: 'Pemerintah',
+      ahli_gizi: 'Ahli Gizi',
+      vendor: 'Vendor',
+      sekolah: 'Sekolah'
+    }
+    const grouped = roleOrder.map((role) => ({
+      role,
+      label: labelMap[role],
+      accounts: rows
+        .filter((item) => item.role === role)
+        .map(({ id_user, name, email, password, status, entityId, entityName }) => ({ id_user, name, email, password, status, entityId, entityName }))
+    }))
+    res.json(grouped)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -353,7 +551,11 @@ app.get('/api/sekolah', async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === 'true'
     const [rows] = await pool.query(
-      `SELECT * FROM sekolah ${includeInactive ? '' : 'WHERE status = "active"'} ORDER BY nama_sekolah`
+      `SELECT s.*, u.name AS account_name, u.email, u.status AS account_status
+       FROM sekolah s
+       LEFT JOIN users u ON s.id_user = u.id_user
+       ${includeInactive ? '' : 'WHERE s.status = "active"'}
+       ORDER BY s.nama_sekolah`
     )
     res.json(rows)
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -361,7 +563,13 @@ app.get('/api/sekolah', async (req, res) => {
 
 app.get('/api/sekolah/:id', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM sekolah WHERE id_sekolah = ?', [req.params.id])
+    const [rows] = await pool.query(
+      `SELECT s.*, u.name AS account_name, u.email, u.status AS account_status
+       FROM sekolah s
+       LEFT JOIN users u ON s.id_user = u.id_user
+       WHERE s.id_sekolah = ?`,
+      [req.params.id]
+    )
     if (rows.length === 0) return res.status(404).json({ error: 'Sekolah tidak ditemukan' })
     res.json(rows[0])
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -371,7 +579,10 @@ app.get('/api/sekolah/by-user/:userId', async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === 'true'
     const [rows] = await pool.query(
-      `SELECT * FROM sekolah WHERE id_user = ? ${includeInactive ? '' : 'AND status = "active"'} LIMIT 1`,
+      `SELECT s.*, u.name AS account_name, u.email, u.status AS account_status
+       FROM sekolah s
+       LEFT JOIN users u ON s.id_user = u.id_user
+       WHERE s.id_user = ? ${includeInactive ? '' : 'AND s.status = "active"'} LIMIT 1`,
       [req.params.userId]
     )
     if (rows.length === 0) return res.status(404).json({ error: 'Sekolah untuk user ini tidak ditemukan' })
@@ -380,14 +591,33 @@ app.get('/api/sekolah/by-user/:userId', async (req, res) => {
 })
 
 app.post('/api/sekolah', async (req, res) => {
+  let connection
   try {
-    const { nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, status } = req.body
-    const [result] = await pool.query(
-      'INSERT INTO sekolah (nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, status) VALUES (?,?,?,?,?,?,?)',
-      [nama_sekolah, alamat, jenjang, jumlah_siswa || 0, alergi_count || 0, intoleran_count || 0, status || 'active']
+    const { nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, status, account_name, email, password } = req.body
+    connection = await pool.getConnection()
+    await connection.beginTransaction()
+    let userAccount = null
+    if (email || password || account_name) {
+      userAccount = await createUserAccount(connection, {
+        name: account_name || `Admin ${nama_sekolah}`,
+        email,
+        password,
+        role: 'sekolah',
+        status: status === 'inactive' ? 'inactive' : 'active'
+      })
+    }
+    const [result] = await connection.query(
+      'INSERT INTO sekolah (nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, id_user, status) VALUES (?,?,?,?,?,?,?,?)',
+      [nama_sekolah, alamat, jenjang, jumlah_siswa || 0, alergi_count || 0, intoleran_count || 0, userAccount?.id_user || null, status || 'active']
     )
-    res.status(201).json({ id_sekolah: result.insertId, status: status || 'active', ...req.body })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+    await connection.commit()
+    res.status(201).json({ id_sekolah: result.insertId, id_user: userAccount?.id_user || null, status: status || 'active', ...req.body })
+  } catch (err) {
+    if (connection) await connection.rollback()
+    res.status(getOperationalErrorStatus(err.message)).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
 })
 
 app.put('/api/sekolah/:id', async (req, res) => {
@@ -397,6 +627,9 @@ app.put('/api/sekolah/:id', async (req, res) => {
       'UPDATE sekolah SET nama_sekolah=?, alamat=?, jenjang=?, jumlah_siswa=?, alergi_count=?, intoleran_count=?, status=? WHERE id_sekolah=?',
       [nama_sekolah, alamat, jenjang, jumlah_siswa, alergi_count, intoleran_count, status || 'active', req.params.id]
     )
+    if (status === 'inactive' || status === 'active') {
+      await updateUserStatusForSchool(pool, req.params.id, status === 'inactive' ? 'inactive' : 'active')
+    }
     res.json({ message: 'Updated' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -404,6 +637,7 @@ app.put('/api/sekolah/:id', async (req, res) => {
 app.delete('/api/sekolah/:id', async (req, res) => {
   try {
     await pool.query('UPDATE sekolah SET status="inactive" WHERE id_sekolah = ?', [req.params.id])
+    await updateUserStatusForSchool(pool, req.params.id, 'inactive')
     res.json({ message: 'Deactivated' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -411,6 +645,7 @@ app.delete('/api/sekolah/:id', async (req, res) => {
 app.put('/api/sekolah/:id/reactivate', async (req, res) => {
   try {
     await pool.query('UPDATE sekolah SET status="active" WHERE id_sekolah = ?', [req.params.id])
+    await updateUserStatusForSchool(pool, req.params.id, 'active')
     res.json({ message: 'Reactivated' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -420,14 +655,26 @@ app.put('/api/sekolah/:id/reactivate', async (req, res) => {
 // ============================================
 app.get('/api/vendors', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM vendors ORDER BY nama_vendor')
+    const [rows] = await pool.query(`
+      SELECT v.*, u.name AS account_name, u.email AS account_email, u.status AS account_status, ag.name AS ahli_gizi_pengawas_name, ag.email AS ahli_gizi_pengawas_email
+      FROM vendors v
+      LEFT JOIN users u ON v.id_user = u.id_user
+      LEFT JOIN users ag ON v.id_ahli_gizi_pengawas = ag.id_user
+      ORDER BY v.nama_vendor
+    `)
     res.json(rows)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.get('/api/vendors/:id', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM vendors WHERE id_vendor = ?', [req.params.id])
+    const [rows] = await pool.query(`
+      SELECT v.*, u.name AS account_name, u.email AS account_email, u.status AS account_status, ag.name AS ahli_gizi_pengawas_name, ag.email AS ahli_gizi_pengawas_email
+      FROM vendors v
+      LEFT JOIN users u ON v.id_user = u.id_user
+      LEFT JOIN users ag ON v.id_ahli_gizi_pengawas = ag.id_user
+      WHERE v.id_vendor = ?
+    `, [req.params.id])
     if (rows.length === 0) return res.status(404).json({ error: 'Vendor tidak ditemukan' })
     res.json(rows[0])
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -435,21 +682,46 @@ app.get('/api/vendors/:id', async (req, res) => {
 
 app.get('/api/vendors/by-user/:userId', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM vendors WHERE id_user = ? LIMIT 1', [req.params.userId])
+    const [rows] = await pool.query(`
+      SELECT v.*, u.name AS account_name, u.email AS account_email, u.status AS account_status, ag.name AS ahli_gizi_pengawas_name, ag.email AS ahli_gizi_pengawas_email
+      FROM vendors v
+      LEFT JOIN users u ON v.id_user = u.id_user
+      LEFT JOIN users ag ON v.id_ahli_gizi_pengawas = ag.id_user
+      WHERE v.id_user = ?
+      LIMIT 1
+    `, [req.params.userId])
     if (rows.length === 0) return res.status(404).json({ error: 'Vendor untuk user ini tidak ditemukan' })
     res.json(rows[0])
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.post('/api/vendors', async (req, res) => {
+  let connection
   try {
-    const { nama_vendor, region, izin_usaha, status_verifikasi } = req.body
-    const [result] = await pool.query(
-      'INSERT INTO vendors (nama_vendor, region, izin_usaha, status_verifikasi) VALUES (?,?,?,?)',
-      [nama_vendor, region, izin_usaha, status_verifikasi || 'pending']
+    const { nama_vendor, region, izin_usaha, status_verifikasi, account_name, email, password } = req.body
+    connection = await pool.getConnection()
+    await connection.beginTransaction()
+    const ahliGizi = await getActiveAhliGizi(connection)
+    if (!ahliGizi) throw new Error('Akun Ahli Gizi aktif wajib diatur sebelum menambah vendor baru.')
+    const userAccount = await createUserAccount(connection, {
+      name: account_name || nama_vendor,
+      email,
+      password,
+      role: 'vendor',
+      status: status_verifikasi === 'suspended' ? 'suspended' : 'active'
+    })
+    const [result] = await connection.query(
+      'INSERT INTO vendors (nama_vendor, region, izin_usaha, status_verifikasi, id_user, id_ahli_gizi_pengawas) VALUES (?,?,?,?,?,?)',
+      [nama_vendor, region, izin_usaha, status_verifikasi || 'pending', userAccount.id_user, ahliGizi.id_user]
     )
-    res.status(201).json({ id_vendor: result.insertId, ...req.body })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+    await connection.commit()
+    res.status(201).json({ id_vendor: result.insertId, id_user: userAccount.id_user, id_ahli_gizi_pengawas: ahliGizi.id_user, ahli_gizi_pengawas_name: ahliGizi.name, ...req.body })
+  } catch (err) {
+    if (connection) await connection.rollback()
+    res.status(getOperationalErrorStatus(err.message)).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
 })
 
 app.put('/api/vendors/:id', async (req, res) => {
@@ -459,6 +731,12 @@ app.put('/api/vendors/:id', async (req, res) => {
       'UPDATE vendors SET nama_vendor=?, region=?, izin_usaha=?, status_verifikasi=? WHERE id_vendor=?',
       [nama_vendor, region, izin_usaha, status_verifikasi, req.params.id]
     )
+    if (status_verifikasi === 'approved') {
+      await updateUserStatusForVendor(pool, req.params.id, 'active')
+    }
+    if (status_verifikasi === 'suspended') {
+      await updateUserStatusForVendor(pool, req.params.id, 'suspended')
+    }
     res.json({ message: 'Updated' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -466,6 +744,7 @@ app.put('/api/vendors/:id', async (req, res) => {
 app.delete('/api/vendors/:id', async (req, res) => {
   try {
     await pool.query("UPDATE vendors SET status_verifikasi='suspended' WHERE id_vendor = ?", [req.params.id])
+    await updateUserStatusForVendor(pool, req.params.id, 'suspended')
     res.json({ message: 'Suspended' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -497,7 +776,7 @@ app.post('/api/vendor-registrations', async (req, res) => {
 app.put('/api/vendor-registrations/:id/approve', async (req, res) => {
   let connection
   try {
-    const { reviewed_by, review_note } = req.body
+    const { reviewed_by, review_note, email, password, account_name } = req.body
     connection = await pool.getConnection()
     await connection.beginTransaction()
     const [regs] = await connection.query('SELECT * FROM vendor_registrations WHERE id_registration=?', [req.params.id])
@@ -506,9 +785,21 @@ app.put('/api/vendor-registrations/:id/approve', async (req, res) => {
       return res.status(404).json({ error: 'Registrasi vendor tidak ditemukan.' })
     }
     const reg = regs[0]
+    const ahliGizi = await getActiveAhliGizi(connection)
+    if (!ahliGizi) {
+      await connection.rollback()
+      return res.status(400).json({ error: 'Akun Ahli Gizi aktif wajib diatur sebelum menyetujui vendor.' })
+    }
+    const userAccount = await createUserAccount(connection, {
+      name: account_name || reg.nama_vendor,
+      email: email || reg.email,
+      password,
+      role: 'vendor',
+      status: 'active'
+    })
     const [vendorResult] = await connection.query(
-      'INSERT INTO vendors (nama_vendor, region, status_verifikasi, izin_usaha) VALUES (?,?,?,?)',
-      [reg.nama_vendor, reg.region || 'Belum ditentukan', 'approved', reg.izin_usaha || `REG-${reg.id_registration}`]
+      'INSERT INTO vendors (nama_vendor, region, status_verifikasi, izin_usaha, id_user, id_ahli_gizi_pengawas) VALUES (?,?,?,?,?,?)',
+      [reg.nama_vendor, reg.region || 'Belum ditentukan', 'approved', reg.izin_usaha || `REG-${reg.id_registration}`, userAccount.id_user, ahliGizi.id_user]
     )
     const idVendor = vendorResult.insertId
     const docs = typeof reg.documents === 'string' ? JSON.parse(reg.documents || '[]') : (reg.documents || [])
@@ -523,10 +814,10 @@ app.put('/api/vendor-registrations/:id/approve', async (req, res) => {
       [reviewed_by || null, review_note || null, idVendor, req.params.id]
     )
     await connection.commit()
-    res.json({ message: 'Approved', id_vendor: idVendor })
+    res.json({ message: 'Approved', id_vendor: idVendor, id_user: userAccount.id_user, id_ahli_gizi_pengawas: ahliGizi.id_user })
   } catch (err) {
     if (connection) await connection.rollback()
-    res.status(500).json({ error: err.message })
+    res.status(getOperationalErrorStatus(err.message)).json({ error: err.message })
   } finally {
     if (connection) connection.release()
   }
@@ -549,9 +840,10 @@ app.put('/api/vendor-registrations/:id/reject', async (req, res) => {
 app.get('/api/dapur', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT d.*, v.nama_vendor 
+      SELECT d.*, v.nama_vendor, reviewer.name AS reviewed_by_name
       FROM dapur d 
       JOIN vendors v ON d.id_vendor = v.id_vendor 
+      LEFT JOIN users reviewer ON d.reviewed_by = reviewer.id_user
       ORDER BY d.lokasi
     `)
     res.json(rows)
@@ -562,10 +854,10 @@ app.post('/api/dapur', async (req, res) => {
   try {
     const { id_vendor, lokasi, kapasitas_produksi } = req.body
     const [result] = await pool.query(
-      'INSERT INTO dapur (id_vendor, lokasi, kapasitas_produksi) VALUES (?,?,?)',
-      [id_vendor, lokasi, kapasitas_produksi || 0]
+      'INSERT INTO dapur (id_vendor, lokasi, kapasitas_produksi, status_verifikasi, review_note, reviewed_by, reviewed_at) VALUES (?,?,?,?,?,?,?)',
+      [id_vendor, lokasi, kapasitas_produksi || 0, 'pending', null, null, null]
     )
-    res.status(201).json({ id_dapur: result.insertId, ...req.body })
+    res.status(201).json({ id_dapur: result.insertId, ...req.body, status_verifikasi: 'pending', review_note: null, reviewed_by: null, reviewed_at: null })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -587,6 +879,32 @@ app.delete('/api/dapur/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+app.put('/api/dapur/:id/approve', async (req, res) => {
+  try {
+    const { reviewed_by, review_note } = req.body
+    await pool.query(
+      'UPDATE dapur SET status_verifikasi="approved", review_note=?, reviewed_by=?, reviewed_at=NOW() WHERE id_dapur=?',
+      [typeof review_note === 'string' && review_note.trim() ? review_note.trim() : null, reviewed_by || null, req.params.id]
+    )
+    res.json({ message: 'Approved' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.put('/api/dapur/:id/reject', async (req, res) => {
+  try {
+    const { reviewed_by, review_note } = req.body
+    const normalizedNote = typeof review_note === 'string' ? review_note.trim() : ''
+    if (!normalizedNote) {
+      return res.status(400).json({ error: 'Catatan penolakan dapur wajib diisi.' })
+    }
+    await pool.query(
+      'UPDATE dapur SET status_verifikasi="rejected", review_note=?, reviewed_by=?, reviewed_at=NOW() WHERE id_dapur=?',
+      [normalizedNote, reviewed_by || null, req.params.id]
+    )
+    res.json({ message: 'Rejected' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 // ============================================
 // MAPPING DAPUR-SEKOLAH
 // ============================================
@@ -605,6 +923,7 @@ app.get('/api/mapping', async (req, res) => {
 app.post('/api/mapping', async (req, res) => {
   try {
     const { id_dapur, id_sekolah } = req.body
+    await assertDapurApproved(pool, id_dapur)
     const [schoolRows] = await pool.query('SELECT status FROM sekolah WHERE id_sekolah = ? LIMIT 1', [id_sekolah])
     if (schoolRows.length === 0) return res.status(404).json({ error: 'Sekolah tidak ditemukan.' })
     if (schoolRows[0].status !== 'active') return res.status(400).json({ error: 'Sekolah nonaktif tidak dapat dipetakan ke dapur.' })
@@ -613,7 +932,7 @@ app.post('/api/mapping', async (req, res) => {
       [id_dapur, id_sekolah]
     )
     res.status(201).json({ id_mapping: result.insertId, ...req.body })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) { res.status(getOperationalErrorStatus(err.message)).json({ error: err.message }) }
 })
 
 app.delete('/api/mapping/:id', async (req, res) => {
@@ -667,12 +986,14 @@ app.post('/api/uploads/confirmation-photo', async (req, res) => {
 
 app.get('/api/menus', async (req, res) => {
   try {
+    const { ahliGiziUserId } = req.query
     const [rows] = await pool.query(`
-      SELECT m.*, v.nama_vendor 
-      FROM menus m 
-      JOIN vendors v ON m.id_vendor = v.id_vendor 
+      SELECT m.*, v.nama_vendor, v.id_ahli_gizi_pengawas
+      FROM menus m
+      JOIN vendors v ON m.id_vendor = v.id_vendor
+      ${ahliGiziUserId ? 'WHERE v.id_ahli_gizi_pengawas = ?' : ''}
       ORDER BY m.tanggal DESC
-    `)
+    `, ahliGiziUserId ? [ahliGiziUserId] : [])
     res.json(rows)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -687,11 +1008,14 @@ app.get('/api/menus/:id', async (req, res) => {
 
 app.post('/api/menus', async (req, res) => {
   try {
-    const { id_vendor, nama_menu, bahan, tanggal, foto_url } = req.body
+    const { id_vendor, nama_menu, bahan, tanggal, foto_url, notes } = req.body
     const calculatedMenu = await calculateMenuNutrition(bahan)
+    const normalizedNotes = Array.isArray(notes)
+      ? notes.map((item) => String(item || '').trim()).filter(Boolean)
+      : []
 
     // Auto-register missing ingredients to all vendor's kitchens
-    const [dapurs] = await pool.query('SELECT id_dapur FROM dapur WHERE id_vendor = ?', [id_vendor])
+    const [dapurs] = await pool.query('SELECT id_dapur FROM dapur WHERE id_vendor = ? AND status_verifikasi = "approved"', [id_vendor])
     if (dapurs.length > 0 && calculatedMenu.bahan && Array.isArray(calculatedMenu.bahan)) {
       for (let d of dapurs) {
         const [stokRows] = await pool.query('SELECT nama_bahan FROM dapur_stok WHERE id_dapur = ?', [d.id_dapur])
@@ -715,8 +1039,8 @@ app.post('/api/menus', async (req, res) => {
     }
 
     const [result] = await pool.query(
-      'INSERT INTO menus (id_vendor, nama_menu, bahan, nilai_gizi, foto_url, tanggal) VALUES (?,?,?,?,?,?)',
-      [id_vendor, nama_menu, JSON.stringify(calculatedMenu.bahan), JSON.stringify(calculatedMenu.nilai_gizi), foto_url || null, tanggal]
+      'INSERT INTO menus (id_vendor, nama_menu, bahan, nilai_gizi, foto_url, notes, tanggal) VALUES (?,?,?,?,?,?,?)',
+      [id_vendor, nama_menu, JSON.stringify(calculatedMenu.bahan), JSON.stringify(calculatedMenu.nilai_gizi), foto_url || null, JSON.stringify(normalizedNotes), tanggal]
     )
     res.status(201).json({ id_menu: result.insertId, ...req.body, ...calculatedMenu })
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -726,6 +1050,9 @@ app.put('/api/menus/:id', async (req, res) => {
   try {
     const { nama_menu, bahan, nilai_gizi, foto_url, status_validasi, notes, tanggal } = req.body
     const fields = [], values = []
+    const normalizedNotes = Array.isArray(notes)
+      ? notes.map((item) => String(item || '').trim()).filter(Boolean)
+      : undefined
     if (nama_menu !== undefined) { fields.push('nama_menu=?'); values.push(nama_menu) }
     if (bahan !== undefined) {
       const calculatedMenu = await calculateMenuNutrition(bahan)
@@ -736,7 +1063,7 @@ app.put('/api/menus/:id', async (req, res) => {
     }
     if (foto_url !== undefined) { fields.push('foto_url=?'); values.push(foto_url || null) }
     if (status_validasi !== undefined) { fields.push('status_validasi=?'); values.push(status_validasi) }
-    if (notes !== undefined) { fields.push('notes=?'); values.push(JSON.stringify(notes)) }
+    if (notes !== undefined) { fields.push('notes=?'); values.push(JSON.stringify(normalizedNotes || [])) }
     if (tanggal !== undefined) { fields.push('tanggal=?'); values.push(tanggal) }
     if (fields.length === 0) return res.status(400).json({ error: 'Tidak ada data menu untuk diperbarui.' })
     values.push(req.params.id)
@@ -785,6 +1112,8 @@ app.post('/api/produksi', async (req, res) => {
     connection = await pool.getConnection()
     await connection.beginTransaction()
 
+    await assertDapurApproved(connection, id_dapur)
+
     const [menuRows] = await connection.query('SELECT status_validasi FROM menus WHERE id_menu = ?', [id_menu])
     if (menuRows.length === 0) {
       await connection.rollback()
@@ -832,9 +1161,9 @@ app.post('/api/produksi', async (req, res) => {
     res.status(201).json({ id_produksi, ...req.body })
   } catch (err) {
     if (connection) await connection.rollback()
-    const statusCode = err.message.includes('tidak mencukupi') || err.message.includes('belum terdaftar') || err.message.includes('Menu tidak ditemukan.')
+    const statusCode = err.message.includes('Menu tidak ditemukan.')
       ? 400
-      : 500
+      : getOperationalErrorStatus(err.message)
     res.status(statusCode).json({ error: err.message })
   } finally {
     if (connection) connection.release()
@@ -1025,6 +1354,7 @@ app.get('/api/validasi-log', async (req, res) => {
 app.post('/api/validasi-log', async (req, res) => {
   try {
     const { id_menu, id_user, aksi, catatan, force_override } = req.body
+    const normalizedNote = typeof catatan === 'string' ? catatan.trim() : ''
     if (aksi === 'approved') {
       const [menuRows] = await pool.query('SELECT bahan, nilai_gizi FROM menus WHERE id_menu=?', [id_menu])
       if (menuRows.length === 0) return res.status(404).json({ error: 'Menu tidak ditemukan.' })
@@ -1036,9 +1366,12 @@ app.post('/api/validasi-log', async (req, res) => {
         return res.status(400).json({ error: 'Menu belum memiliki data nutrisi terhitung dari bahan terverifikasi.' })
       }
     }
+    if (aksi === 'rejected' && !normalizedNote) {
+      return res.status(400).json({ error: 'Catatan revisi Ahli Gizi wajib diisi sebelum mengirim permintaan revisi.' })
+    }
     const finalNote = force_override && aksi === 'approved'
-      ? `[OVERRIDE APPROVAL] ${catatan || 'Menu disahkan melalui override ahli gizi setelah konfirmasi manual.'}`
-      : catatan
+      ? `[OVERRIDE APPROVAL] ${normalizedNote || 'Menu disahkan melalui override ahli gizi setelah konfirmasi manual.'}`
+      : (normalizedNote || null)
     // Also update menu status
     await pool.query('UPDATE menus SET status_validasi=? WHERE id_menu=?', [aksi, id_menu])
     const [result] = await pool.query(
@@ -1303,14 +1636,16 @@ app.delete('/api/dokumen/:id', async (req, res) => {
 // ============================================
 app.get('/api/stok/:id_dapur', async (req, res) => {
   try {
+    await assertDapurApproved(pool, req.params.id_dapur)
     const [rows] = await pool.query('SELECT * FROM dapur_stok WHERE id_dapur = ? ORDER BY nama_bahan', [req.params.id_dapur])
     res.json(rows)
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) { res.status(getOperationalErrorStatus(err.message)).json({ error: err.message }) }
 })
 
 app.post('/api/stok', async (req, res) => {
   try {
     const { id_dapur, nama_bahan, jumlah, satuan } = req.body
+    await assertDapurApproved(pool, id_dapur)
     const trimmed = (nama_bahan || '').trim()
     if (!trimmed) {
       return res.status(400).json({ error: 'Nama bahan baku tidak boleh kosong' })
@@ -1331,7 +1666,7 @@ app.post('/api/stok', async (req, res) => {
     )
     
     res.status(201).json({ id_stok: result.insertId, ...req.body, nama_bahan: formattedName })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) { res.status(getOperationalErrorStatus(err.message)).json({ error: err.message }) }
 })
 
 app.put('/api/stok/:id_stok', async (req, res) => {
@@ -1340,6 +1675,7 @@ app.put('/api/stok/:id_stok', async (req, res) => {
     const [oldRows] = await pool.query('SELECT id_dapur, nama_bahan, jumlah, satuan FROM dapur_stok WHERE id_stok = ?', [req.params.id_stok])
     if (oldRows.length === 0) return res.status(404).json({ error: 'Item not found' })
     const old = oldRows[0]
+    await assertDapurApproved(pool, old.id_dapur)
 
     await pool.query(
       'UPDATE dapur_stok SET jumlah = ? WHERE id_stok = ?',
@@ -1357,7 +1693,7 @@ app.put('/api/stok/:id_stok', async (req, res) => {
     }
 
     res.json({ message: 'Updated' })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) { res.status(getOperationalErrorStatus(err.message)).json({ error: err.message }) }
 })
 
 app.delete('/api/stok/:id_stok', async (req, res) => {
@@ -1365,6 +1701,7 @@ app.delete('/api/stok/:id_stok', async (req, res) => {
     const [oldRows] = await pool.query('SELECT id_dapur, nama_bahan, jumlah, satuan FROM dapur_stok WHERE id_stok = ?', [req.params.id_stok])
     if (oldRows.length > 0) {
       const old = oldRows[0]
+      await assertDapurApproved(pool, old.id_dapur)
       await pool.query(
         'INSERT INTO dapur_stok_history (id_dapur, nama_bahan, tipe, jumlah, satuan, keterangan) VALUES (?,?,?,?,?,?)',
         [old.id_dapur, old.nama_bahan, 'DEBIT', old.jumlah, old.satuan, 'Item Dihapus']
@@ -1372,17 +1709,18 @@ app.delete('/api/stok/:id_stok', async (req, res) => {
     }
     await pool.query('DELETE FROM dapur_stok WHERE id_stok = ?', [req.params.id_stok])
     res.json({ message: 'Deleted' })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) { res.status(getOperationalErrorStatus(err.message)).json({ error: err.message }) }
 })
 
 app.get('/api/stok/history/:id_dapur', async (req, res) => {
   try {
+    await assertDapurApproved(pool, req.params.id_dapur)
     const [rows] = await pool.query(
       'SELECT * FROM dapur_stok_history WHERE id_dapur = ? ORDER BY created_at DESC',
       [req.params.id_dapur]
     )
     res.json(rows)
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) { res.status(getOperationalErrorStatus(err.message)).json({ error: err.message }) }
 })
 
 // ============================================

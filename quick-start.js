@@ -42,21 +42,21 @@ async function ensureDatabaseReady(connection) {
   const state = await databaseState(connection, dbConfig)
 
   if (forceReset) {
-    console.log(`\nReset requested. Rebuilding "${dbConfig.database}" with minimal baseline data...`)
+    console.log(`\nReset requested. Rebuilding "${dbConfig.database}" with Kendari clean baseline data...`)
     await initializeMinimalDatabase(connection, { reset: true, config: dbConfig })
     printBootstrapNotice('Database reset completed.')
     return
   }
 
   if (!state.exists || !state.hasTables) {
-    console.log(`\nDatabase "${dbConfig.database}" is missing or empty. Initializing schema and minimal baseline...`)
+    console.log(`\nDatabase "${dbConfig.database}" is missing or empty. Initializing schema and Kendari clean baseline...`)
     await initializeMinimalDatabase(connection, { config: dbConfig })
     printBootstrapNotice('Database initialized successfully.')
     return
   }
 
   if (state.totalRows === 0) {
-    console.log(`\nDatabase "${dbConfig.database}" has schema but no baseline data. Applying minimal bootstrap...`)
+    console.log(`\nDatabase "${dbConfig.database}" has schema but no baseline data. Applying Kendari clean baseline...`)
     await connection.query(`USE \`${dbConfig.database}\``)
     await applyMinimalBootstrap(connection)
     printBootstrapNotice('Baseline data applied successfully.')
@@ -64,13 +64,13 @@ async function ensureDatabaseReady(connection) {
   }
 
   console.log(`Database "${dbConfig.database}" already exists and will be reused.`)
-  console.log('Optional demo data: `npm run seed:demo -- --merge`')
+  console.log('Optional richer demo data: `npm run seed:db -- --profile=kendari-demo --reset`')
 }
 
 function printBootstrapNotice(prefix) {
   console.log(`\x1b[32m${prefix}\x1b[0m`)
   console.log('App is operational with baseline accounts.')
-  console.log('Optional demo data: `npm run seed:demo -- --merge`')
+  console.log('Optional richer demo data: `npm run seed:db -- --profile=kendari-demo --reset`')
 }
 
 function startServices() {

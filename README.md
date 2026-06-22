@@ -18,7 +18,7 @@ TRAKSI adalah platform pelacakan dan transparansi distribusi makanan bergizi unt
 - Dashboard berbasis peran untuk Vendor, Ahli Gizi, Sekolah, dan Pemerintah.
 - Alur operasional dari stok bahan -> produksi -> distribusi -> konfirmasi sekolah -> feedback.
 - Integrasi frontend React dengan backend Express dan database MySQL.
-- Seeder demo terpisah untuk menyiapkan data presentasi tanpa harus reset manual lewat SQL.
+- Seeder database kanonis berbasis profil untuk baseline Kendari clean dan demo.
 - Quick start lokal untuk menjalankan frontend dan backend sekaligus.
 
 ## Tech Stack
@@ -33,7 +33,7 @@ TRAKSI adalah platform pelacakan dan transparansi distribusi makanan bergizi unt
 
 ```text
 .
-|-- database/               # SQL schema, baseline bootstrap, dan data demo opsional
+|-- database/               # SQL schema dan arsip seed SQL lama yang sudah dipensiunkan
 |-- public/                 # Aset statis
 |-- scripts/                # Script utilitas terminal
 |-- server/                 # Backend Express + koneksi MySQL
@@ -85,11 +85,11 @@ Perintah ini akan:
 - gagal cepat bila MySQL belum berjalan,
 - membuat atau menginisialisasi `traksi_db` bila database kosong,
 - mengimpor schema dari `database/schema.sql`,
-- mengimpor baseline minimal dari `database/bootstrap_minimal.sql`,
-- menampilkan instruksi seed demo opsional `npm run seed:demo -- --merge`,
+- menanam baseline `kendari-clean` dari canonical seed di `scripts/seed-data.js`,
+- menampilkan instruksi demo opsional `npm run seed:db -- --profile=kendari-demo --reset`,
 - menjalankan backend dan frontend secara bersamaan.
 
-Untuk reset schema + baseline minimal:
+Untuk reset schema + baseline clean:
 
 ```bash
 npm start -- --reset
@@ -114,48 +114,47 @@ Default URL:
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:3001`
 
-## Seeder Demo
+## Seeder Database
 
-Seeder demo sekarang bisa dijalankan terpisah dari `npm start`.
+Seeder database sekarang memakai satu sumber data kanonis dengan dua profil yang saling konsisten.
+
+```bash
+npm run seed:db -- --profile=kendari-clean --reset
+```
+
+Untuk baseline demo presentasi yang tetap memakai graph data yang sama:
+
+```bash
+npm run seed:db -- --profile=kendari-demo --reset
+```
+
+Alias kompatibilitas tetap tersedia:
 
 ```bash
 npm run seed:demo
 ```
 
-Perintah ini akan memeriksa kondisi database lalu:
+Perilaku seeder:
 
-- meminta pilihan jika data sudah ada,
-- menawarkan mode `merge`, `overwrite`, atau `cancel`,
-- menyiapkan data demo yang cocok untuk presentasi.
-
-Contoh:
-
-```bash
-npm run seed:demo -- --merge
-npm run seed:demo -- --overwrite
-npm run seed:demo -- --overwrite --yes
-```
-
-Penjelasan mode:
-
-- `--merge`: menambahkan atau menyegarkan data demo di atas schema + baseline minimal yang sudah ada.
-- `--overwrite`: membuat ulang schema, baseline minimal, lalu menambahkan seluruh data demo opsional.
-- `--yes`: melewati prompt konfirmasi.
+- `--reset`: drop dan bangun ulang database secara otoritatif dari schema + seed profile terpilih.
+- tanpa `--reset`, command hanya akan jalan jika database masih kosong; jika sudah berisi data, command akan berhenti dan meminta reset eksplisit.
+- `npm run seed:demo` sekarang memetakan ke profil `kendari-demo` dengan reset penuh.
 
 Catatan:
 
 - `npm start` cocok untuk bootstrap cepat setelah service MySQL lokal aktif.
-- `npm run seed:demo` cocok saat Anda ingin menyiapkan ulang data demo sebelum sidang tanpa menebak kondisi database saat ini.
+- `npm run seed:db -- --profile=kendari-clean --reset` adalah cara paling aman untuk mulai fresh tanpa data yatim.
+- `npm run seed:db -- --profile=kendari-demo --reset` menambah histori demo di atas master data Kendari yang sama.
 - `npm run server` saja tidak melakukan bootstrap database.
 
 ## Akun Demo
 
 | Role | Email | Password |
 | :--- | :--- | :--- |
-| Vendor | `v.jaktim@traksi.id` | `vendor123` |
-| Pemerintah | `gov.dki@traksi.id` | `gov123` |
-| Ahli Gizi | `nutri.jaktim@traksi.id` | `nutri123` |
-| Sekolah | `sdn06@sekolah.traksi.id` | `sekolah123` |
+| Vendor | `vendor.mandonga@traksi.id` | `vendor123` |
+| Pemerintah | `pemkot.kendari@traksi.id` | `gov123` |
+| Ahli Gizi | `gizi.kendari@traksi.id` | `nutri123` |
+| Sekolah | `sdn02.mandonga@sekolah.traksi.id` | `sekolah123` |
 
 ## Alur Demo yang Disarankan
 

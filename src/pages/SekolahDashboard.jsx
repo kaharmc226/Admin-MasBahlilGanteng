@@ -66,7 +66,7 @@ const Header = ({ title, subtitle, showAdd = false, onAdd, isFeedback }) => (
   </div>
 )
 
-const AddFormModal = ({ onClose, isFeedback, activeDelivery, user, onNotify }) => {
+const AddFormModal = ({ onClose, isFeedback, activeDelivery, user, onNotify, reportArea = 'Kota Kendari' }) => {
   const [rating, setRating] = useState(4);
   const [fields, setFields] = useState({
     nama_siswa: '',
@@ -96,7 +96,7 @@ const AddFormModal = ({ onClose, isFeedback, activeDelivery, user, onNotify }) =
           judul: fields.judul || 'Kendala Sekolah',
           deskripsi: fields.deskripsi || 'Tidak ada deskripsi.',
           severity: fields.urgency === 'Tinggi (Segera)' ? 'warning' : (fields.urgency === 'Sedang' ? 'info' : 'info'),
-          wilayah: 'Jakarta Timur'
+          wilayah: reportArea
         })
         onNotify?.('Kendala berhasil dilaporkan ke Vendor dan Pemerintah!', 'warning')
       }
@@ -271,7 +271,7 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
     id_menu: selectedDelivery.id_menu,
     jumlah_porsi: selectedDelivery.jumlah_porsi,
     id: selectedDelivery.kode_transaksi,
-    vendor: 'Dapur Sehat Nusantara',
+    vendor: selectedDelivery.nama_vendor || 'Dapur Sehat Mandonga',
     status: selectedDelivery.status,
     time: (selectedDelivery.waktu_tiba || selectedDelivery.waktu_kirim) ? new Date(selectedDelivery.waktu_tiba || selectedDelivery.waktu_kirim).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : '-',
     menuName: selectedDelivery.nama_menu || 'Menu Hari Ini',
@@ -287,6 +287,16 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
     menuName: 'Belum ada jadwal',
     progress: 0
   }
+
+  const schoolRegionLabel = useMemo(() => {
+    const segments = schoolProfile?.alamat
+      ?.split(',')
+      .map((segment) => segment.trim())
+      .filter(Boolean)
+
+    if (!segments?.length) return 'Kota Kendari'
+    return segments.length >= 2 ? segments.slice(-2).join(', ') : segments[0]
+  }, [schoolProfile?.alamat])
 
   const handleConfirmArrival = async () => {
     if (!activeDelivery.id_distribusi) {
@@ -493,12 +503,12 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
       
         <>
           <AnimatePresence>
-            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} activeDelivery={activeDelivery} user={user} onNotify={triggerToast} />}
+            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={false} activeDelivery={activeDelivery} user={user} onNotify={triggerToast} reportArea={schoolRegionLabel} />}
           </AnimatePresence>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div>
               <h1 style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-1px' }}>{schoolProfile?.nama_sekolah || 'Sekolah MBG'}</h1>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: '500' }}>Pusat Penerimaan Gizi Nasional — Jakarta Timur</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: '500' }}>Pusat Penerimaan Gizi Nasional - {schoolRegionLabel}</p>
             </div>
             <div style={{ padding: '12px 24px', background: 'var(--banana-light)', borderRadius: '14px', display: 'flex', gap: '12px', alignItems: 'center', border: '1px solid var(--banana)' }}>
               <Users size={20} color="var(--banana)" />
@@ -553,7 +563,7 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
           {isKonfirmasi && <Header title="Konfirmasi Kedatangan" subtitle="Manajemen bukti serah terima logistik gizi nasional." showAdd onAdd={() => setShowAddForm(true)} />}
           {isFeedback && <Header title="Pusat Feedback Sekolah" subtitle="Suara institusi untuk standar gizi masa depan." />}
           <AnimatePresence>
-            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={isFeedback} activeDelivery={activeDelivery} user={user} onNotify={triggerToast} />}
+            {showAddForm && <AddFormModal onClose={() => setShowAddForm(false)} isFeedback={isFeedback} activeDelivery={activeDelivery} user={user} onNotify={triggerToast} reportArea={schoolRegionLabel} />}
           </AnimatePresence>
           {renderContent()}
         </>

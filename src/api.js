@@ -18,6 +18,7 @@ async function request(endpoint, options = {}) {
 const api = {
   // Auth
   login: (email, password) => request('/auth/login', { method: 'POST', body: { email, password } }),
+  getLoginAccounts: () => request('/auth/accounts'),
 
   // Users
   getUsers: () => request('/users'),
@@ -44,6 +45,8 @@ const api = {
   createDapur: (data) => request('/dapur', { method: 'POST', body: data }),
   updateDapur: (id, data) => request(`/dapur/${id}`, { method: 'PUT', body: data }),
   deleteDapur: (id) => request(`/dapur/${id}`, { method: 'DELETE' }),
+  approveDapur: (id, data) => request(`/dapur/${id}/approve`, { method: 'PUT', body: data }),
+  rejectDapur: (id, data) => request(`/dapur/${id}/reject`, { method: 'PUT', body: data }),
 
   getStok: (idDapur) => request(`/stok/${idDapur}`),
   createStok: (data) => request('/stok', { method: 'POST', body: data }),
@@ -57,7 +60,7 @@ const api = {
   deleteMapping: (id) => request(`/mapping/${id}`, { method: 'DELETE' }),
 
   // Menus
-  getMenus: () => request('/menus'),
+  getMenus: (options = {}) => request(`/menus${options.ahliGiziUserId ? `?ahliGiziUserId=${options.ahliGiziUserId}` : ''}`),
   getMenuById: (id) => request(`/menus/${id}`),
   createMenu: (data) => request('/menus', { method: 'POST', body: data }),
   updateMenu: (id, data) => request(`/menus/${id}`, { method: 'PUT', body: data }),

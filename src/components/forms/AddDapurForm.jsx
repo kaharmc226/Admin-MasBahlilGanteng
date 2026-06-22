@@ -9,57 +9,64 @@ export const AddDapurForm = ({ isOpen, onClose, onSave }) => {
     kapasitas: '',
     alamat: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.lokasi || !formData.kapasitas) {
-      alert("Mohon isi nama lokasi dan kapasitas!");
+      alert('Mohon isi nama lokasi dan kapasitas!');
       return;
     }
-    
-    onSave({
-      id: Date.now(),
-      lokasi: formData.lokasi,
-      kapasitas_produksi: parseInt(formData.kapasitas),
-      alamat: formData.alamat
-    });
-    
-    alert("🚀 Data Dapur Berhasil Dikirim ke Badan Gizi Nasional untuk Verifikasi!");
-    onClose();
+
+    try {
+      setIsSubmitting(true);
+      await onSave({
+        id: Date.now(),
+        lokasi: formData.lokasi,
+        kapasitas_produksi: parseInt(formData.kapasitas, 10),
+        alamat: formData.alamat
+      });
+      alert('Pengajuan dapur berhasil dikirim ke Pemerintah dan menunggu verifikasi.');
+      onClose();
+    } catch (err) {
+      alert(err.message || 'Gagal mengirim pengajuan dapur.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <Modal 
-      isOpen={isOpen} 
+    <Modal
+      isOpen={isOpen}
       onClose={onClose}
       title="Registrasi Dapur"
-      subtitle="Daftarkan unit dapur produksi baru."
+      subtitle="Daftarkan unit dapur produksi baru untuk diverifikasi Pemerintah sebelum operasional."
       type="slide"
       width="448px"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '8px' }}>
-        <Input 
+        <Input
           label="NAMA LOKASI DAPUR"
-          placeholder="Contoh: Dapur Jakarta Selatan"
+          placeholder="Contoh: Dapur Mandonga Kendari"
           value={formData.lokasi}
-          onChange={(e) => setFormData({...formData, lokasi: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, lokasi: e.target.value })}
         />
 
-        <Input 
+        <Input
           label="KAPASITAS PRODUKSI (PORSI/HARI)"
           type="number"
           placeholder="Contoh: 5000"
           value={formData.kapasitas}
-          onChange={(e) => setFormData({...formData, kapasitas: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, kapasitas: e.target.value })}
         />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label style={{ 
-            fontSize: '0.8rem', 
-            fontWeight: '800', 
+          <label style={{
+            fontSize: '0.8rem',
+            fontWeight: '800',
             color: 'var(--text-muted, #64748b)',
             letterSpacing: '0.5px',
           }}>ALAMAT LENGKAP UNIT</label>
-          <textarea 
+          <textarea
             style={{
               width: '100%',
               padding: '12px',
@@ -78,7 +85,7 @@ export const AddDapurForm = ({ isOpen, onClose, onSave }) => {
             }}
             placeholder="Masukkan alamat lengkap operasional dapur..."
             value={formData.alamat}
-            onChange={(e) => setFormData({...formData, alamat: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, alamat: e.target.value })}
             onFocus={(e) => { e.target.style.borderColor = 'var(--primary, #10b981)'; }}
             onBlur={(e) => { e.target.style.borderColor = 'var(--border, #e2e8f0)'; }}
           />
@@ -86,13 +93,14 @@ export const AddDapurForm = ({ isOpen, onClose, onSave }) => {
       </div>
 
       <div style={{ marginTop: '32px' }}>
-        <Button 
-          variant="primary" 
-          size="lg" 
-          style={{ width: '100%' }}
+        <Button
+          variant="primary"
+          size="lg"
+          style={{ width: '100%', opacity: isSubmitting ? 0.7 : 1 }}
           onClick={handleSubmit}
+          disabled={isSubmitting}
         >
-          Daftarkan Dapur Sekarang
+          {isSubmitting ? 'Mengirim...' : 'Daftarkan Dapur Sekarang'}
         </Button>
       </div>
     </Modal>

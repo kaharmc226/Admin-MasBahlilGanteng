@@ -3,27 +3,36 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import mysql from 'mysql2/promise'
 import { dbConfig, getAdminConnectionConfig } from '../server/dbConfig.js'
+import { applySeedProfile, defaultSeedProfile } from './seed-data.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '..')
 
 export const dbAssetPaths = Object.freeze({
   schema: path.join(rootDir, 'database', 'schema.sql'),
-  bootstrap: path.join(rootDir, 'database', 'bootstrap_minimal.sql'),
-  demoSeed: path.join(rootDir, 'database', 'demo_seed.sql'),
 })
 
 const trackedTables = [
   'users',
   'sekolah',
   'vendors',
+  'vendor_registrations',
   'dapur',
+  'dapur_stok',
+  'dapur_stok_history',
+  'mapping_dapur_sekolah',
   'menus',
   'produksi',
   'distribusi',
+  'standar_gizi',
+  'validasi_log',
+  'konfirmasi_kedatangan',
   'feedback',
   'alerts',
+  'wilayah_data',
   'dokumen_vendor',
+  'nutrition_database',
+  'nutrition_requests',
 ]
 
 export function formatDbTarget(config = dbConfig) {
@@ -73,24 +82,31 @@ export async function resetDatabase(connection, config = dbConfig) {
   await connection.query(`DROP DATABASE IF EXISTS \`${config.database}\``)
 }
 
-export async function initializeMinimalDatabase(connection, options = {}) {
-  const { reset = false, config = dbConfig } = options
+export async function initializeSeedProfileDatabase(connection, options = {}) {
+  const { reset = false, config = dbConfig, profileName = defaultSeedProfile } = options
   if (reset) {
     await resetDatabase(connection, config)
   }
 
   await importSqlFile(connection, dbAssetPaths.schema)
-  await applyMinimalBootstrap(connection)
+  await applySeedProfile(connection, profileName)
+}
+
+export async function applySeedBootstrap(connection, options = {}) {
+  const { profileName = defaultSeedProfile } = options
+  await applySeedProfile(connection, profileName)
+}
+
+export async function initializeMinimalDatabase(connection, options = {}) {
+  return initializeSeedProfileDatabase(connection, { ...options, profileName: defaultSeedProfile })
 }
 
 export async function applyMinimalBootstrap(connection) {
-  await importSqlFile(connection, dbAssetPaths.bootstrap)
+  return applySeedBootstrap(connection, { profileName: defaultSeedProfile })
 }
 
 export async function initializeDemoDatabase(connection, options = {}) {
-  const { reset = false, config = dbConfig } = options
-  await initializeMinimalDatabase(connection, { reset, config })
-  await importSqlFile(connection, dbAssetPaths.demoSeed)
+  return initializeSeedProfileDatabase(connection, { ...options, profileName: 'kendari-demo' })
 }
 
 export function formatRowCounts(rowCounts) {
