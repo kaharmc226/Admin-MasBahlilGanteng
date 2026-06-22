@@ -38,6 +38,24 @@ import DashboardLayout from "../components/DashboardLayout"
 import { AddDapurForm } from "../components/forms/AddDapurForm"
 import { AddMenuForm } from "../components/forms/AddMenuForm"
 
+import { 
+  parseNutrientValue, 
+  parseJsonField, 
+  normalizeMenuIngredient, 
+  normalizeValidationLog, 
+  attachValidationMetadata 
+} from "../utils/dashboardHelpers"
+import Motif from "../components/dashboard/Motif"
+import Header from "../components/dashboard/DashboardHeader"
+import WelcomeBanner from "../components/dashboard/WelcomeBanner"
+import Footer from "../components/dashboard/Footer"
+import FloatingShape from "../components/dashboard/FloatingShape"
+import FoodItem3D from "../components/dashboard/FoodItem3D"
+import PdfModal from "../components/modals/PdfModal"
+import VisualAuditModal from "../components/modals/VisualAuditModal"
+import AddTicketForm from "../components/modals/AddTicketForm"
+
+
 const produksiStatusMeta = {
   pending: {
     label: "PENDING",
@@ -110,53 +128,15 @@ const dapurStatusMeta = {
   },
 }
 
-const parseNutrientValue = (value) => {
-  const parsed = parseFloat(String(value ?? '').replace(',', '.').replace(/[^0-9.-]/g, ''))
-  return Number.isFinite(parsed) ? parsed : 0
-}
+// parseNutrientValue is imported
 
-const parseJsonField = (value, fallback) => {
-  if (value === null || value === undefined || value === '') return fallback
-  if (typeof value !== 'string') return value
-  try {
-    return JSON.parse(value)
-  } catch {
-    return fallback
-  }
-}
+// parseJsonField is imported
 
-const normalizeMenuIngredient = (item, nutritionMap) => {
-  const linkedItem = nutritionMap.get(String(item?.id_nutrition || ''))
-  const jumlah = parseNutrientValue(item?.jumlah ?? item?.berat ?? item?.takaran)
-  return {
-    ...item,
-    id_nutrition: item?.id_nutrition ?? null,
-    nama: linkedItem?.nama || item?.nama || 'Bahan tanpa nama',
-    jumlah,
-    satuan: item?.satuan || 'gram',
-    takaran: item?.takaran || (jumlah > 0 ? `~${jumlah} g` : '-')
-  }
-}
+// normalizeMenuIngredient is imported
 
-const normalizeValidationLog = (log) => ({
-  ...log,
-  catatan: typeof log?.catatan === 'string' ? log.catatan.trim() : (log?.catatan || ''),
-})
+// normalizeValidationLog is imported)
 
-const attachValidationMetadata = (menu, validationLogs = []) => {
-  const menuId = menu.id_menu || menu.id
-  const logs = validationLogs
-    .filter((item) => (item.id_menu || item.id) === menuId)
-    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-
-  return {
-    ...menu,
-    validationLogs: logs,
-    latestValidationLog: logs[0] || null,
-    latestRejectedLog: logs.find((item) => item.aksi === 'rejected') || null,
-    latestApprovedLog: logs.find((item) => item.aksi === 'approved') || null,
-  }
-}
+// attachValidationMetadata is imported
 
 const normalizeVendorMenu = (menu, nutritionMap, validationLogs = []) => {
   const bahan = parseJsonField(menu?.bahan, [])
@@ -172,191 +152,17 @@ const normalizeVendorMenu = (menu, nutritionMap, validationLogs = []) => {
   return attachValidationMetadata(normalizedMenu, validationLogs)
 }
 
-const Header = ({ title }) => (
-  <div className="card dashboard-card-vibrant" style={{ 
-    marginBottom: '1.5rem', 
-    padding: '1rem 1.5rem',
-    borderRadius: '16px',
-    background: 'white',
-    border: '1px solid white',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.03)',
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    position: 'relative',
-    zIndex: 10
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-      <div style={{ width: '55px', height: '55px', background: 'var(--primary-light)', borderRadius: '18px', display: 'grid', placeItems: 'center', boxShadow: '0 8px 16px rgba(16, 185, 129, 0.1)' }}>
-        <LayoutDashboard color="var(--primary)" size={28} />
-      </div>
-      <div>
-        <h1 style={{ fontSize: "2.1rem", fontWeight: "950", letterSpacing: "-1.5px", color: 'var(--text-main)', lineHeight: '1.2' }}>{title}</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-          <div style={{ width: '6px', height: '6px', background: 'var(--primary)', borderRadius: '50%', animation: 'pulse 1.5s infinite' }}></div>
-          <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Operational Center • Live Monitoring</p>
-        </div>
-      </div>
-    </div>
-    
-    <div style={{ 
-      padding: '0.6rem 1.4rem', 
-      borderRadius: '8px', 
-      display: 'flex', 
-      alignItems: 'center', 
-      gap: '15px',
-      background: 'var(--bg)',
-      border: '1px solid var(--border)'
-    }}>
-       <div style={{ textAlign: 'right', borderRight: '1.5px solid var(--border)', paddingRight: '15px' }}>
-          <p style={{ fontWeight: '950', fontSize: '1rem', color: 'var(--text-main)', margin: 0 }}>{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-          <p style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: '900', margin: 0 }}>{new Date().toLocaleDateString('id-ID', { weekday: 'long' }).toUpperCase()}</p>
-       </div>
-       <div className="flex" style={{ gap: '12px' }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{ width: '38px', height: '38px', background: 'white', borderRadius: '12px', display: 'grid', placeItems: 'center', boxShadow: '0 5px 10px rgba(0,0,0,0.05)' }}>
-              <Activity size={18} color="var(--primary)" />
-            </div>
-            <motion.div 
-               animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0, 0.4] }}
-               transition={{ duration: 2, repeat: Infinity }}
-               style={{ position: 'absolute', inset: 0, background: 'var(--primary)', borderRadius: '12px', zIndex: -1 }}
-            />
-          </div>
-          <div>
-            <p style={{ fontSize: '0.6rem', fontWeight: '900', color: 'var(--text-muted)', marginBottom: '1px' }}>SISTEM STATUS</p>
-            <p style={{ fontSize: '0.8rem', fontWeight: '950', color: 'var(--primary)' }}>SINKRON</p>
-          </div>
-       </div>
-    </div>
-  </div>
-)
+// Header is imported
 
-const WelcomeBanner = ({ name }) => (
-  <motion.div 
-    initial={{ scale: 0.95, opacity: 0 }}
-    animate={{ scale: 1, opacity: 1 }}
-    style={{ 
-      background: 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)',
-      padding: '1.5rem',
-      borderRadius: '16px',
-      marginBottom: '1.5rem',
-      position: 'relative',
-      overflow: 'hidden',
-      color: 'white',
-      boxShadow: '0 30px 60px -15px rgba(6, 78, 59, 0.4)'
-    }}
-  >
-    <div style={{ position: 'relative', zIndex: 2 }}>
-      <h2 style={{ fontSize: '2.5rem', fontWeight: '950', color: 'white', marginBottom: '10px' }}>Halo Selamat Siang, {name}! 👋</h2>
-      <p style={{ fontSize: '1.1rem', fontWeight: '600', opacity: 0.9, maxWidth: '600px', lineHeight: '1.6' }}>Semoga hari ini penuh produktivitas. Dapur Anda sedang memantau 2 batch produksi gizi nasional.</p>
-      
-      <div style={{ display: 'flex', gap: '15px', marginTop: '2.5rem' }}>
-        <button style={{ background: 'white', color: 'var(--text-main)', padding: '0.8rem 1.8rem', border: 'none', borderRadius: '15px', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          Jelajahi Laporan <ChevronRight size={20} />
-        </button>
-        <button style={{ background: 'rgba(255,255,255,0.15)', color: 'white', padding: '0.8rem 1.8rem', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '15px', fontWeight: '900', cursor: 'pointer', backdropFilter: 'blur(10px)' }}>
-          Update Stok Bahan
-        </button>
-      </div>
-    </div>
+// WelcomeBanner is imported
 
-    {/* Decorative Elements inside banner */}
-    <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '250px', height: '250px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', pointerEvents: 'none' }}></div>
-    <div style={{ position: 'absolute', bottom: '-20px', right: '50px', width: '150px', height: '150px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%', pointerEvents: 'none' }}></div>
-    <UtensilsCrossed style={{ position: 'absolute', right: '40px', top: '50%', transform: 'translateY(-50%) rotate(15deg)', opacity: 0.1, color: 'white' }} size={200} />
-  </motion.div>
-)
+// Footer is imported
 
-const Footer = () => (
-  <div className="card dashboard-card-vibrant" style={{ 
-    marginTop: '2rem', 
-    padding: '1.5rem', 
-    borderRadius: '16px',
-    background: 'white',
-    border: '1px solid white',
-    boxShadow: '0 -10px 40px rgba(0,0,0,0.02)',
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    position: 'relative',
-    zIndex: 2
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-      <div style={{ background: 'var(--primary)', color: 'white', width: '45px', height: '45px', borderRadius: '14px', display: 'grid', placeItems: 'center', fontWeight: '950', fontSize: '1.2rem', boxShadow: '0 8px 16px rgba(16, 185, 129, 0.2)' }}>T</div>
-      <div>
-        <h4 style={{ fontWeight: '950', fontSize: '1.1rem', color: 'var(--text-main)', marginBottom: '2px', letterSpacing: '-0.5px' }}>TRAKSI National Ecosystem</h4>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '700' }}>Platform Transparansi & Gizi Nasional • Versi 4.2.0-Production</p>
-      </div>
-    </div>
-    <div style={{ display: 'flex', gap: '40px', alignItems: 'center' }}>
-       <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '900', marginBottom: '8px', letterSpacing: '1px' }}>KONEKSI ENKRIPSI</p>
-          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-             {[1,2,3,4,5,6].map(i => <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }} style={{ width: '12px', height: '6px', background: 'var(--primary)', borderRadius: '10px' }}></motion.div>)}
-          </div>
-       </div>
-       <div style={{ display: 'flex', gap: '12px' }}>
-          <button style={{ width: '45px', height: '45px', background: 'var(--bg)', border: 'none', borderRadius: '14px', display: 'grid', placeItems: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}><MessageSquare size={20} /></button>
-          <button style={{ width: '45px', height: '45px', background: 'var(--bg)', border: 'none', borderRadius: '14px', display: 'grid', placeItems: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}><ShieldCheck size={20} /></button>
-       </div>
-    </div>
-  </div>
-)
+// FloatingShape is imported
 
-const FloatingShape = ({ initial, animate, duration, color, size }) => (
-  <motion.div 
-    initial={initial}
-    animate={animate}
-    transition={{ duration, repeat: Infinity, ease: "linear" }}
-    style={{ 
-      position: 'absolute', 
-      width: size, 
-      height: size, 
-      borderRadius: '50%', 
-      background: color, 
-      filter: 'blur(100px)', 
-      opacity: 0.25,
-      zIndex: 0,
-      pointerEvents: 'none'
-    }}
-  />
-)
+// FoodItem3D is imported
 
-const FoodItem3D = ({ src, top, left, right, bottom, size = 120, delay = 0, rotate = 0 }) => (
-  <motion.div
-    initial={{ y: 0, opacity: 0, scale: 0.5, rotate }}
-    animate={{ 
-      y: [0, -40, 0],
-      rotate: [rotate, rotate + 15, rotate - 15, rotate],
-      opacity: 0.25,
-      scale: 1
-    }}
-    transition={{ 
-      duration: 5 + Math.random() * 3, 
-      repeat: Infinity, 
-      ease: "easeInOut",
-      delay 
-    }}
-    style={{
-      position: 'fixed',
-      top, left, right, bottom,
-      width: size,
-      height: size,
-      zIndex: 0,
-      pointerEvents: 'none',
-      filter: 'blur(1px) drop-shadow(0 25px 50px rgba(0,0,0,0.15))'
-    }}
-  >
-    <img src={src} alt="food decoration" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', border: '4px solid white', boxShadow: 'inset 0 0 20px rgba(0,0,0,0.1)' }} />
-  </motion.div>
-)
-
-const Motif = ({ icon: Icon, top, right, bottom, left, color }) => (
-  <div style={{ position: "absolute", top, right, bottom, left, opacity: 0.05, pointerEvents: "none", zIndex: 0 }}>
-    <Icon size={120} color={color} />
-  </div>
-)
+// Motif is imported
 
 const getDocumentAsset = (title = '') => {
   if (title.includes('NIB')) return '/nib_mockup.png'
@@ -365,633 +171,12 @@ const getDocumentAsset = (title = '') => {
   return '/higiene_mockup.png'
 }
 
-const PdfModal = ({ doc, onClose }) => {
-  if (!doc) return null;
-  const assetPath = api.assetUrl(doc.file_path) || getDocumentAsset(doc.title)
-  const isPdf = assetPath?.toLowerCase().includes('.pdf')
+// PdfModal is imported
 
-  const handleDownload = () => {
-    if (doc.file_path) {
-      window.open(assetPath, '_blank')
-      return
-    }
-    const link = document.createElement('a')
-    link.href = assetPath
-    link.download = `${(doc.title || 'dokumen').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const handlePrint = () => {
-    if (doc.file_path) {
-      window.open(assetPath, '_blank')
-      return
-    }
-    const printWindow = window.open('', '_blank', 'width=1000,height=800')
-    if (!printWindow) return
-    printWindow.document.write(`
-      <html>
-        <head><title>${doc.title}</title></head>
-        <body style="margin:0;display:flex;justify-content:center;align-items:flex-start;background:#111;">
-          <img src="${assetPath}" style="max-width:100%;height:auto;" />
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
-    printWindow.focus()
-    printWindow.print()
-  }
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }} 
-      animate={{ opacity: 1 }} 
-      exit={{ opacity: 0 }} 
-      style={{ 
-        position: 'fixed', 
-        inset: 0, 
-        background: 'rgba(15, 23, 42, 0.9)', 
-        zIndex: 10000, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        backdropFilter: 'blur(20px)' 
-      }}
-    >
-      <div style={{ 
-        background: '#0f172a', 
-        color: 'white', 
-        padding: '1.2rem 2.5rem', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
-        borderBottom: '1px solid rgba(255,255,255,0.1)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '25px' }}>
-          <button 
-            onClick={onClose} 
-            style={{ 
-              background: 'rgba(255,255,255,0.1)', 
-              border: '1px solid rgba(255,255,255,0.2)', 
-              color: 'white', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '10px', 
-              fontWeight: '800',
-              padding: '10px 20px',
-              borderRadius: '12px',
-              transition: 'all 0.2s'
-            }}
-          >
-            <ArrowLeft size={20} /> Kembali
-          </button>
-          <div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.1)' }} />
-          <div>
-            <p style={{ fontWeight: '800', fontSize: '1.1rem', letterSpacing: '0.5px', marginBottom: '2px' }}>{doc.title}</p>
-            <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>DOC-VERIFIED-V4 • {doc.date}</p>
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '30px' }}>
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '14px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
-             <button style={{ background: 'none', border: 'none', color: 'white', padding: '10px', cursor: 'pointer', opacity: 0.8 }}><ZoomOut size={20} /></button>
-             <div style={{ padding: '0 20px', display: 'flex', alignItems: 'center', fontWeight: '800', fontSize: '1rem', color: '#38bdf8' }}>100%</div>
-             <button style={{ background: 'none', border: 'none', color: 'white', padding: '10px', cursor: 'pointer', opacity: 0.8 }}><ZoomIn size={20} /></button>
-          </div>
-          <div style={{ display: 'flex', gap: '15px' }}>
-             <button onClick={handlePrint} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', cursor: 'pointer', width: '45px', height: '45px', borderRadius: '12px', display: 'grid', placeItems: 'center' }} title="Cetak"><Printer size={22} /></button>
-             <button onClick={handleDownload} style={{ background: 'var(--primary)', border: 'none', color: 'white', padding: '0 25px', borderRadius: '12px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', height: '45px', boxShadow: '0 10px 20px rgba(16, 185, 129, 0.3)' }}>
-               <Download size={20} /> Download PDF
-             </button>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ 
-        flex: 1, 
-        overflowY: 'auto', 
-        padding: '4rem 1rem', 
-        display: 'flex', 
-        flexDirection: 'column',
-        alignItems: 'center',
-        background: '#0f172a'
-      }}>
-        <motion.div 
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          style={{ 
-            width: '100%', 
-            maxWidth: '1000px',
-            background: 'white', 
-            boxShadow: '0 30px 60px rgba(0,0,0,0.5)', 
-            borderRadius: '4px', 
-            position: 'relative',
-            marginBottom: '4rem'
-          }}
-        >
-          {doc.file_path && isPdf ? (
-            <iframe src={assetPath} title={doc.title} style={{ width: '100%', height: '80vh', border: 'none', display: 'block' }} />
-          ) : doc.file_path ? (
-            <img src={assetPath} style={{ width: '100%', height: 'auto', display: 'block' }} alt={doc.title} />
-          ) : doc.title.includes('NIB') ? (
-            <img src="/nib_mockup.png" style={{ width: '100%', height: 'auto', display: 'block' }} alt="NIB Photo" />
-          ) : doc.title.includes('Halal') ? (
-            <img src="/halal_mockup.png" style={{ width: '100%', height: 'auto', display: 'block' }} alt="Halal" />
-          ) : doc.title.includes('P-IRT') ? (
-            <img src="/pirt_mockup.png" style={{ width: '100%', height: 'auto', display: 'block' }} alt="P-IRT" />
-          ) : (
-            <img src="/higiene_mockup.png" style={{ width: '100%', height: 'auto', display: 'block' }} alt="Higiene" />
-          )}
-        </motion.div>
-      </div>
-    </motion.div>
-  )
-}
-
-const VisualAuditModal = ({ menu, onClose, onRevise, onEditRecipe }) => {
-  if (!menu) return null;
-
-  const bahan = Array.isArray(menu.bahan) ? menu.bahan : []
-  const photoUrl = api.assetUrl(menu.foto_url)
-  const vendorNotes = Array.isArray(menu.notes) ? menu.notes : []
-  const latestRejectedLog = menu.latestRejectedLog
-  const latestValidationLog = menu.latestValidationLog
-  const latestApprovedLog = menu.latestApprovedLog
-  const isApproved = menu.status_validasi === 'approved'
-  const isRejected = menu.status_validasi === 'rejected'
-  const statusMeta = isApproved
-    ? { label: 'Menu Disahkan', background: 'var(--primary-light)', color: 'var(--primary)', border: '1.5px solid var(--primary)' }
-    : isRejected
-      ? { label: 'Butuh Revisi', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5' }
-      : { label: 'Menunggu Validasi', background: 'var(--banana-light)', color: 'var(--banana)', border: '1.5px solid var(--banana)' }
-  const validationTimeLabel = latestRejectedLog?.created_at
-    ? new Date(latestRejectedLog.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : null
-  const approvalTimeLabel = latestApprovedLog?.created_at
-    ? new Date(latestApprovedLog.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : null
-  const latestReviewTimeLabel = latestValidationLog?.created_at
-    ? new Date(latestValidationLog.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : null
-  const nutritionRows = [
-    { label: 'Energi', value: menu.nilai_gizi?.energi || '-' },
-    { label: 'Protein', value: menu.nilai_gizi?.protein || '-' },
-    { label: 'Lemak', value: menu.nilai_gizi?.lemak || '-' },
-    { label: 'Karbohidrat', value: menu.nilai_gizi?.karbohidrat || '-' },
-    { label: 'Serat', value: menu.nilai_gizi?.serat || '-' },
-    { label: 'Natrium', value: menu.nilai_gizi?.natrium || '-' }
-  ]
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15, 23, 42, 0.95)',
-        zIndex: 10000,
-        display: 'grid',
-        placeItems: 'center',
-        backdropFilter: 'blur(15px)',
-        padding: '1rem',
-        overflowY: 'auto'
-      }}
-    >
-      <motion.div
-        initial={{ scale: 0.9, y: 30 }}
-        animate={{ scale: 1, y: 0 }}
-        style={{
-          background: 'white',
-          borderRadius: '16px',
-          width: '100%',
-          maxWidth: '1120px',
-          padding: '2rem',
-          position: 'relative',
-          boxShadow: '0 50px 100px rgba(0,0,0,0.5)',
-          border: '1px solid rgba(255,255,255,0.1)'
-        }}
-      >
-        <button
-          onClick={onClose}
-          style={{ position: 'absolute', top: '24px', right: '24px', background: '#f1f5f9', border: 'none', padding: '12px', borderRadius: '50%', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-        >
-          <X size={24} color="#64748b" />
-        </button>
-
-        <div style={{ marginBottom: '1.4rem', paddingRight: '3.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ margin: 0, fontSize: '0.78rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                {isApproved ? 'Detail Menu Disetujui' : isRejected ? 'Laporan Revisi Vendor' : 'Detail Audit Menu'}
-              </p>
-              <h2 style={{ fontSize: '2.1rem', fontWeight: '950', color: '#0f172a', margin: '0.35rem 0 0', letterSpacing: '-0.04em' }}>{menu.nama_menu}</h2>
-              <p style={{ margin: '0.45rem 0 0', color: '#64748b', fontWeight: '700', fontSize: '0.92rem' }}>
-                {menu.nama_vendor || 'Vendor terdaftar'} - {menu.tanggal || menu.date || '-'}
-              </p>
-            </div>
-            <div style={{ padding: '0.7rem 1rem', borderRadius: '999px', background: statusMeta.background, color: statusMeta.color, border: statusMeta.border, fontWeight: '900', fontSize: '0.8rem', textTransform: 'uppercase' }}>
-              {statusMeta.label}
-            </div>
-          </div>
-        </div>
-
-        <div className="vendor-audit-modal-layout">
-          <div className="vendor-audit-media-column">
-            <div style={{ minHeight: '430px', height: '100%', borderRadius: '24px', border: '1.5px solid #dbe5f0', background: '#f8fafc', overflow: 'hidden', boxShadow: '0 24px 50px -24px rgba(15, 23, 42, 0.45)' }}>
-              {photoUrl ? (
-                <img src={photoUrl} alt={`Foto ${menu.nama_menu}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              ) : (
-                <div style={{ width: '100%', height: '100%', minHeight: '430px', display: 'grid', placeItems: 'center', textAlign: 'center', padding: '2rem', color: '#64748b', fontWeight: '850', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' }}>
-                  Vendor belum mengunggah foto menu.
-                </div>
-              )}
-            </div>
-            <div style={{ padding: '1.1rem', borderRadius: '18px', border: '1.5px solid #e2e8f0', background: 'white' }}>
-              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Catatan Vendor</p>
-              {vendorNotes.length > 0 ? (
-                <ul style={{ margin: '0.65rem 0 0', paddingLeft: '1.15rem', color: '#334155', fontWeight: '750', fontSize: '0.9rem', lineHeight: '1.7' }}>
-                  {vendorNotes.map((note, index) => <li key={index}>{note}</li>)}
-                </ul>
-              ) : (
-                <p style={{ margin: '0.6rem 0 0', color: '#64748b', fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                  Belum ada catatan dari vendor.
-                </p>
-              )}
-            </div>
-            <div style={{ padding: '0.95rem 1rem', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-              <p style={{ margin: 0, color: '#64748b', fontWeight: '800', fontSize: '0.82rem', lineHeight: '1.5' }}>
-                Sumber laporan: unggahan vendor TRAKSI dan hasil validasi Ahli Gizi terbaru.
-              </p>
-            </div>
-          </div>
-
-          <div className="vendor-audit-sidebar">
-            <div style={{ padding: '1rem 1.1rem', borderRadius: '18px', border: '1.5px solid #e2e8f0', background: 'white' }}>
-              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status Review</p>
-              <p style={{ margin: '0.35rem 0 0', fontSize: '1.05rem', fontWeight: '900', color: '#0f172a' }}>
-                {latestReviewTimeLabel ? `Review terakhir ${latestReviewTimeLabel}` : 'Belum ada histori review'}
-              </p>
-            </div>
-
-            <div style={{
-              padding: '1.1rem',
-              borderRadius: '18px',
-              border: isApproved ? '1.5px solid #bbf7d0' : '1.5px solid #fecaca',
-              background: isApproved ? '#f0fdf4' : '#fff7f7'
-            }}>
-              <p style={{
-                margin: 0,
-                fontSize: '0.75rem',
-                fontWeight: '900',
-                color: isApproved ? '#15803d' : '#b91c1c',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                {isApproved ? 'Status Persetujuan Ahli Gizi' : 'Revisi Terakhir Ahli Gizi'}
-              </p>
-              <p style={{
-                margin: '0.55rem 0 0',
-                fontSize: '0.95rem',
-                fontWeight: '800',
-                color: isApproved ? '#166534' : '#7f1d1d',
-                lineHeight: '1.7'
-              }}>
-                {isApproved
-                  ? latestApprovedLog?.catatan || 'Menu ini sudah lolos validasi dan siap digunakan untuk operasional produksi.'
-                  : latestRejectedLog?.catatan || 'Belum ada pesan revisi dari Ahli Gizi untuk menu ini.'}
-              </p>
-              {isApproved && approvalTimeLabel && (
-                <p style={{ margin: '0.7rem 0 0', fontSize: '0.76rem', color: '#15803d', fontWeight: '700' }}>
-                  Disahkan: {approvalTimeLabel}
-                </p>
-              )}
-              {!isApproved && validationTimeLabel && (
-                <p style={{ margin: '0.7rem 0 0', fontSize: '0.76rem', color: '#b91c1c', fontWeight: '700' }}>
-                  Dikirim: {validationTimeLabel}
-                </p>
-              )}
-            </div>
-
-            <div style={{ padding: '1.1rem', borderRadius: '18px', border: '1.5px solid #dbe5f0', background: 'white', height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ringkasan Nilai Gizi</p>
-              <div className="vendor-audit-nutrition-grid" style={{ marginTop: '0.2rem' }}>
-                {nutritionRows.map((row) => (
-                  <div key={row.label} style={{ padding: '0.85rem 0', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
-                    <span style={{ color: '#64748b', fontWeight: '800', fontSize: '0.88rem' }}>{row.label}</span>
-                    <span style={{ color: '#0f172a', fontWeight: '900', fontSize: '0.92rem', textAlign: 'right' }}>{row.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ padding: '1.1rem', borderRadius: '18px', border: '1.5px solid #dbe5f0', background: 'white', height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bahan Menu</p>
-              <div style={{ display: 'grid', gap: '0.7rem', marginTop: '0.75rem', overflowY: 'auto', paddingRight: '0.25rem' }}>
-                {bahan.length > 0 ? bahan.map((item, index) => (
-                  <div key={`${item.nama}-${index}`} style={{ padding: '0.8rem 0.9rem', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'center' }}>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ margin: 0, fontWeight: '900', color: '#0f172a', fontSize: '0.9rem', lineHeight: '1.35' }}>{item.nama}</p>
-                      <p style={{ margin: '0.2rem 0 0', fontWeight: '700', color: '#64748b', fontSize: '0.8rem' }}>{item.takaran || '-'}</p>
-                    </div>
-                    <span style={{ flexShrink: 0, padding: '4px 8px', borderRadius: '999px', background: item.id_nutrition ? '#dcfce7' : '#ffedd5', color: item.id_nutrition ? '#15803d' : '#c2410c', fontWeight: '900', fontSize: '0.68rem', textTransform: 'uppercase' }}>
-                      {item.id_nutrition ? 'DB Match' : 'Cek DB'}
-                    </span>
-                  </div>
-                )) : (
-                  <p style={{ margin: 0, color: '#64748b', fontWeight: '700', fontSize: '0.9rem' }}>Belum ada daftar bahan.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={onClose}
-            style={{ flex: '1 1 220px', padding: '1rem 1.2rem', borderRadius: '18px', border: '2px solid #e2e8f0', background: 'white', fontWeight: '900', color: '#64748b', cursor: 'pointer' }}
-          >
-            Tutup Laporan
-          </button>
-          {isRejected ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onClose(); setTimeout(() => onRevise(menu), 50); }}
-              style={{ flex: '1 1 280px', padding: '1rem 1.2rem', borderRadius: '18px', border: 'none', background: '#dc2626', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: '0 10px 25px rgba(220, 38, 38, 0.2)' }}
-            >
-              Revisi Sekarang
-            </button>
-          ) : (
-            <button
-              onClick={(e) => { e.stopPropagation(); onClose(); setTimeout(() => onEditRecipe(menu), 50); }}
-              style={{ flex: '1 1 280px', padding: '1rem 1.2rem', borderRadius: '18px', border: 'none', background: isApproved ? '#16a34a' : 'var(--primary)', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: isApproved ? '0 10px 25px rgba(22, 163, 74, 0.2)' : '0 10px 25px rgba(14, 165, 233, 0.2)' }}
-            >
-              {isApproved ? 'Edit Resep Menu' : 'Perbarui Menu'}
-            </button>
-          )}
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-
-  if (false) return (
-    <>
-      <motion.div>
-        <motion.div>
-        {/* Tray Visual Section */}
-        <div style={{ position: 'relative', height: '380px', width: '100%', margin: '0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1.5rem' }}>
-           {/* Annotations Left */}
-           <div style={{ position: 'absolute', left: '0', top: '10%', zIndex: 10 }}>
-              {leftBahan.map((b, i) => (
-                <motion.div key={i} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.1 }} style={{ textAlign: 'right', marginBottom: '35px', position: 'relative' }}>
-                   <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.2rem', margin: 0, lineHeight: '1.1' }}>{b.nama}</p>
-                   <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1.1rem', margin: 0 }}>{b.takaran}</p>
-                   <div style={{ width: '40px', height: '3px', background: '#334155', position: 'relative', marginTop: '8px', marginLeft: 'auto', opacity: 0.6 }}>
-                      <div style={{ position: 'absolute', left: '100%', top: '-5px', borderLeft: '12px solid #334155', borderTop: '6px solid transparent', borderBottom: '6px solid transparent' }}></div>
-                   </div>
-                </motion.div>
-              ))}
-           </div>
-
-           {/* Main Tray Image Container */}
-           <div style={{ position: 'relative', width: '380px', height: '320px', display: 'grid', placeItems: 'center' }}>
-              <div style={{ width: '100%', height: '100%', border: '12px solid #cbd5e1', borderRadius: '16px', background: '#f1f5f9', overflow: 'hidden', boxShadow: '0 40px 80px -15px rgba(0,0,0,0.3)', position: 'relative' }}>
-                 {photoUrl ? (
-                   <img src={photoUrl} alt={`Foto ${menu.nama_menu}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                 ) : (
-                   <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', textAlign: 'center', padding: '1.5rem', color: '#64748b', fontWeight: '850', background: '#f8fafc' }}>
-                     Belum ada foto menu
-                   </div>
-                 )}
-              </div>
-           </div>
-
-           {/* Annotations Right */}
-           <div style={{ position: 'absolute', right: '0', top: '15%', zIndex: 10 }}>
-              {rightBahan.map((b, i) => (
-                <motion.div key={i} initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: (i+3) * 0.1 }} style={{ textAlign: 'left', marginBottom: '40px' }}>
-                   <p style={{ fontWeight: '950', color: '#dc2626', fontSize: '1.2rem', margin: 0, lineHeight: '1.1' }}>{b.nama}</p>
-                   <p style={{ fontWeight: '800', color: '#1e293b', fontSize: '1.1rem', margin: 0 }}>{b.takaran}</p>
-                   <div style={{ width: '40px', height: '3px', background: '#334155', position: 'relative', marginTop: '8px', opacity: 0.6 }}>
-                      <div style={{ position: 'absolute', right: '100%', top: '-5px', borderRight: '12px solid #334155', borderTop: '6px solid transparent', borderBottom: '6px solid transparent' }}></div>
-                   </div>
-                </motion.div>
-              ))}
-           </div>
-        </div>
-
-        <div style={{ fontSize: '0.9rem', color: '#64748b', textAlign: 'center', marginBottom: '1.5rem', fontWeight: '750', lineHeight: '1.6' }}>
-           Menu MBG SD GIT Manumuti, Kabupaten Kupang, NTT<br/>
-           <span style={{ fontWeight: '600', opacity: 0.8 }}>Sumber: traksi.go.id • Verifikasi Audit Ahli Gizi</span>
-        </div>
-
-        {/* Bottom Grid: Notes & Table Side-by-side */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '2.5rem', alignItems: 'start' }}>
-           {/* Notes Box */}
-           <div style={{ border: '3px solid #ef4444', borderRadius: '12px', padding: '1rem', background: '#fffafa', position: 'relative' }}>
-              <div style={{ position: 'absolute', top: '-15px', left: '25px', background: '#ef4444', color: 'white', padding: '4px 15px', borderRadius: '10px', fontWeight: '950', fontSize: '0.8rem' }}>REKOMENDASI AUDIT</div>
-              <p style={{ fontWeight: '950', color: '#ef4444', fontSize: '1.3rem', marginBottom: '15px' }}>*Catatan Ahli Gizi</p>
-              <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#334155', fontWeight: '800', fontSize: '1rem', lineHeight: '1.8' }}>
-                 <li>Kandungan gizi menu ini <span style={{color: '#dc2626'}}>cukup</span> untuk memenuhi makan siang anak, namun porsi <span style={{color: '#dc2626'}}>serat</span> perlu ditambah.</li>
-                 <li>Pengolahan disarankan beralih ke <span style={{color: '#dc2626'}}>kukus/tumis</span> untuk mengurangi lemak jenuh.</li>
-                 {menu.notes?.map((n, i) => <li key={i}>{n}</li>)}
-              </ul>
-           </div>
-
-           {/* Nutrition Table Box */}
-           <div style={{ border: '3px solid #1e293b', borderRadius: '12px', overflow: 'hidden', background: 'white', boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                 <tbody>
-                    {[
-                      { l: 'Energi', v: '503 kkal' },
-                      { l: 'Protein', v: '15.9 g' },
-                      { l: 'Lemak', v: '21.3 g' },
-                      { l: 'Karbohidrat', v: '61.4 g' },
-                      { l: 'Serat', v: '3.6 g' },
-                      { l: 'Natrium', v: '558 mg' }
-                    ].map((row, i) => (
-                      <tr key={i} style={{ borderBottom: i === 5 ? 'none' : '1px solid #e2e8f0' }}>
-                         <td style={{ padding: '12px 20px', fontWeight: '850', color: '#64748b', fontSize: '1rem' }}>{row.l}</td>
-                         <td style={{ padding: '12px 20px', fontWeight: '950', color: '#1e293b', textAlign: 'right', fontSize: '1.1rem' }}>{row.v}</td>
-                      </tr>
-                    ))}
-                 </tbody>
-              </table>
-           </div>
-        </div>
-
-        <div style={{ marginTop: '3.5rem', display: 'flex', gap: '1rem' }}>
-           <button 
-             onClick={onClose}
-             style={{ flex: 1, padding: '1.2rem', borderRadius: '24px', border: '2px solid #e2e8f0', background: 'white', fontWeight: '900', color: '#64748b', cursor: 'pointer' }}
-           >
-             Tutup Laporan
-           </button>
-           <button 
-             onClick={() => { onRevise(menu); onClose(); }}
-             style={{ flex: 2, padding: '1.2rem', borderRadius: '24px', border: 'none', background: '#dc2626', fontWeight: '950', color: 'white', cursor: 'pointer', boxShadow: '0 10px 25px rgba(220, 38, 38, 0.2)' }}
-           >
-             Revisi Sekarang
-           </button>
-        </div>
-      </motion.div>
-    </motion.div>
-    </>
-  )
-}
+// VisualAuditModal is imported
 
 
-const AddTicketForm = ({ onClose, onSave, dapurs, menus, sekolah, onNotify }) => {
-  const validMenus = menus.filter(m => m.status_validasi === 'approved')
-  const [formData, setFormData] = useState({
-    id_dapur: dapurs[0]?.id_dapur || dapurs[0]?.id || '',
-    id_menu: validMenus[0]?.id_menu || '',
-    id_sekolah: sekolah[0]?.id_sekolah || '',
-    jumlah_porsi: ''
-  })
-  const availableSekolah = sekolah.filter((s) => {
-    if (!formData.id_dapur) return false
-    return (s.id_dapur || '').toString() === formData.id_dapur.toString()
-  })
-
-  useEffect(() => {
-    if (availableSekolah.length === 0) {
-      setFormData((prev) => ({ ...prev, id_sekolah: '' }))
-      return
-    }
-    const stillValid = availableSekolah.some((s) => s.id_sekolah.toString() === (formData.id_sekolah || '').toString())
-    if (!stillValid) {
-      setFormData((prev) => ({ ...prev, id_sekolah: availableSekolah[0].id_sekolah }))
-    }
-  }, [formData.id_dapur, availableSekolah, formData.id_sekolah])
-
-  const handleSubmit = async () => {
-    if (!formData.id_dapur || !formData.id_menu || !formData.id_sekolah || !formData.jumlah_porsi) {
-      alert("Lengkapi semua data tiket produksi.")
-      return
-    }
-    try {
-      await onSave({
-        ...formData,
-        jumlah_porsi: parseInt(formData.jumlah_porsi)
-      })
-      onNotify?.('Tiket produksi berhasil dibuat.')
-      onClose()
-    } catch (err) {
-      onNotify?.(err.message || 'Gagal membuat tiket produksi.', 'warning')
-    }
-  }
-
-  return (
-    <div 
-      style={{ 
-        position: 'fixed', 
-        inset: 0, 
-        background: 'rgba(15, 23, 42, 0.4)', 
-        backdropFilter: 'blur(8px)', 
-        zIndex: 9999, 
-        display: 'flex', 
-        justifyContent: 'flex-end' 
-      }}
-      onClick={onClose}
-    >
-      <motion.div 
-        initial={{ x: '100%' }} 
-        animate={{ x: 0 }} 
-        exit={{ x: '100%' }} 
-        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        style={{ 
-          width: '100%', 
-          maxWidth: '400px', 
-          height: '100%', 
-          background: 'white', 
-          boxShadow: '-10px 0 40px rgba(0,0,0,0.1)', 
-          padding: '1.5rem', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          justifyContent: 'space-between',
-          overflowY: 'auto'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div>
-          <div className="flex justify-between" style={{ marginBottom: '1.5rem', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ fontWeight: '950', fontSize: '1.8rem', color: '#0f172a', letterSpacing: '-0.5px' }}>Buat Tiket Produksi</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600', marginTop: '4px' }}>Buat tiket antrian produksi baru.</p>
-            </div>
-            <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
-              <X size={20} color="#64748b" />
-            </button>
-          </div>
-          
-          <div style={{ display: 'grid', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DAPUR OPERASIONAL</label>
-              <select 
-                value={formData.id_dapur} 
-                onChange={e => setFormData({...formData, id_dapur: e.target.value})}
-                disabled={dapurs.length === 0}
-                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
-              >
-                <option value="" disabled>{dapurs.length === 0 ? 'Belum ada dapur approved' : 'Pilih Dapur'}</option>
-                {dapurs.map(d => <option key={d.id_dapur || d.id} value={d.id_dapur || d.id}>{d.lokasi}</option>)}
-              </select>
-              {dapurs.length === 0 && (
-                <p style={{ fontSize: '0.75rem', color: '#92400e', fontWeight: '700', marginTop: '0.45rem' }}>
-                  Produksi baru bisa dibuat setelah ada dapur yang disetujui Pemerintah.
-                </p>
-              )}
-            </div>
-            <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PILIH MENU (APPROVED)</label>
-              <select 
-                value={formData.id_menu} 
-                onChange={e => setFormData({...formData, id_menu: e.target.value})}
-                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
-              >
-                <option value="" disabled>Pilih Menu</option>
-                {validMenus.map(m => <option key={m.id_menu} value={m.id_menu}>{m.nama_menu}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>TARGET SEKOLAH (DISTRIBUSI)</label>
-              <select 
-                value={formData.id_sekolah} 
-                onChange={e => setFormData({...formData, id_sekolah: e.target.value})}
-                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
-              >
-                <option value="" disabled>Pilih Sekolah</option>
-                {availableSekolah.map(s => <option key={s.id_sekolah} value={s.id_sekolah}>{s.nama_sekolah}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>JUMLAH PORSI</label>
-              <input 
-                type="number" 
-                placeholder="Misal: 500"
-                value={formData.jumlah_porsi}
-                onChange={e => setFormData({...formData, jumlah_porsi: e.target.value})}
-                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '2px solid var(--border)', fontWeight: '700' }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <button 
-          onClick={handleSubmit}
-          className="btn-primary" 
-          style={{ width: '100%', padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '2rem', cursor: 'pointer' }}
-        >
-          Terbitkan Tiket
-        </button>
-      </motion.div>
-    </div>
-  )
-}
+// AddTicketForm is imported
 
 const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const location = useLocation()
@@ -1474,7 +659,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const renderContent = () => {
     if (isInformasi) return (
       <div className="grid" style={{ gap: '1rem' }}>
-        <Header title="Informasi & Dokumen Vendor" />
+        <Header title="Informasi & Dokumen Vendor" subtitle="Operational Center • Live Monitoring" />
         
         {/* Section: Daftar Dapur */}
         <AnimatePresence>
@@ -1780,7 +965,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
 
     if (isStok) return (
       <div className="grid" style={{ gap: '1.5rem' }}>
-        <Header title="Manajemen Stok & Gudang" />
+        <Header title="Manajemen Stok & Gudang" subtitle="Operational Center • Live Monitoring" />
         
         <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px' }}>
            <div style={{ marginBottom: '1.5rem' }}>
@@ -2213,7 +1398,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
 
     if (isMenu) return (
       <div className="grid" style={{ gap: '1.5rem' }}>
-        <Header title="Katalog Menu Gizi" />
+        <Header title="Katalog Menu Gizi" subtitle="Operational Center • Live Monitoring" />
         <AnimatePresence>
           {showMenuForm && (
             <AddMenuForm
@@ -2389,7 +1574,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
 
       return (
         <div className="grid" style={{ gap: '1rem' }}>
-          <Header title="Sistem Tiket & Monitoring Produksi" />
+          <Header title="Sistem Tiket & Monitoring Produksi" subtitle="Operational Center • Live Monitoring" />
           
           {prodError && (
             <div style={{
@@ -2602,7 +1787,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
 
     if (isDistribusi) return (
       <div className="grid" style={{ gap: '1rem' }}>
-        <Header title="Logistik & Pelacakan Armada" />
+        <Header title="Logistik & Pelacakan Armada" subtitle="Operational Center • Live Monitoring" />
         
         {/* Hub Command Control */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.7)', padding: '12px 30px', borderRadius: '24px', border: '1px solid white', backdropFilter: 'blur(10px)', marginBottom: '-12px', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>

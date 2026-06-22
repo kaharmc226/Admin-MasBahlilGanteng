@@ -53,433 +53,11 @@ import api from '../data/../api'
 import DashboardLayout from '../components/DashboardLayout'
 
 // --- Sub-components (Moved Outside) ---
+import Motif from '../components/dashboard/Motif'
+import Header from '../components/dashboard/DashboardHeader'
+import AddFormModal from '../components/modals/AddFormModal'
+import VendorAuditModal from '../components/modals/VendorAuditModal'
 
-const Motif = ({ icon: Icon, top, right, bottom, left, color }) => (
-  <div style={{ position: 'absolute', top, right, bottom, left, opacity: 0.04, pointerEvents: 'none', zIndex: 0 }}>
-    <Icon size={120} color={color} />
-  </div>
-)
-
-const Header = ({ title, subtitle, showAdd = false, onAdd, isVendor, isMapping }) => (
-  <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-    <div>
-      <h1 style={{ fontSize: '2.8rem', fontWeight: '950', letterSpacing: '-2px' }}>{title}</h1>
-      <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', fontWeight: '600' }}>{subtitle}</p>
-    </div>
-    {showAdd && (
-      <button onClick={onAdd} className="btn-primary" style={{ padding: '1rem 2rem', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '8px', border: 'none', color: 'white', fontWeight: '800' }}>
-        <Plus size={20} /> Tambah {isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target'}
-      </button>
-    )}
-  </div>
-)
-
-const dapurReviewMeta = {
-  approved: { label: 'APPROVED', background: 'var(--primary-light)', color: 'var(--primary)' },
-  pending: { label: 'PENDING', background: 'var(--banana-light)', color: 'var(--banana)' },
-  rejected: { label: 'REJECTED', background: '#fee2e2', color: '#b91c1c' },
-}
-
-const vendorDocumentStatusMeta = {
-  valid: { label: 'Valid', background: '#dcfce7', color: '#166534', description: 'Dokumen sudah lolos verifikasi dan bisa dipakai untuk operasional.' },
-  pending_review: { label: 'Perlu Review', background: '#fef3c7', color: '#92400e', description: 'Dokumen menunggu peninjauan atau revisi dari reviewer pemerintah.' },
-  expired: { label: 'Expired', background: '#fee2e2', color: '#b91c1c', description: 'Masa berlaku dokumen habis atau dokumen tidak lagi bisa digunakan.' },
-}
-
-const vendorDocumentTypeLabel = {
-  izin_usaha: 'Izin Usaha', sertifikat_halal: 'Sertifikat Halal', sertifikat_laik_hygiene: 'Sertifikat Laik Hygiene',
-  npwp: 'NPWP', siup: 'SIUP', lainnya: 'Dokumen Lainnya',
-}
-
-const formatShortDate = (value) => {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-const formatDateTime = (value) => {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-const getFileLabel = (path = '') => {
-  if (!path) return 'Tanpa file'
-  const normalized = String(path).split('?')[0]
-  const extension = normalized.includes('.') ? normalized.split('.').pop() : ''
-  return extension ? extension.toUpperCase() : 'FILE'
-}
-
-const AddFormModal = ({ onClose, onSave, isVendor, isMapping, dapurs = [] }) => {
-  const [isSaving, setIsSaving] = useState(false)
-  const [fields, setFields] = useState({
-    nama_vendor: '',
-    region: '',
-    izin_usaha: '',
-    account_name: '',
-    email: '',
-    password: '',
-    nama_sekolah: '',
-    jumlah_siswa: '',
-    alamat: '',
-    id_dapur: ''
-  })
-
-  const handleSave = async () => {
-    setIsSaving(true)
-    try {
-      await onSave(isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target', fields)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const getFields = () => {
-    if (isVendor) return (
-      <>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA VENDOR</label>
-          <input required value={fields.nama_vendor} onChange={(e) => setFields({ ...fields, nama_vendor: e.target.value })} placeholder="Contoh: PT. Pangan Sejahtera" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NOMOR IZIN USAHA</label>
-          <input required value={fields.izin_usaha} onChange={(e) => setFields({ ...fields, izin_usaha: e.target.value })} placeholder="B-9988/2026/MBG" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>WILAYAH OPERASIONAL</label>
-          <input required value={fields.region} onChange={(e) => setFields({ ...fields, region: e.target.value })} placeholder="Contoh: Kecamatan Mandonga, Kota Kendari" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA AKUN VENDOR</label>
-          <input required value={fields.account_name} onChange={(e) => setFields({ ...fields, account_name: e.target.value })} placeholder="Contoh: Admin Dapur Sejahtera" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>EMAIL LOGIN</label>
-          <input required type="email" value={fields.email} onChange={(e) => setFields({ ...fields, email: e.target.value })} placeholder="vendor@traksi.id" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PASSWORD LOGIN</label>
-          <input required type="password" value={fields.password} onChange={(e) => setFields({ ...fields, password: e.target.value })} placeholder="Tetapkan password akun vendor" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-      </>
-    )
-    if (isMapping) return (
-      <>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DAPUR PENANGGUNG JAWAB</label>
-          <select required value={fields.id_dapur} onChange={(e) => setFields({ ...fields, id_dapur: e.target.value })} disabled={dapurs.length === 0} style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', background: 'white' }}>
-            <option value="">{dapurs.length === 0 ? 'Belum ada dapur approved' : 'Pilih dapur'}</option>
-            {dapurs.map((d) => (
-              <option key={d.id_dapur} value={d.id_dapur}>Dapur {d.lokasi} - Vendor #{d.id_vendor}</option>
-            ))}
-          </select>
-          {dapurs.length === 0 && (
-            <p style={{ marginTop: '0.45rem', fontSize: '0.75rem', color: '#92400e', fontWeight: '700' }}>Mapping sekolah hanya bisa dibuat ke dapur yang sudah disetujui Pemerintah.</p>
-          )}
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA SEKOLAH BARU</label>
-          <input required value={fields.nama_sekolah} onChange={(e) => setFields({ ...fields, nama_sekolah: e.target.value })} placeholder="Contoh: SDN 05 Menteng" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>JUMLAH SISWA</label>
-          <input required type="number" value={fields.jumlah_siswa} onChange={(e) => setFields({ ...fields, jumlah_siswa: e.target.value })} placeholder="450" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>ALAMAT LENGKAP SEKOLAH</label>
-          <textarea required value={fields.alamat} onChange={(e) => setFields({ ...fields, alamat: e.target.value })} placeholder="Jl. Merdeka No. 10..." style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700', minHeight: '100px', fontFamily: 'inherit' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA AKUN SEKOLAH</label>
-          <input required value={fields.account_name} onChange={(e) => setFields({ ...fields, account_name: e.target.value })} placeholder="Contoh: Admin SDN 05 Menteng" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>EMAIL LOGIN</label>
-          <input required type="email" value={fields.email} onChange={(e) => setFields({ ...fields, email: e.target.value })} placeholder="admin@sekolah.traksi.id" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>PASSWORD LOGIN</label>
-          <input required type="password" value={fields.password} onChange={(e) => setFields({ ...fields, password: e.target.value })} placeholder="Tetapkan password akun sekolah" style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-        </div>
-      </>
-    )
-    return (
-      <div>
-        <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>ANGGARAN TARGET (CAPEX/OPEX)</label>
-        <input placeholder="Masukkan nilai anggaran..." style={{ width: '100%', padding: '1.2rem', borderRadius: '15px', border: '2px solid #eee', fontWeight: '700' }} />
-      </div>
-    )
-  }
-
-  return (
-    <div 
-      style={{ 
-        position: 'fixed', 
-        inset: 0, 
-        background: 'rgba(15, 23, 42, 0.4)', 
-        backdropFilter: 'blur(8px)', 
-        zIndex: 9999, 
-        display: 'flex', 
-        justifyContent: 'flex-end' 
-      }}
-      onClick={onClose}
-    >
-      <motion.div 
-        initial={{ x: '100%' }} 
-        animate={{ x: 0 }} 
-        exit={{ x: '100%' }} 
-        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        style={{ 
-          width: '100%', 
-          maxWidth: '400px', 
-          height: '100%', 
-          background: 'white', 
-          boxShadow: '-10px 0 40px rgba(0,0,0,0.1)', 
-          padding: '1.5rem', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          justifyContent: 'space-between',
-          overflowY: 'auto'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div>
-          <div className="flex justify-between" style={{ marginBottom: '1.5rem', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ fontWeight: '950', fontSize: '1.8rem', color: '#0f172a', letterSpacing: '-0.5px' }}>Tambah {isVendor ? 'Vendor' : isMapping ? 'Sekolah' : 'Target'}</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600', marginTop: '4px' }}>Input data administrasi ke dalam ekosistem pemerintah.</p>
-            </div>
-            <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
-              <X size={20} color="#64748b" />
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gap: '1rem' }}>
-            {getFields()}
-          </div>
-        </div>
-
-        <button 
-          onClick={handleSave}
-          className="btn-primary" 
-          style={{ width: '100%', padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '950', fontSize: '1.1rem', marginTop: '2rem', cursor: 'pointer' }}
-        >
-          {isSaving ? 'Menyimpan ke Ledger...' : 'Simpan Data'}
-        </button>
-      </motion.div>
-    </div>
-  )
-}
-
-const VendorAuditModal = ({ vendor, docs, dapurs, onClose, onReviewDocument, onSuspendVendor, onReinstateVendor }) => {
-  if (!vendor) return null
-
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'grid', placeItems: 'center', padding: '1rem', overflowY: 'auto' }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 20, scale: 0.96 }}
-        style={{ width: '100%', maxWidth: '820px', background: 'white', borderRadius: '24px', padding: '2rem', boxShadow: '0 30px 80px rgba(0,0,0,0.2)', margin: 'auto' }}
-        onClick={(e) => e.stopPropagation()}
-        className="government-audit-modal"
-      >
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', gap: '1.25rem' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'var(--bg)', display: 'grid', placeItems: 'center', border: '1px solid var(--border)' }}>
-              <Building size={32} color="var(--primary)" />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-                <h2 style={{ fontWeight: '950', fontSize: '1.8rem', letterSpacing: '-0.5px' }}>{vendor.nama_vendor}</h2>
-                <span className="badge" style={{ 
-                  background: vendor.status_verifikasi === 'approved' ? 'var(--primary-light)' : '#fee2e2',
-                  color: vendor.status_verifikasi === 'approved' ? 'var(--primary)' : '#b91c1c',
-                  fontWeight: '900', fontSize: '0.75rem'
-                }}>
-                  {vendor.status_verifikasi.toUpperCase()}
-                </span>
-              </div>
-              <p style={{ color: 'var(--text-muted)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <MapPin size={16} /> {vendor.region} • <FileText size={16} /> Izin: {vendor.izin_usaha}
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} style={{ background: 'var(--bg)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-muted)' }}>
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-          <div style={{ padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', background: 'white', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ background: 'var(--primary-light)', padding: '0.75rem', borderRadius: '12px' }}><ChefHat color="var(--primary)" size={20} /></div>
-            <div>
-              <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>DAPUR AKTIF</p>
-              <h3 style={{ fontWeight: '950', fontSize: '1.5rem', lineHeight: 1 }}>{dapurs.length}</h3>
-            </div>
-          </div>
-          <div style={{ padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', background: 'white', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ background: '#fef3c7', padding: '0.75rem', borderRadius: '12px' }}><FileText color="#d97706" size={20} /></div>
-            <div>
-              <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>TOTAL DOKUMEN</p>
-              <h3 style={{ fontWeight: '950', fontSize: '1.5rem', lineHeight: 1 }}>{docs.length}</h3>
-            </div>
-          </div>
-          <div style={{ padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', background: 'white', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ background: '#dcfce7', padding: '0.75rem', borderRadius: '12px' }}><ShieldCheck color="#166534" size={20} /></div>
-            <div>
-              <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>DOKUMEN VALID</p>
-              <h3 style={{ fontWeight: '950', fontSize: '1.5rem', lineHeight: 1 }}>{docs.filter(d => d.status === 'valid').length}</h3>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Tabs area */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem' }}>
-          
-          {/* Left Col: Dokumen Legalitas */}
-          <div>
-            <h3 style={{ fontWeight: '900', fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileText size={18} color="var(--primary)" /> Dokumen Legalitas & Sertifikasi
-            </h3>
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              {docs.length === 0 ? (
-                <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg)', borderRadius: '16px', border: '1px dashed var(--border)' }}>
-                  <FileText size={32} color="#cbd5e1" style={{ margin: '0 auto 0.5rem' }} />
-                  <p style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Belum ada dokumen yang diunggah.</p>
-                </div>
-              ) : docs.map((doc) => {
-                const meta = vendorDocumentStatusMeta[doc.status || 'pending_review'] || vendorDocumentStatusMeta.pending_review
-                
-                return (
-                  <div key={doc.id_dokumen} className="government-doc-card" style={{ padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', background: 'white' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '1rem' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--bg)', display: 'grid', placeItems: 'center', fontWeight: '900', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                          {getFileLabel(doc.file_path)}
-                        </div>
-                        <div>
-                          <p style={{ fontWeight: '900', fontSize: '1.05rem', marginBottom: '0.2rem' }}>{vendorDocumentTypeLabel[doc.jenis] || doc.jenis}</p>
-                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>
-                            Diunggah {formatShortDate(doc.tanggal_unggah)}
-                          </p>
-                        </div>
-                      </div>
-                      <span style={{ 
-                        background: meta.background, color: meta.color, 
-                        padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '900', whiteSpace: 'nowrap'
-                      }}>
-                        {meta.label}
-                      </span>
-                    </div>
-
-                    <div style={{ background: 'var(--bg)', padding: '0.75rem 1rem', borderRadius: '12px', marginBottom: '1rem' }}>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: '600', lineHeight: 1.5 }}>
-                        <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Catatan Review:</span>
-                        {doc.review_note || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Belum ada catatan review.</span>}
-                      </p>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-                      {doc.file_path ? (
-                        <button 
-                          onClick={() => window.open(api.assetUrl(doc.file_path), '_blank')}
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'white', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0.5rem 1rem', borderRadius: '10px', fontWeight: '800', fontSize: '0.85rem', cursor: 'pointer', flex: 1, justifyContent: 'center' }}
-                        >
-                          <Download size={16} /> Buka File
-                        </button>
-                      ) : (
-                        <div style={{ flex: 1 }}></div>
-                      )}
-                      
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button 
-                          onClick={() => onReviewDocument(doc, 'valid')} 
-                          style={{ border: 'none', borderRadius: '8px', padding: '0.5rem 0.75rem', background: doc.status === 'valid' ? '#166534' : '#f1f5f9', color: doc.status === 'valid' ? 'white' : 'var(--text-muted)', fontWeight: '800', fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                          title="Tandai Valid"
-                        >Valid</button>
-                        <button 
-                          onClick={() => onReviewDocument(doc, 'pending_review')} 
-                          style={{ border: 'none', borderRadius: '8px', padding: '0.5rem 0.75rem', background: doc.status === 'pending_review' ? '#92400e' : '#f1f5f9', color: doc.status === 'pending_review' ? 'white' : 'var(--text-muted)', fontWeight: '800', fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                          title="Minta Revisi"
-                        >Revisi</button>
-                        <button 
-                          onClick={() => onReviewDocument(doc, 'expired')} 
-                          style={{ border: 'none', borderRadius: '8px', padding: '0.5rem 0.75rem', background: doc.status === 'expired' ? '#b91c1c' : '#f1f5f9', color: doc.status === 'expired' ? 'white' : 'var(--text-muted)', fontWeight: '800', fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                          title="Tandai Expired"
-                        >Expired</button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Right Col: Dapur Operasional */}
-          <div>
-            <h3 style={{ fontWeight: '900', fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <ChefHat size={18} color="var(--primary)" /> Dapur Operasional
-            </h3>
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
-              {dapurs.length === 0 ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', background: 'var(--bg)', borderRadius: '16px', border: '1px dashed var(--border)' }}>
-                  <p style={{ color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.9rem' }}>Belum ada dapur yang didaftarkan.</p>
-                </div>
-              ) : dapurs.map((d) => (
-                <div key={d.id_dapur} style={{ padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                    <p style={{ fontWeight: '900', fontSize: '1rem' }}>{d.lokasi}</p>
-                    <span style={{ 
-                      background: d.status === 'approved' ? 'var(--primary-light)' : '#fef3c7', 
-                      color: d.status === 'approved' ? 'var(--primary)' : '#d97706',
-                      padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '900'
-                    }}>
-                      {(d.status || 'pending').toUpperCase()}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem' }}>
-                    <div>
-                      <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800' }}>KAPASITAS</p>
-                      <p style={{ fontWeight: '700', fontSize: '0.85rem' }}>{d.kapasitas_produksi} porsi/hari</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
-              <h4 style={{ fontSize: '0.85rem', fontWeight: '900', color: 'var(--text-muted)', marginBottom: '1rem', textTransform: 'uppercase' }}>Tindakan Administratif</h4>
-              {vendor.status_verifikasi === 'suspended' ? (
-                <button 
-                  onClick={() => onReinstateVendor(vendor)} 
-                  style={{ width: '100%', border: 'none', borderRadius: '12px', padding: '1rem', background: 'var(--primary)', color: 'white', fontWeight: '900', cursor: 'pointer', display: 'flex', justifyContent: 'center', gap: '0.5rem', alignItems: 'center' }}
-                >
-                  <ShieldCheck size={18} /> Pulihkan Status Vendor
-                </button>
-              ) : (
-                <button 
-                  onClick={() => onSuspendVendor(vendor)} 
-                  style={{ width: '100%', border: 'none', borderRadius: '12px', padding: '1rem', background: '#fee2e2', color: '#b91c1c', fontWeight: '900', cursor: 'pointer', display: 'flex', justifyContent: 'center', gap: '0.5rem', alignItems: 'center' }}
-                >
-                  <AlertTriangle size={18} /> Suspend Operasional Vendor
-                </button>
-              )}
-            </div>
-          </div>
-
-        </div>
-      </motion.div>
-    </div>
-  )
-}
 
 const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const location = useLocation()
@@ -806,7 +384,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const renderContent = () => {
     if (isVendor) return (
       <div className="grid">
-        <Header title="Audit Vendor Nasional" subtitle="Verifikasi izin usaha dan standar operasional MBG." showAdd onAdd={() => setShowAddForm(true)} isVendor={isVendor} />
+        <Header title="Audit Vendor Nasional" subtitle="Verifikasi izin usaha dan standar operasional MBG." showAdd onAdd={() => setShowAddForm(true)} addLabel="Tambah Vendor" variant="simple" />
         <AnimatePresence>
           {showAddForm && (
             <AddFormModal 
@@ -898,7 +476,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
 
     if (isMapping) return (
       <div className="grid">
-        <Header title="Hubungkan Dapur ↔ Sekolah" subtitle="Tentukan cakupan wilayah pelayanan dapur ke institusi pendidikan." showAdd onAdd={() => setShowAddForm(true)} isMapping={isMapping} />
+        <Header title="Hubungkan Dapur ↔ Sekolah" subtitle="Tentukan cakupan wilayah pelayanan dapur ke institusi pendidikan." showAdd onAdd={() => setShowAddForm(true)} addLabel="Tambah Sekolah" variant="simple" />
         <AnimatePresence>
           {showAddForm && (
             <AddFormModal 
@@ -968,7 +546,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
 
     if (isStatistik) return (
       <div className="grid">
-        <Header title="Laporan & Statistik" subtitle="Analisis pertumbuhan dan efektivitas distribusi gizi." />
+        <Header title="Laporan & Statistik" subtitle="Analisis pertumbuhan dan efektivitas distribusi gizi." variant="simple" />
         <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '2.5rem' }}>
           <div className="card" style={{ padding: '1.5rem', borderRadius: '16px', background: 'white' }}>
              <h3 style={{ fontWeight: '900', marginBottom: '1rem' }}>Penerima Manfaat per Jenjang</h3>
@@ -999,7 +577,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
 
     if (isAlert) return (
       <div className="grid">
-        <Header title="Sistem Alert & Log" subtitle="Deteksi dini kendala distribusi dan kualitas di lapangan." />
+        <Header title="Sistem Alert & Log" subtitle="Deteksi dini kendala distribusi dan kualitas di lapangan." variant="simple" />
         <div className="grid" style={{ gap: '1rem' }}>
           {alerts.length === 0 ? (
             <div className="card" style={{ padding: '3rem', textAlign: 'center', background: 'white', borderRadius: '16px', border: '1px solid var(--border)' }}>
@@ -1055,7 +633,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
 
     if (isPeta) return (
       <div className="grid">
-        <Header title="Peta Distribusi Real-time" subtitle="Visualisasi sebaran dapur dan sekolah di seluruh Nusantara." />
+        <Header title="Peta Distribusi Real-time" subtitle="Visualisasi sebaran dapur dan sekolah di seluruh Nusantara." variant="simple" />
         <div className="card" style={{ minHeight: '600px', background: 'var(--bg)', borderRadius: '16px', padding: '1.5rem', position: 'relative' }}>
            <div style={{ display: 'grid', gap: '1rem' }}>
              {mappingData.length === 0 ? (
@@ -1083,7 +661,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
 
     if (isMain) return (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ position: 'relative', zIndex: 1 }}>
-        <Header title="Monitoring Gizi Nasional" subtitle="Portal Transparansi Program Makan Bergizi Gratis (MBG)." />
+        <Header title="Monitoring Gizi Nasional" subtitle="Portal Transparansi Program Makan Bergizi Gratis (MBG)." variant="simple" />
         
         <div style={{ display: 'flex', gap: '15px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
            <div className="badge" style={{ background: '#064E3B', color: '#34D399', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
