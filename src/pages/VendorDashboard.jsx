@@ -1699,6 +1699,80 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
             </div>
           )}
         </div>
+
+        {/* 3. Approved Menus Catalog */}
+        <div style={{ marginTop: '1rem' }}>
+          <div className="card dashboard-card-vibrant" style={{ padding: '2rem', borderRadius: '20px', background: 'white', border: '1px solid #e2e8f0', boxShadow: '0 10px 30px rgba(0,0,0,0.02)' }}>
+            <h3 style={{ fontWeight: '950', marginBottom: '1.5rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem' }}>
+              <div style={{ background: 'var(--primary-light)', padding: '12px', borderRadius: '14px', display: 'grid', placeItems: 'center' }}>
+                <CheckCircle2 color="var(--primary)" size={24} />
+              </div>
+              Menu Siap Diproduksi
+            </h3>
+            <p style={{ color: '#64748b', fontWeight: '600', marginBottom: '2rem', fontSize: '1rem' }}>
+              Menu-menu di bawah ini telah disahkan oleh Ahli Gizi dan siap digunakan untuk tiket operasional produksi harian.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+              {approvedMenus.map((m, i) => (
+                <motion.div 
+                  whileHover={{ scale: 1.02, translateY: -4 }}
+                  key={i} 
+                  className="card" 
+                  style={{ 
+                    borderRadius: '16px', 
+                    border: '1px solid #e2e8f0', 
+                    background: 'white', 
+                    cursor: 'pointer', 
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                  onClick={() => setSelectedAuditMenu(m)}
+                >
+                  <div style={{ height: '140px', background: '#f8fafc', position: 'relative', borderBottom: '1px solid #e2e8f0' }}>
+                    {m.foto_url ? (
+                      <img src={api.assetUrl(m.foto_url)} alt={m.nama_menu} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: '#cbd5e1' }}>
+                        <UtensilsCrossed size={48} />
+                      </div>
+                    )}
+                    <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
+                      <span className="badge" style={{ background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: '900', padding: '6px 12px', borderRadius: '8px', border: '1px solid #bbf7d0', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>APPROVED</span>
+                    </div>
+                  </div>
+                  <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <h4 style={{ fontWeight: '950', fontSize: '1.2rem', color: '#0f172a', marginBottom: '8px', lineHeight: '1.3' }}>{m.nama_menu}</h4>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '700', marginBottom: '1.25rem', flex: 1 }}>
+                      {m.bahan.slice(0, 3).map(b => b.nama).join(', ')}{m.bahan.length > 3 ? ', dll.' : ''}
+                    </p>
+                    <div className="flex justify-between" style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '1rem', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '700' }}>
+                        Disahkan: {m.latestApprovedLog?.created_at ? new Date(m.latestApprovedLog.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : (m.tanggal || m.date || '-')}
+                      </span>
+                      <button 
+                        style={{ color: 'var(--primary)', background: 'none', border: 'none', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.9rem' }}
+                      >
+                        Detail <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+            {approvedMenus.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '3rem 2rem', background: '#f8fafc', borderRadius: '16px', border: '2px dashed #cbd5e1' }}>
+                <CheckCircle2 color="#94a3b8" size={48} style={{ margin: '0 auto 15px', opacity: 0.5 }} />
+                <h4 style={{ color: '#475569', fontWeight: '900', fontSize: '1.2rem', marginBottom: '8px' }}>Belum Ada Menu Disahkan</h4>
+                <p style={{ color: '#64748b', fontWeight: '600', maxWidth: '400px', margin: '0 auto' }}>
+                  Menu yang telah divalidasi dan disetujui oleh Ahli Gizi akan muncul di sini sebagai katalog produksi Anda.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     )
 
