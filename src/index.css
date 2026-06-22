@@ -90,6 +90,36 @@
    RESET & BASE
    ============================================= */
 
+.government-audit-modal {
+  /* Scrollbar styling for modal */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.government-audit-modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.government-audit-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.government-audit-modal::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 20px;
+}
+
+.government-doc-card {
+  transition: all 0.2s ease;
+}
+
+.government-doc-card:hover {
+  border-color: var(--primary-light);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.05);
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
