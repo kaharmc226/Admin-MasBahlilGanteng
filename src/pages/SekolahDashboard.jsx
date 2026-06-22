@@ -405,9 +405,9 @@ const SekolahDashboard = ({ user, onLogout, onSwitchRole }) => {
             <h3 style={{ marginBottom: '1rem', fontWeight: '950', fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}><History color="var(--primary)" /> Riwayat 3 Hari</h3>
             <div style={{ display: 'grid', gap: '1.2rem' }}>
               {(konfirmasiHistory.length > 0 ? konfirmasiHistory.slice(0, 3) : distribusi.length > 0 ? distribusi.slice(0, 3) : [
-                { created_at: '2026-03-13T00:00:00Z', nama_menu: 'Nasi Kuning Special', jumlah_porsi: 404, status: 'SELESAI' },
-                { created_at: '2026-03-12T00:00:00Z', nama_menu: 'Ayam Kecap Madu', jumlah_porsi: 404, status: 'SELESAI' },
-                { created_at: '2026-03-11T00:00:00Z', nama_menu: 'Sup Bakso Sehat', jumlah_porsi: 404, status: 'SELESAI' }
+                { created_at: '2026-03-13T00:00:00Z', nama_menu: 'Nasi Kuning Special', jumlah_porsi: schoolProfile?.jumlah_siswa || 360, status: 'SELESAI' },
+                { created_at: '2026-03-12T00:00:00Z', nama_menu: 'Ayam Kecap Madu', jumlah_porsi: schoolProfile?.jumlah_siswa || 360, status: 'SELESAI' },
+                { created_at: '2026-03-11T00:00:00Z', nama_menu: 'Sup Bakso Sehat', jumlah_porsi: schoolProfile?.jumlah_siswa || 360, status: 'SELESAI' }
               ]).map((h, i) => {
                 const rawDate = h.waktu_konfirmasi || h.waktu_tiba || h.created_at || new Date().toISOString()
                 const dateStr = new Date(rawDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });

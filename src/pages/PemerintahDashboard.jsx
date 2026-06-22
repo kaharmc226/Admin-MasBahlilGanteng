@@ -1001,46 +1001,54 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
       <div className="grid">
         <Header title="Sistem Alert & Log" subtitle="Deteksi dini kendala distribusi dan kualitas di lapangan." />
         <div className="grid" style={{ gap: '1rem' }}>
-          {alerts.map((a, i) => (
-            <div key={i} className="card" style={{ padding: '1rem', borderRadius: '12px', display: 'flex', gap: '25px', alignItems: 'center', background: 'white' }}>
-              <div style={{ background: 'var(--bg)', padding: '20px', borderRadius: '8px' }}><AlertTriangle color="#EF4444" /></div>
-              <div style={{ flex: 1 }}>
-                <div className="flex justify-between" style={{ marginBottom: '5px' }}>
-                  <h4 style={{ fontWeight: '900', fontSize: '1.2rem' }}>{a.judul}</h4>
-                  <span className="badge" style={{
-                    background: a.is_resolved ? 'var(--primary-light)' : 'var(--banana-light)',
-                    color: a.is_resolved ? 'var(--primary)' : 'var(--banana)',
-                    fontWeight: '900'
-                  }}>
-                    {a.is_resolved ? 'SELESAI' : 'TERBUKA'}
-                  </span>
-                </div>
-                <p style={{ color: 'var(--text-muted)', fontWeight: '500' }}>{a.deskripsi}</p>
-                <p style={{ color: 'var(--text-muted)', fontWeight: '700', fontSize: '0.8rem', marginTop: '0.75rem' }}>
-                  Wilayah: {a.wilayah || 'Tidak ditentukan'}
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <select value={a.severity || 'info'} onChange={(e) => handleAlertSeverity(a, e.target.value)} style={{ padding: '0.7rem', borderRadius: '12px', border: '1px solid var(--border)', fontWeight: '800', background: 'white' }}>
-                  <option value="info">Info</option>
-                  <option value="warning">Warning</option>
-                  <option value="critical">Critical</option>
-                </select>
-                {!a.is_resolved && (
-                  <button
-                    onClick={() => handleResolveAlert(a.id_alert)}
-                    className="btn-primary"
-                    style={{ padding: '0.8rem 1rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer' }}
-                  >
-                    Tandai Selesai
-                  </button>
-                )}
-                <button onClick={() => handleArchiveAlert(a.id_alert)} style={{ padding: '0.8rem 1rem', borderRadius: '12px', border: 'none', background: '#fee2e2', color: '#b91c1c', fontWeight: '800', cursor: 'pointer' }}>
-                  Arsipkan
-                </button>
-              </div>
+          {alerts.length === 0 ? (
+            <div className="card" style={{ padding: '3rem', textAlign: 'center', background: 'white', borderRadius: '16px', border: '1px solid var(--border)' }}>
+              <ShieldCheck size={48} color="var(--primary)" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
+              <h4 style={{ fontWeight: '900', fontSize: '1.25rem', marginBottom: '0.5rem' }}>Semua Sistem Normal</h4>
+              <p style={{ color: 'var(--text-muted)', fontWeight: '600', maxWidth: '400px', margin: '0 auto' }}>Tidak ada laporan kendala operasional atau keluhan kualitas gizi aktif saat ini.</p>
             </div>
-          ))}
+          ) : (
+            alerts.map((a, i) => (
+              <div key={i} className="card" style={{ padding: '1rem', borderRadius: '12px', display: 'flex', gap: '25px', alignItems: 'center', background: 'white' }}>
+                <div style={{ background: 'var(--bg)', padding: '20px', borderRadius: '8px' }}><AlertTriangle color="#EF4444" /></div>
+                <div style={{ flex: 1 }}>
+                  <div className="flex justify-between" style={{ marginBottom: '5px' }}>
+                    <h4 style={{ fontWeight: '900', fontSize: '1.2rem' }}>{a.judul}</h4>
+                    <span className="badge" style={{
+                      background: a.is_resolved ? 'var(--primary-light)' : 'var(--banana-light)',
+                      color: a.is_resolved ? 'var(--primary)' : 'var(--banana)',
+                      fontWeight: '900'
+                    }}>
+                      {a.is_resolved ? 'SELESAI' : 'TERBUKA'}
+                    </span>
+                  </div>
+                  <p style={{ color: 'var(--text-muted)', fontWeight: '500' }}>{a.deskripsi}</p>
+                  <p style={{ color: 'var(--text-muted)', fontWeight: '700', fontSize: '0.8rem', marginTop: '0.75rem' }}>
+                    Wilayah: {a.wilayah || 'Tidak ditentukan'}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <select value={a.severity || 'info'} onChange={(e) => handleAlertSeverity(a, e.target.value)} style={{ padding: '0.7rem', borderRadius: '12px', border: '1px solid var(--border)', fontWeight: '800', background: 'white' }}>
+                    <option value="info">Info</option>
+                    <option value="warning">Warning</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                  {!a.is_resolved && (
+                    <button
+                      onClick={() => handleResolveAlert(a.id_alert)}
+                      className="btn-primary"
+                      style={{ padding: '0.8rem 1rem', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer' }}
+                    >
+                      Tandai Selesai
+                    </button>
+                  )}
+                  <button onClick={() => handleArchiveAlert(a.id_alert)} style={{ padding: '0.8rem 1rem', borderRadius: '12px', border: 'none', background: '#fee2e2', color: '#b91c1c', fontWeight: '800', cursor: 'pointer' }}>
+                    Arsipkan
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     )

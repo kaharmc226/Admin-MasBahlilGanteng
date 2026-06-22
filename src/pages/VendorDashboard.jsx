@@ -1153,14 +1153,14 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   }, [approvedDapurs, selectedDapurForStok])
 
   useEffect(() => {
-    if (selectedDapurForStok) {
+    if (selectedDapurForStok && approvedDapurs.some(d => (d.id_dapur || d.id || '').toString() === selectedDapurForStok.toString())) {
       api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
       api.getStokHistory(selectedDapurForStok).then(setStokHistory).catch(console.error)
       return
     }
     setStokData([])
     setStokHistory([])
-  }, [selectedDapurForStok])
+  }, [selectedDapurForStok, approvedDapurs])
 
   const [formBahan, setFormBahan] = useState('')
   const [formSatuan, setFormSatuan] = useState('kg')
