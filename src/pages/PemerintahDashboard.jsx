@@ -167,18 +167,20 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   }, [])
 
   const refreshGovernmentData = async () => {
-    const [vendors, registrations, mapping, alertRows, schools] = await Promise.all([
+    const [vendors, registrations, mapping, alertRows, schools, dapurRows] = await Promise.all([
       api.getVendors(),
       api.getVendorRegistrations(),
       api.getMapping(),
       api.getAlerts(),
-      api.getSekolah({ includeInactive: true })
+      api.getSekolah({ includeInactive: true }),
+      api.getDapur()
     ])
     setActiveVendors(vendors.filter(x => ['approved', 'suspended'].includes(x.status_verifikasi)))
     setRegQueue(registrations.filter(x => ['pending', 'revision'].includes(x.status)))
     setMappingData(mapping)
     setAlerts(alertRows)
     setSekolahList(schools)
+    setDapurs(dapurRows)
   }
 
   const handleApproveVendor = async (vendor) => {
@@ -219,6 +221,42 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
     } catch (err) {
       console.error(err)
       alert('Gagal memperbarui dokumen: ' + err.message)
+    }
+  }
+
+  const handleApproveDapur = async (dapur) => {
+    const review_note = window.prompt('Catatan persetujuan dapur (opsional):', dapur.review_note || '')
+    if (review_note === null) return
+    try {
+      await api.approveDapur(dapur.id_dapur, {
+        reviewed_by: user.id_user,
+        review_note
+      })
+      await refreshGovernmentData()
+      triggerToast(`Dapur ${dapur.lokasi} disetujui untuk operasional.`)
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menyetujui dapur: ' + err.message)
+    }
+  }
+
+  const handleRejectDapur = async (dapur) => {
+    const review_note = window.prompt('Catatan penolakan / revisi dapur:', dapur.review_note || '')
+    if (review_note === null) return
+    if (!review_note.trim()) {
+      alert('Catatan penolakan dapur wajib diisi.')
+      return
+    }
+    try {
+      await api.rejectDapur(dapur.id_dapur, {
+        reviewed_by: user.id_user,
+        review_note
+      })
+      await refreshGovernmentData()
+      triggerToast(`Review dapur ${dapur.lokasi} berhasil disimpan.`)
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menolak dapur: ' + err.message)
     }
   }
 
@@ -486,7 +524,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
               onClose={() => setShowAddForm(false)} 
               onSave={handleModalSave}
               isMapping={isMapping} 
-              dapurs={dapurs}
+              dapurs={dapurs.filter((d) => d.status_verifikasi === 'approved')}
             />
           )}
         </AnimatePresence>
@@ -668,6 +706,8 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
             docs={selectedVendorDocs}
             dapurs={dapurs.filter((d) => d.id_vendor === selectedVendorAudit.id_vendor)}
             onReviewDocument={handleReviewDocument}
+            onApproveDapur={handleApproveDapur}
+            onRejectDapur={handleRejectDapur}
             onSuspendVendor={handleSuspendVendor}
             onReinstateVendor={handleReinstateVendor}
             onClose={() => {
