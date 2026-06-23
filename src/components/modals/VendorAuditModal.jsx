@@ -28,12 +28,32 @@ const vendorDocumentTypeLabel = {
   lainnya: 'Dokumen Lainnya',
 }
 
+const dapurStatusMeta = {
+  approved: {
+    label: 'APPROVED',
+    background: 'var(--primary-light)',
+    color: 'var(--primary)',
+  },
+  pending: {
+    label: 'PENDING',
+    background: '#fef3c7',
+    color: '#d97706',
+  },
+  rejected: {
+    label: 'REJECTED',
+    background: '#fee2e2',
+    color: '#b91c1c',
+  },
+}
+
 export const VendorAuditModal = ({ 
   vendor, 
   docs, 
   dapurs, 
   onClose, 
   onReviewDocument, 
+  onApproveDapur,
+  onRejectDapur,
   onSuspendVendor, 
   onReinstateVendor 
 }) => {
@@ -85,7 +105,7 @@ export const VendorAuditModal = ({
             <div style={{ background: 'var(--primary-light)', padding: '0.75rem', borderRadius: '12px' }}><ChefHat color="var(--primary)" size={20} /></div>
             <div>
               <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>DAPUR AKTIF</p>
-              <h3 style={{ fontWeight: '950', fontSize: '1.5rem', lineHeight: 1 }}>{dapurs.length}</h3>
+              <h3 style={{ fontWeight: '950', fontSize: '1.5rem', lineHeight: 1 }}>{dapurs.filter((d) => d.status_verifikasi === 'approved').length}</h3>
             </div>
           </div>
           <div style={{ padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', background: 'white', display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -196,26 +216,58 @@ export const VendorAuditModal = ({
                 <div style={{ padding: '1.5rem', textAlign: 'center', background: 'var(--bg)', borderRadius: '16px', border: '1px dashed var(--border)' }}>
                   <p style={{ color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.9rem' }}>Belum ada dapur yang didaftarkan.</p>
                 </div>
-              ) : dapurs.map((d) => (
-                <div key={d.id_dapur} style={{ padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                    <p style={{ fontWeight: '900', fontSize: '1rem' }}>{d.lokasi}</p>
-                    <span style={{ 
-                      background: d.status === 'approved' ? 'var(--primary-light)' : '#fef3c7', 
-                      color: d.status === 'approved' ? 'var(--primary)' : '#d97706',
-                      padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '900'
-                    }}>
-                      {(d.status || 'pending').toUpperCase()}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem' }}>
-                    <div>
-                      <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800' }}>KAPASITAS</p>
-                      <p style={{ fontWeight: '700', fontSize: '0.85rem' }}>{d.kapasitas_produksi} porsi/hari</p>
+              ) : dapurs.map((d) => {
+                const status = d.status_verifikasi || 'pending'
+                const statusMeta = dapurStatusMeta[status] || dapurStatusMeta.pending
+
+                return (
+                  <div key={d.id_dapur} style={{ padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', gap: '0.75rem' }}>
+                      <p style={{ fontWeight: '900', fontSize: '1rem' }}>{d.lokasi}</p>
+                      <span style={{ 
+                        background: statusMeta.background, 
+                        color: statusMeta.color,
+                        padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '900'
+                      }}>
+                        {statusMeta.label}
+                      </span>
                     </div>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem' }}>
+                      <div>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800' }}>KAPASITAS</p>
+                        <p style={{ fontWeight: '700', fontSize: '0.85rem' }}>{d.kapasitas_produksi} porsi/hari</p>
+                      </div>
+                    </div>
+                    {d.review_note && (
+                      <div style={{ background: 'white', padding: '0.75rem', borderRadius: '10px', marginTop: '0.75rem', border: '1px solid var(--border)' }}>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '800', marginBottom: '0.2rem' }}>CATATAN REVIEW</p>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-main)', fontWeight: '600', lineHeight: 1.5 }}>{d.review_note}</p>
+                      </div>
+                    )}
+                    {(d.reviewed_at || d.reviewed_by_name) && (
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '700', marginTop: '0.7rem' }}>
+                        Ditinjau {d.reviewed_at ? formatShortDate(d.reviewed_at) : '-'}{d.reviewed_by_name ? ` oleh ${d.reviewed_by_name}` : ''}
+                      </p>
+                    )}
+                    {status !== 'approved' && (
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.85rem' }}>
+                        <button
+                          onClick={() => onApproveDapur(d)}
+                          style={{ border: 'none', borderRadius: '8px', padding: '0.55rem 0.8rem', background: 'var(--primary)', color: 'white', fontWeight: '800', fontSize: '0.8rem', cursor: 'pointer' }}
+                        >
+                          Sahkan
+                        </button>
+                        <button
+                          onClick={() => onRejectDapur(d)}
+                          style={{ border: 'none', borderRadius: '8px', padding: '0.55rem 0.8rem', background: '#fee2e2', color: '#b91c1c', fontWeight: '800', fontSize: '0.8rem', cursor: 'pointer' }}
+                        >
+                          Tolak / Revisi
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>

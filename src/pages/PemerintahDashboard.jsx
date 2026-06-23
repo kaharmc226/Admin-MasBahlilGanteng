@@ -72,14 +72,17 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const handleModalSave = async (type, data) => {
     try {
       if (type === 'Vendor') {
-        const created = await api.createVendor({
+        await api.createVendor({
           nama_vendor: data.nama_vendor,
           izin_usaha: data.izin_usaha,
           region: data.region,
+          account_name: data.account_name,
+          email: data.email,
+          password: data.password,
           status_verifikasi: 'approved',
           date_pendaftaran: new Date().toISOString().split('T')[0]
         })
-        setActiveVendors(prev => [created, ...prev])
+        await refreshGovernmentData()
       } else if (type === 'Sekolah') {
         const createdSekolah = await api.createSekolah({
           nama_sekolah: data.nama_sekolah,
@@ -87,9 +90,11 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
           alamat: data.alamat,
           jenjang: 'SD',
           alergi_count: 0,
-          intoleran_count: 0
+          intoleran_count: 0,
+          account_name: data.account_name,
+          email: data.email,
+          password: data.password
         })
-        setSekolahList(prev => [...prev, createdSekolah])
         if (!data.id_dapur) {
           throw new Error('Pilih dapur penanggung jawab sebelum membuat mapping.')
         }
@@ -98,8 +103,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
           id_dapur: data.id_dapur,
           id_sekolah: createdSekolah.id_sekolah
         })
-        const m = await api.getMapping()
-        setMappingData(m)
+        await refreshGovernmentData()
       }
       setShowAddForm(false)
       triggerToast(`Data ${type} baru berhasil ditambahkan!`)
@@ -167,18 +171,20 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   }, [])
 
   const refreshGovernmentData = async () => {
-    const [vendors, registrations, mapping, alertRows, schools] = await Promise.all([
+    const [vendors, registrations, mapping, alertRows, schools, dapurRows] = await Promise.all([
       api.getVendors(),
       api.getVendorRegistrations(),
       api.getMapping(),
       api.getAlerts(),
-      api.getSekolah({ includeInactive: true })
+      api.getSekolah({ includeInactive: true }),
+      api.getDapur()
     ])
     setActiveVendors(vendors.filter(x => ['approved', 'suspended'].includes(x.status_verifikasi)))
     setRegQueue(registrations.filter(x => ['pending', 'revision'].includes(x.status)))
     setMappingData(mapping)
     setAlerts(alertRows)
     setSekolahList(schools)
+    setDapurs(dapurRows)
   }
 
   const handleApproveVendor = async (vendor) => {
@@ -219,6 +225,42 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
     } catch (err) {
       console.error(err)
       alert('Gagal memperbarui dokumen: ' + err.message)
+    }
+  }
+
+  const handleApproveDapur = async (dapur) => {
+    const review_note = window.prompt('Catatan persetujuan dapur (opsional):', dapur.review_note || '')
+    if (review_note === null) return
+    try {
+      await api.approveDapur(dapur.id_dapur, {
+        reviewed_by: user.id_user,
+        review_note
+      })
+      await refreshGovernmentData()
+      triggerToast(`Dapur ${dapur.lokasi} disetujui untuk operasional.`)
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menyetujui dapur: ' + err.message)
+    }
+  }
+
+  const handleRejectDapur = async (dapur) => {
+    const review_note = window.prompt('Catatan penolakan / revisi dapur:', dapur.review_note || '')
+    if (review_note === null) return
+    if (!review_note.trim()) {
+      alert('Catatan penolakan dapur wajib diisi.')
+      return
+    }
+    try {
+      await api.rejectDapur(dapur.id_dapur, {
+        reviewed_by: user.id_user,
+        review_note
+      })
+      await refreshGovernmentData()
+      triggerToast(`Review dapur ${dapur.lokasi} berhasil disimpan.`)
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menolak dapur: ' + err.message)
     }
   }
 
@@ -486,7 +528,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
               onClose={() => setShowAddForm(false)} 
               onSave={handleModalSave}
               isMapping={isMapping} 
-              dapurs={dapurs}
+              dapurs={dapurs.filter((d) => d.status_verifikasi === 'approved')}
             />
           )}
         </AnimatePresence>
@@ -668,6 +710,8 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
             docs={selectedVendorDocs}
             dapurs={dapurs.filter((d) => d.id_vendor === selectedVendorAudit.id_vendor)}
             onReviewDocument={handleReviewDocument}
+            onApproveDapur={handleApproveDapur}
+            onRejectDapur={handleRejectDapur}
             onSuspendVendor={handleSuspendVendor}
             onReinstateVendor={handleReinstateVendor}
             onClose={() => {
