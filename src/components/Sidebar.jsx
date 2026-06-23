@@ -4,13 +4,11 @@ import {
   Home,
   FileText,
   Layout,
-  ChefHat,
   Utensils,
   Truck,
   School,
   ShieldCheck,
   BarChart3,
-  Map,
   BadgeAlert,
   Zap,
   ChevronsLeft,
@@ -44,7 +42,6 @@ const Sidebar = ({ user, collapsed, mobileOpen, onToggle, onMobileClose }) => {
       ]
     },
     { title: 'Status Produksi', path: '/vendor/produksi', icon: <Layout size={20}/> },
-    { title: 'Distribusi', path: '/vendor/distribusi', icon: <Truck size={20}/> },
   ]
 
   const ahliGiziMenu = [
@@ -55,7 +52,7 @@ const Sidebar = ({ user, collapsed, mobileOpen, onToggle, onMobileClose }) => {
 
   const sekolahMenu = [
     { title: 'Dashboard', path: '/sekolah', icon: <Home size={20}/> },
-    { title: 'Konfirmasi Makan', path: '/sekolah/konfirmasi', icon: <School size={20}/> },
+    { title: 'Status Distribusi', path: '/sekolah/konfirmasi', icon: <School size={20}/> },
     { title: 'Feedback', path: '/sekolah/feedback', icon: <FileText size={20}/> },
   ]
 
@@ -63,7 +60,6 @@ const Sidebar = ({ user, collapsed, mobileOpen, onToggle, onMobileClose }) => {
     { title: 'Overview', path: '/pemerintah', icon: <Home size={20}/> },
     { title: 'Hubungkan Sekolah', path: '/pemerintah/mapping', icon: <Truck size={20}/> },
     { title: 'Monitoring Vendor', path: '/pemerintah/vendor', icon: <ShieldCheck size={20}/> },
-    { title: 'Peta Distribusi', path: '/pemerintah/peta', icon: <Map size={20}/> },
     { title: 'Statistik & Laporan', path: '/pemerintah/statistik', icon: <BarChart3 size={20}/> },
     { title: 'Sistem Alert', path: '/pemerintah/alert', icon: <BadgeAlert size={20}/> },
   ]

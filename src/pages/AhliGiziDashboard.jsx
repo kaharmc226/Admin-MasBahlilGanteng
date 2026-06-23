@@ -32,12 +32,24 @@ import {
   Coffee
 } from 'lucide-react'
 
+// Modular imports
+import { 
+  parseNutrientValue, 
+  parseJsonField, 
+  normalizeMenuIngredient, 
+  normalizeValidationLog, 
+  attachValidationMetadata 
+} from '../utils/dashboardHelpers'
+import Motif from '../components/dashboard/Motif'
+import Header from '../components/dashboard/DashboardHeader'
+import WelcomeBanner from '../components/dashboard/WelcomeBanner'
+import Footer from '../components/dashboard/Footer'
+import FloatingShape from '../components/dashboard/FloatingShape'
+import FoodItem3D from '../components/dashboard/FoodItem3D'
+import StandardModal from '../components/modals/StandardModal'
+
 const nutrientKeys = ['energi', 'protein', 'lemak', 'karbohidrat', 'serat', 'natrium']
 
-const parseNutrientValue = (value) => {
-  const parsed = parseFloat(String(value ?? '').replace(',', '.').replace(/[^0-9.-]/g, ''))
-  return Number.isFinite(parsed) ? parsed : 0
-}
 
 const normalizeNutritionItem = (item) => ({
   ...item,
@@ -50,30 +62,6 @@ const normalizeNutritionItem = (item) => ({
   status: item.status || 'active'
 })
 
-const parseJsonField = (value, fallback) => {
-  if (value === null || value === undefined || value === '') return fallback
-  if (typeof value !== 'string') return value
-  try {
-    return JSON.parse(value)
-  } catch {
-    return fallback
-  }
-}
-
-const normalizeMenuIngredient = (item, nutritionMap) => {
-  const linkedItem = nutritionMap.get(String(item?.id_nutrition || ''))
-  const jumlah = parseNutrientValue(item?.jumlah ?? item?.berat ?? item?.takaran)
-  return {
-    ...item,
-    id_nutrition: item?.id_nutrition ?? null,
-    nama: linkedItem?.nama || item?.nama || 'Bahan tanpa nama',
-    jumlah,
-    satuan: item?.satuan || linkedItem?.satuan || 'gram',
-    takaran: item?.takaran || (jumlah > 0 ? `~${jumlah} g` : '-'),
-    nutritionItem: linkedItem || null
-  }
-}
-
 const normalizeMenu = (menu, nutritionMap) => {
   const bahan = parseJsonField(menu?.bahan, [])
   const nilaiGizi = parseJsonField(menu?.nilai_gizi, {})
@@ -83,26 +71,6 @@ const normalizeMenu = (menu, nutritionMap) => {
     bahan: Array.isArray(bahan) ? bahan.map((item) => normalizeMenuIngredient(item, nutritionMap)) : [],
     nilai_gizi: nilaiGizi && typeof nilaiGizi === 'object' ? nilaiGizi : {},
     notes: Array.isArray(notes) ? notes : []
-  }
-}
-
-const normalizeValidationLog = (log) => ({
-  ...log,
-  catatan: typeof log?.catatan === 'string' ? log.catatan.trim() : (log?.catatan || ''),
-})
-
-const attachValidationMetadata = (menu, validationLogs = []) => {
-  const menuId = menu.id_menu || menu.id
-  const logs = validationLogs
-    .filter((item) => (item.id_menu || item.id) === menuId)
-    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-
-  return {
-    ...menu,
-    validationLogs: logs,
-    latestValidationLog: logs[0] || null,
-    latestRejectedLog: logs.find((item) => item.aksi === 'rejected') || null,
-    latestApprovedLog: logs.find((item) => item.aksi === 'approved') || null,
   }
 }
 
@@ -194,310 +162,19 @@ import DashboardLayout from '../components/DashboardLayout'
 
 // --- Sub-components (Moved Outside to prevent re-mounting issues) ---
 
-const Motif = ({ icon: Icon, top, right, bottom, left, color }) => (
-  <div style={{ position: 'absolute', top, right, bottom, left, opacity: 0.05, pointerEvents: 'none', zIndex: 0 }}>
-    <Icon size={120} color={color} />
-  </div>
-)
+// Motif is imported
 
-const Header = ({ title }) => (
-  <div className="card dashboard-card-vibrant" style={{ 
-    marginBottom: '1.5rem', 
-    padding: '1rem 1.5rem',
-    borderRadius: '16px',
-    background: 'white',
-    border: '1px solid white',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.03)',
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    position: 'relative',
-    zIndex: 10
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-      <div style={{ width: '55px', height: '55px', background: 'var(--primary-light)', borderRadius: '18px', display: 'grid', placeItems: 'center', boxShadow: '0 8px 16px rgba(16, 185, 129, 0.1)' }}>
-        <LayoutDashboard color="var(--primary)" size={28} />
-      </div>
-      <div>
-        <h1 style={{ fontSize: "2.1rem", fontWeight: "950", letterSpacing: "-1.5px", color: 'var(--text-main)', lineHeight: '1.2' }}>{title}</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-          <div style={{ width: '6px', height: '6px', background: 'var(--primary)', borderRadius: '50%', animation: 'pulse 1.5s infinite' }}></div>
-          <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>National Audit Center • Live Inspection</p>
-        </div>
-      </div>
-    </div>
-    
-    <div style={{ 
-      padding: '0.6rem 1.4rem', 
-      borderRadius: '8px', 
-      display: 'flex', 
-      alignItems: 'center', 
-      gap: '15px',
-      background: 'var(--bg)',
-      border: '1px solid var(--border)'
-    }}>
-       <div style={{ textAlign: 'right', borderRight: '1.5px solid var(--border)', paddingRight: '15px' }}>
-          <p style={{ fontWeight: '950', fontSize: '1rem', color: 'var(--text-main)', margin: 0 }}>{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-          <p style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: '900', margin: 0 }}>{new Date().toLocaleDateString('id-ID', { weekday: 'long' }).toUpperCase()}</p>
-       </div>
-       <div className="flex" style={{ gap: '12px' }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{ width: '38px', height: '38px', background: 'white', borderRadius: '12px', display: 'grid', placeItems: 'center', boxShadow: '0 5px 10px rgba(0,0,0,0.05)' }}>
-              <Activity size={18} color="var(--primary)" />
-            </div>
-            <motion.div 
-               animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0, 0.4] }}
-               transition={{ duration: 2, repeat: Infinity }}
-               style={{ position: 'absolute', inset: 0, background: 'var(--primary)', borderRadius: '12px', zIndex: -1 }}
-            />
-          </div>
-          <div>
-            <p style={{ fontSize: '0.6rem', fontWeight: '900', color: 'var(--text-muted)', marginBottom: '1px' }}>SISTEM STATUS</p>
-            <p style={{ fontSize: '0.8rem', fontWeight: '950', color: 'var(--primary)' }}>SINKRON</p>
-          </div>
-       </div>
-    </div>
-  </div>
-)
+// Header is imported
 
-const WelcomeBanner = ({ name }) => (
-  <motion.div 
-    initial={{ scale: 0.95, opacity: 0 }}
-    animate={{ scale: 1, opacity: 1 }}
-    style={{ 
-      background: 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)',
-      padding: '1.5rem',
-      borderRadius: '16px',
-      marginBottom: '1.5rem',
-      position: 'relative',
-      overflow: 'hidden',
-      color: 'white',
-      boxShadow: '0 30px 60px -15px rgba(6, 78, 59, 0.4)'
-    }}
-  >
-    <div style={{ position: 'relative', zIndex: 2 }}>
-      <h2 style={{ fontSize: '2.5rem', fontWeight: '950', color: 'white', marginBottom: '10px' }}>Halo Selamat Siang, {name}! 🔬</h2>
-      <p style={{ fontSize: '1.1rem', fontWeight: '600', opacity: 0.9, maxWidth: '600px', lineHeight: '1.6' }}>Satu menu baru sedang menunggu audit Anda. Pastikan standar gizi nasional terpenuhi untuk generasi emas Indonesia.</p>
-      
-      <div style={{ display: 'flex', gap: '15px', marginTop: '2.5rem' }}>
-        <button style={{ background: 'white', color: 'var(--text-main)', padding: '0.8rem 1.8rem', border: 'none', borderRadius: '15px', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          Mulai Validasi <ChevronRight size={20} />
-        </button>
-        <button style={{ background: 'rgba(255,255,255,0.15)', color: 'white', padding: '0.8rem 1.8rem', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '15px', fontWeight: '900', cursor: 'pointer', backdropFilter: 'blur(10px)' }}>
-          Update Regulasi
-        </button>
-      </div>
-    </div>
+// WelcomeBanner is imported
 
-    {/* Decorative Elements inside banner */}
-    <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '250px', height: '250px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', pointerEvents: 'none' }}></div>
-    <div style={{ position: 'absolute', bottom: '-20px', right: '50px', width: '150px', height: '150px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%', pointerEvents: 'none' }}></div>
-    <Microscope style={{ position: 'absolute', right: '40px', top: '50%', transform: 'translateY(-50%) rotate(15deg)', opacity: 0.1, color: 'white' }} size={200} />
-  </motion.div>
-)
+// Footer is imported
 
-const Footer = () => (
-  <div className="card dashboard-card-vibrant" style={{ 
-    marginTop: '2rem', 
-    padding: '1.5rem', 
-    borderRadius: '16px',
-    background: 'white',
-    border: '1px solid white',
-    boxShadow: '0 -10px 40px rgba(0,0,0,0.02)',
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    position: 'relative',
-    zIndex: 2
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-      <div style={{ background: 'var(--primary)', color: 'white', width: '45px', height: '45px', borderRadius: '14px', display: 'grid', placeItems: 'center', fontWeight: '950', fontSize: '1.2rem', boxShadow: '0 8px 16px rgba(16, 185, 129, 0.2)' }}>A</div>
-      <div>
-        <h4 style={{ fontWeight: '950', fontSize: '1.1rem', color: 'var(--text-main)', marginBottom: '2px', letterSpacing: '-0.5px' }}>TRAKSI National Ecosystem</h4>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '700' }}>Platform Transparansi & Gizi Nasional • Versi 4.2.0-Production</p>
-      </div>
-    </div>
-    <div style={{ display: 'flex', gap: '40px', alignItems: 'center' }}>
-       <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '900', marginBottom: '8px', letterSpacing: '1px' }}>KONEKSI ENKRIPSI</p>
-          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-             {[1,2,3,4,5,6].map(i => <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }} style={{ width: '12px', height: '6px', background: 'var(--primary)', borderRadius: '10px' }}></motion.div>)}
-          </div>
-       </div>
-       <div style={{ display: 'flex', gap: '12px' }}>
-          <button style={{ width: '45px', height: '45px', background: 'var(--bg)', border: 'none', borderRadius: '14px', display: 'grid', placeItems: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}><MessageCircle size={20} /></button>
-          <button style={{ width: '45px', height: '45px', background: 'var(--bg)', border: 'none', borderRadius: '14px', display: 'grid', placeItems: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}><ShieldCheck size={20} /></button>
-       </div>
-    </div>
-  </div>
-)
+// FloatingShape is imported
 
-const FloatingShape = ({ initial, animate, duration, color, size }) => (
-  <motion.div 
-    initial={initial}
-    animate={animate}
-    transition={{ duration, repeat: Infinity, ease: "linear" }}
-    style={{ 
-      position: 'absolute', 
-      width: size, 
-      height: size, 
-      borderRadius: '50%', 
-      background: color, 
-      filter: 'blur(100px)', 
-      opacity: 0.25,
-      zIndex: 0,
-      pointerEvents: 'none'
-    }}
-  />
-)
+// FoodItem3D is imported
 
-const FoodItem3D = ({ src, top, left, right, bottom, size = 120, delay = 0, rotate = 0 }) => (
-  <motion.div
-    initial={{ y: 0, opacity: 0, scale: 0.5, rotate }}
-    animate={{ 
-      y: [0, -40, 0],
-      rotate: [rotate, rotate + 15, rotate - 15, rotate],
-      opacity: 0.25,
-      scale: 1
-    }}
-    transition={{ 
-      duration: 5 + Math.random() * 3, 
-      repeat: Infinity, 
-      ease: "easeInOut",
-      delay
-    }}
-    style={{ 
-      position: 'absolute', 
-      top, left, right, bottom, 
-      zIndex: 0,
-      pointerEvents: 'none' 
-    }}
-  >
-    <img 
-      src={src} 
-      alt="Food Decoration" 
-      style={{ 
-        width: size, 
-        height: size, 
-        objectFit: 'cover', 
-        borderRadius: '50%',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-        filter: 'contrast(1.1) brightness(1.1)'
-      }} 
-    />
-  </motion.div>
-)
-
-const StandardModal = ({ onClose, onSave, standard, setStandard, isEdit = false }) => (
-  <div 
-    style={{ 
-      position: 'fixed', 
-      inset: 0, 
-      background: 'rgba(15, 23, 42, 0.4)', 
-      backdropFilter: 'blur(8px)', 
-      zIndex: 9999, 
-      display: 'flex', 
-      justifyContent: 'flex-end' 
-    }}
-    onClick={onClose}
-  >
-    <motion.div 
-      initial={{ x: '100%' }} 
-      animate={{ x: 0 }} 
-      exit={{ x: '100%' }} 
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      style={{ 
-        width: '100%', 
-        maxWidth: '400px', 
-        height: '100%', 
-        background: 'white', 
-        boxShadow: '-10px 0 40px rgba(0,0,0,0.1)', 
-        padding: '1.5rem', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        justifyContent: 'space-between',
-        overflowY: 'auto'
-      }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div>
-        <div className="flex justify-between" style={{ marginBottom: '1.5rem', alignItems: 'center' }}>
-          <div>
-            <h2 style={{ fontWeight: '950', fontSize: '1.8rem', color: '#0f172a', letterSpacing: '-0.5px' }}>{isEdit ? 'Edit Data Standar' : 'Tambah Standar Gizi'}</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600', marginTop: '4px' }}>Tetapkan standar kecukupan nutrisi program MBG.</p>
-          </div>
-          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
-            <X size={20} color="#64748b" />
-          </button>
-        </div>
-
-        <form onSubmit={(e) => { e.preventDefault(); onSave(); }} style={{ display: 'grid', gap: '1rem' }}>
-          <div>
-            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>NAMA ZAT GIZI</label>
-            <input 
-              required
-              value={standard.title}
-              onChange={(e) => setStandard({...standard, title: e.target.value})}
-              placeholder="Contoh: Vitamin D / Kalsium" 
-              style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)' }} 
-            />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>RENTANG KEBUTUHAN</label>
-              <input 
-                required
-                value={standard.requirement}
-                onChange={(e) => setStandard({...standard, requirement: e.target.value})}
-                placeholder="20g - 35g" 
-                style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)' }} 
-              />
-            </div>
-            <div>
-               <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>WARNA AKSEN</label>
-               <select 
-                 value={standard.color} 
-                 onChange={(e) => setStandard({...standard, color: e.target.value})}
-                 style={{ width: '100%', padding: '1.1rem', borderRadius: '15px', border: '1.5px solid var(--border)', background: 'white' }}
-               >
-                 <option value="var(--primary)">Hijau (Primary)</option>
-                 <option value="var(--carrot)">Oranye (Carrot)</option>
-                 <option value="var(--secondary)">Biru (Secondary)</option>
-                 <option value="var(--error)">Merah (Error)</option>
-               </select>
-            </div>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>DESKRIPSI RINGKAS</label>
-            <textarea 
-              value={standard.desc}
-              onChange={(e) => setStandard({...standard, desc: e.target.value})}
-              placeholder="Manfaat bagi anak sekolah..." 
-              style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)', height: '80px', fontFamily: 'inherit' }} 
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontWeight: '800', fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-muted)' }}>RINCIAN LANJUTAN</label>
-            <textarea 
-              value={standard.details}
-              onChange={(e) => setStandard({...standard, details: e.target.value})}
-              placeholder="Tambahkan informasi teknis, rujukan sumber..." 
-              style={{ width: '100%', padding: '1rem', borderRadius: '15px', border: '1.5px solid var(--border)', minHeight: '100px', resize: 'vertical', fontFamily: 'inherit' }} 
-            />
-          </div>
-          
-          <button 
-            type="submit"
-            className="btn-primary" 
-            style={{ width: '100%', padding: '1.2rem', borderRadius: '24px', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', marginTop: '1rem', cursor: 'pointer', background: standard.color || 'var(--primary)' }}
-          >
-            {isEdit ? 'Simpan Perubahan' : 'Tetapkan Standar'}
-          </button>
-        </form>
-      </div>
-    </motion.div>
-  </div>
-)
+// StandardModal is imported
 
 const AhliGiziDashboard = ({ user, onLogout, onSwitchRole }) => {
   const location = useLocation()

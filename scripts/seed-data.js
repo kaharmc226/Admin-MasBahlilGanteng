@@ -211,9 +211,11 @@ function buildDemoDataset() {
     ],
     produksi: [
       { id_produksi: 1, id_dapur: 1, id_menu: 1, status: 'selesai', jumlah_porsi: 360, waktu_mulai: '2026-06-21 04:30:00', waktu_selesai: '2026-06-21 07:30:00' },
+      { id_produksi: 2, id_dapur: 1, id_menu: 1, status: 'siap_kirim', jumlah_porsi: 120, waktu_mulai: '2026-06-22 05:10:00', waktu_selesai: '2026-06-22 07:00:00' },
     ],
     distribusi: [
       { id_distribusi: 1, kode_transaksi: 'TX-KDI-001', id_produksi: 1, id_sekolah: 1, jumlah_porsi: 360, waktu_kirim: '2026-06-21 08:00:00', waktu_tiba: '2026-06-21 08:35:00', status: 'SELESAI', blockchain_hash: '0x7ac91f5b2cdd' },
+      { id_distribusi: 2, kode_transaksi: 'TX-KDI-002', id_produksi: 2, id_sekolah: 1, jumlah_porsi: 120, waktu_kirim: '2026-06-22 08:05:00', waktu_tiba: '2026-06-22 08:40:00', status: 'TIBA', blockchain_hash: '0x9be14c8d55aa' },
     ],
     validasi_log: [
       { id_validasi: 1, id_menu: 1, id_user: 3, aksi: 'approved', catatan: 'Menu referensi Kendari lolos validasi otomatis dan siap dipakai untuk distribusi reguler.' },
@@ -226,9 +228,14 @@ function buildDemoDataset() {
     ],
     alerts: [
       { id_alert: 1, judul: 'Pemantauan Distribusi Mandonga', deskripsi: 'Distribusi batch pagi ke SDN 02 Mandonga selesai tepat waktu dan tanpa kendala.', severity: 'info', wilayah: 'Kota Kendari', is_resolved: 0, is_archived: 0, resolved_by: null, resolved_at: null },
+      { id_alert: 2, judul: 'Kesiapan Distribusi Batch Siang', deskripsi: 'Batch siang untuk SDN 02 Mandonga sudah tiba dan menunggu penyelesaian akhir dari sekolah.', severity: 'warning', wilayah: 'Kota Kendari', is_resolved: 0, is_archived: 0, resolved_by: null, resolved_at: null },
     ],
     nutrition_requests: [
       { id_request: 1, id_vendor: 1, requested_by: 1, nama: 'Tahu kukus', kategori: 'lauk_sayur', catatan: 'Usulan bahan alternatif rendah minyak untuk siklus menu pekanan.', status: 'pending', reviewed_by: null, id_nutrition: null, review_note: null, reviewed_at: null },
+    ],
+    dokumen_vendor: [
+      { id_dokumen: 1, id_vendor: 1, nama_dokumen: 'Izin Operasional MBG Mandonga', jenis: 'izin_usaha', file_path: null, status: 'valid', is_archived: 0, review_note: null, tanggal_berlaku: '2026-01-15', tanggal_kadaluarsa: '2027-01-15' },
+      { id_dokumen: 2, id_vendor: 1, nama_dokumen: 'Sertifikat Halal Dapur Sehat Mandonga', jenis: 'sertifikat_halal', file_path: null, status: 'pending_review', is_archived: 0, review_note: 'Menunggu review pemerintah untuk verifikasi perpanjangan sertifikat.', tanggal_berlaku: '2026-02-01', tanggal_kadaluarsa: '2028-02-01' },
     ],
   }
 }
