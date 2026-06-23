@@ -12,7 +12,6 @@ import {
   Store,
   UtensilsCrossed,
   Clock,
-  MapPin,
   MessageSquare,
   ShieldCheck,
   AlertCircle,
@@ -61,6 +60,7 @@ const produksiStatusMeta = {
     label: "PENDING",
     badgeBackground: "var(--banana-light)",
     badgeColor: "var(--banana)",
+    helper: "Tiket sudah dibuat dan menunggu persiapan bahan.",
     nextStatus: "persiapan",
     actionLabel: "Mulai Persiapan (Potong Stok)",
     actionBackground: "var(--primary)",
@@ -70,6 +70,7 @@ const produksiStatusMeta = {
     label: "PERSIAPAN",
     badgeBackground: "var(--primary-light)",
     badgeColor: "var(--primary)",
+    helper: "Bahan sedang disiapkan untuk batch ini.",
     nextStatus: "memasak",
     actionLabel: "Masuk Tahap Memasak",
     actionBackground: "var(--secondary)",
@@ -79,6 +80,7 @@ const produksiStatusMeta = {
     label: "MEMASAK",
     badgeBackground: "rgba(14, 165, 233, 0.12)",
     badgeColor: "var(--secondary)",
+    helper: "Produksi makanan sedang berjalan di dapur.",
     nextStatus: "siap_kirim",
     actionLabel: "Tandai Siap Kirim",
     actionBackground: "var(--banana)",
@@ -88,23 +90,51 @@ const produksiStatusMeta = {
     label: "SIAP KIRIM",
     badgeBackground: "rgba(249, 115, 22, 0.12)",
     badgeColor: "var(--carrot)",
+    helper: "Produksi selesai dan batch siap diserahkan ke distribusi.",
     nextStatus: "selesai",
     actionLabel: "Tutup Batch Produksi",
     actionBackground: "var(--role-primary)",
-    toast: "Batch produksi ditutup. Status distribusi ikut diperbarui."
+    toast: "Batch produksi ditutup. Lanjutkan pembaruan status distribusi secara manual."
   },
   selesai: {
     label: "SELESAI",
     badgeBackground: "#e2e8f0",
-    badgeColor: "#64748b"
+    badgeColor: "#64748b",
+    helper: "Produksi ditutup. Pantau penyelesaian lewat status distribusi."
   }
 }
 
 const distribusiStatusMeta = {
-  DIJADWALKAN: { background: "var(--banana-light)", color: "var(--banana)" },
-  DISTRIBUSI: { background: "var(--primary-light)", color: "var(--primary)" },
-  TIBA: { background: "rgba(14, 165, 233, 0.12)", color: "var(--secondary)" },
-  SELESAI: { background: "#e2e8f0", color: "#64748b" }
+  DIJADWALKAN: {
+    label: "DITUGASKAN",
+    background: "var(--banana-light)",
+    color: "var(--banana)",
+    helper: "Tiket sudah terhubung ke sekolah.",
+    nextStatus: "DISTRIBUSI",
+    actionLabel: "Mulai Distribusi",
+    actionBackground: "var(--primary)"
+  },
+  DISTRIBUSI: {
+    label: "DI PERJALANAN",
+    background: "var(--primary-light)",
+    color: "var(--primary)",
+    helper: "Vendor mengirim batch ke sekolah.",
+    nextStatus: "TIBA",
+    actionLabel: "Tandai Tiba",
+    actionBackground: "var(--secondary)"
+  },
+  TIBA: {
+    label: "TIBA",
+    background: "rgba(14, 165, 233, 0.12)",
+    color: "var(--secondary)",
+    helper: "Menunggu konfirmasi akhir dari sekolah."
+  },
+  SELESAI: {
+    label: "SELESAI",
+    background: "#e2e8f0",
+    color: "#64748b",
+    helper: "Distribusi ditutup oleh sekolah."
+  }
 }
 
 const dapurStatusMeta = {
@@ -186,8 +216,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const isMain = path === '/vendor'
   const isInformasi = path === '/vendor/informasi'
   const isMenu = path === '/vendor/menu'
-  const isProduksi = path === '/vendor/produksi'
-  const isDistribusi = path === '/vendor/distribusi'
+  const isProduksi = path === '/vendor/produksi' || path === '/vendor/distribusi'
   const isStok = path === '/vendor/stok'
   const [showAddForm, setShowAddForm] = useState(false)
   const [showMenuForm, setShowMenuForm] = useState(false)
@@ -226,6 +255,16 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
   const [validationLogs, setValidationLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const approvedDapurs = useMemo(() => dapurs.filter((d) => d.status_verifikasi === 'approved'), [dapurs])
+  const distribusiByProduksiId = useMemo(
+    () => new Map(distribusi.map((item) => [item.id_produksi, item])),
+    [distribusi]
+  )
+
+  useEffect(() => {
+    if (path === '/vendor/distribusi') {
+      navigate('/vendor/produksi', { replace: true })
+    }
+  }, [navigate, path])
 
   const buildVendorMenus = (rawMenus = [], activeNutritionItems = [], rawValidationLogs = [], vendorId = null) => {
     const nutritionMap = new Map(activeNutritionItems.map((item) => [String(item.id), item]))
@@ -402,12 +441,6 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
       } catch (err) { console.error(err) }
     }
   }
-
-  const [activeHub, setActiveHub] = useState({
-    name: 'Kendari',
-    url: "https://maps.google.com/maps?q=Kendari&output=embed"
-  })
-
   const closeMenuForm = () => {
     setShowMenuForm(false)
     setEditingMenu(null)
@@ -572,18 +605,22 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
 
   const [showTicketForm, setShowTicketForm] = useState(false)
 
+  const refreshOperationalTickets = async (sourceDapurs = dapurs) => {
+    const dapurIds = new Set((sourceDapurs || []).map((item) => item.id_dapur || item.id))
+    const [produksiRows, distribusiRows] = await Promise.all([
+      api.getProduksi(),
+      api.getDistribusi()
+    ])
+    const filteredProduksi = produksiRows.filter((item) => dapurIds.has(item.id_dapur))
+    const produksiIds = new Set(filteredProduksi.map((item) => item.id_produksi))
+    setProduksi(filteredProduksi)
+    setDistribusi(distribusiRows.filter((item) => produksiIds.has(item.id_produksi)))
+  }
+
   const handleCreateProduksiTicket = async (data) => {
     try {
       await api.createProduksi({ ...data, status: 'pending' })
-      const dapurIds = new Set(dapurs.map(item => item.id_dapur || item.id))
-      api.getProduksi().then(rows => {
-        const filteredProduksi = rows.filter(item => dapurIds.has(item.id_dapur))
-        setProduksi(filteredProduksi)
-        const produksiIds = new Set(filteredProduksi.map(item => item.id_produksi))
-        api.getDistribusi().then(distRows => {
-          setDistribusi(distRows.filter(item => produksiIds.has(item.id_produksi)))
-        }).catch(console.error)
-      }).catch(console.error)
+      await refreshOperationalTickets()
     } catch (err) {
       triggerToast(`Gagal membuat tiket: ${err.message}`, 'warning')
       throw err
@@ -595,15 +632,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
       setProdError(null)
       await api.updateProduksi(id_produksi, { status })
       triggerToast(produksiStatusMeta[status]?.toast || 'Status produksi berhasil diperbarui.')
-      const dapurIds = new Set(dapurs.map(item => item.id_dapur || item.id))
-      api.getProduksi().then(rows => {
-        const filteredProduksi = rows.filter(item => dapurIds.has(item.id_dapur))
-        setProduksi(filteredProduksi)
-        const produksiIds = new Set(filteredProduksi.map(item => item.id_produksi))
-        api.getDistribusi().then(distRows => {
-          setDistribusi(distRows.filter(item => produksiIds.has(item.id_produksi)))
-        }).catch(console.error)
-      }).catch(console.error)
+      await refreshOperationalTickets()
       // Refresh stok silently
       if (selectedDapurForStok) {
         api.getStok(selectedDapurForStok).then(setStokData).catch(console.error)
@@ -627,6 +656,16 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
         dapurId,
         bahanName
       })
+    }
+  }
+
+  const handleUpdateDistribusiStatus = async (id_distribusi, status) => {
+    try {
+      await api.updateDistribusi(id_distribusi, { status })
+      triggerToast(`Status distribusi diperbarui ke ${distribusiStatusMeta[status]?.label || status}.`)
+      await refreshOperationalTickets()
+    } catch (err) {
+      triggerToast(`Gagal memperbarui distribusi: ${err.message}`, 'warning')
     }
   }
 
@@ -1574,7 +1613,7 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
 
       return (
         <div className="grid" style={{ gap: '1rem' }}>
-          <Header title="Sistem Tiket & Monitoring Produksi" subtitle="Operational Center • Live Monitoring" />
+          <Header title="Tiket Produksi & Distribusi" subtitle="Status produksi dan distribusi dikelola dari tiket yang sama." />
           
           {prodError && (
             <div style={{
@@ -1715,7 +1754,12 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
           </div>
           <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px' }}>
             <div className="flex justify-between" style={{ marginBottom: '1rem', alignItems: 'center' }}>
-              <h3 style={{ fontWeight: '950' }}>Tiket Antrian Produksi Teraktif</h3>
+              <div>
+                <h3 style={{ fontWeight: '950', marginBottom: '0.25rem' }}>Tiket Operasional Vendor</h3>
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: '700' }}>
+                  Status produksi dan distribusi sekarang dikelola dari tiket yang sama.
+                </p>
+              </div>
               <button 
                 onClick={() => setShowTicketForm(true)}
                 className="btn-primary" 
@@ -1731,8 +1775,9 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                    <th>TICKET ID</th>
                    <th>MENU & PORSI</th>
                    <th>DAPUR & TARGET</th>
-                   <th>STATUS</th>
-                   <th>AKSI (TICKET STAGE)</th>
+                   <th>PRODUKSI</th>
+                   <th>DISTRIBUSI</th>
+                   <th>AKSI</th>
                  </tr>
                </thead>
                <tbody>
@@ -1744,7 +1789,10 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                       }
                       return p.status === statusFilter;
                     })
-                    .map((p) => (
+                    .map((p) => {
+                   const delivery = distribusiByProduksiId.get(p.id_produksi)
+                   const deliveryMeta = delivery ? (distribusiStatusMeta[delivery.status] || distribusiStatusMeta.DIJADWALKAN) : null
+                   return (
                    <tr key={p.id_produksi} style={{ background: 'var(--bg)', opacity: p.status === 'selesai' ? 0.6 : 1 }}>
                      <td style={{ padding: '1.5rem', fontWeight: '900', borderRadius: '15px 0 0 15px', color: 'var(--primary)' }}>#PRD-{p.id_produksi}</td>
                      <td style={{ padding: '1.5rem' }}>
@@ -1759,24 +1807,54 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                        <span className="badge" style={{ background: produksiStatusMeta[p.status]?.badgeBackground || '#e2e8f0', color: produksiStatusMeta[p.status]?.badgeColor || '#64748b', fontWeight: '900' }}>
                          {produksiStatusMeta[p.status]?.label || String(p.status || '-').toUpperCase()}
                        </span>
+                       <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '700', margin: '0.45rem 0 0' }}>
+                         {produksiStatusMeta[p.status]?.helper || 'Status produksi aktif.'}
+                       </p>
+                     </td>
+                     <td style={{ padding: '1.5rem' }}>
+                       {delivery ? (
+                         <>
+                           <span className="badge" style={{ background: deliveryMeta?.background || '#e2e8f0', color: deliveryMeta?.color || '#64748b', fontWeight: '900' }}>
+                             {deliveryMeta?.label || delivery.status}
+                           </span>
+                           <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '700', margin: '0.45rem 0 0' }}>
+                             {deliveryMeta?.helper || 'Status distribusi aktif.'}
+                           </p>
+                         </>
+                       ) : (
+                         <span style={{ color: 'var(--text-muted)', fontWeight: '800', fontSize: '0.85rem' }}>Belum terhubung ke sekolah</span>
+                       )}
                      </td>
                      <td style={{ padding: '1.5rem', borderRadius: '0 15px 15px 0' }}>
-                       {produksiStatusMeta[p.status]?.nextStatus && (
-                         <button 
-                           onClick={() => handleUpdateProduksiStatus(p.id_produksi, produksiStatusMeta[p.status].nextStatus)}
-                           style={{ background: produksiStatusMeta[p.status].actionBackground, color: 'white', border: 'none', padding: '10px 15px', borderRadius: '24px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(15,23,42,0.12)' }}
-                         >
-                           {produksiStatusMeta[p.status].actionLabel}
-                         </button>
-                       )}
-                       {!produksiStatusMeta[p.status]?.nextStatus && (
-                         <span style={{ color: 'var(--text-muted)', fontWeight: '800', fontSize: '0.85rem' }}>Batch ditutup</span>
-                       )}
+                       <div style={{ display: 'grid', gap: '0.6rem', justifyItems: 'start' }}>
+                         {produksiStatusMeta[p.status]?.nextStatus ? (
+                           <button 
+                             onClick={() => handleUpdateProduksiStatus(p.id_produksi, produksiStatusMeta[p.status].nextStatus)}
+                             style={{ background: produksiStatusMeta[p.status].actionBackground, color: 'white', border: 'none', padding: '10px 15px', borderRadius: '24px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(15,23,42,0.12)' }}
+                           >
+                             {produksiStatusMeta[p.status].actionLabel}
+                           </button>
+                         ) : (
+                           <span style={{ color: 'var(--text-muted)', fontWeight: '800', fontSize: '0.85rem' }}>Batch produksi ditutup</span>
+                         )}
+                         {delivery?.id_distribusi && deliveryMeta?.nextStatus ? (
+                           <button
+                             onClick={() => handleUpdateDistribusiStatus(delivery.id_distribusi, deliveryMeta.nextStatus)}
+                             style={{ background: deliveryMeta.actionBackground, color: 'white', border: 'none', padding: '10px 15px', borderRadius: '24px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(15,23,42,0.12)' }}
+                           >
+                             {deliveryMeta.actionLabel}
+                           </button>
+                         ) : delivery?.status === 'SELESAI' ? (
+                           <span style={{ color: 'var(--primary)', fontWeight: '800', fontSize: '0.82rem' }}>Sekolah sudah menutup distribusi</span>
+                         ) : delivery?.status === 'TIBA' ? (
+                           <span style={{ color: 'var(--secondary)', fontWeight: '800', fontSize: '0.82rem' }}>Menunggu penyelesaian dari sekolah</span>
+                         ) : null}
+                       </div>
                      </td>
                    </tr>
-                 ))}
+                 )})}
                  {produksi.length === 0 && (
-                   <tr><td colSpan="5" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700' }}>Belum ada tiket produksi.</td></tr>
+                   <tr><td colSpan="6" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: '700' }}>Belum ada tiket produksi.</td></tr>
                  )}
                </tbody>
             </table>
@@ -1785,150 +1863,6 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
       )
     }
 
-    if (isDistribusi) return (
-      <div className="grid" style={{ gap: '1rem' }}>
-        <Header title="Logistik & Pelacakan Armada" subtitle="Operational Center • Live Monitoring" />
-        
-        {/* Hub Command Control */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.7)', padding: '12px 30px', borderRadius: '24px', border: '1px solid white', backdropFilter: 'blur(10px)', marginBottom: '-12px', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
-           <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-             <MapPin color="var(--primary)" size={18} />
-             <span style={{ fontWeight: '950', fontSize: '0.85rem', color: 'var(--text-muted)' }}>QUICK JUMP:</span>
-             <div style={{ display: 'flex', gap: '8px' }}>
-               {['Kendari', 'Mandonga', 'Kadia', 'Poasia'].map(city => (
-                 <button 
-                   key={city}
-                   onClick={() => setActiveHub({ name: city, url: `https://maps.google.com/maps?q=${city}&output=embed` })}
-                   style={{
-                     padding: '8px 18px',
-                     borderRadius: '24px',
-                     border: activeHub.name === city ? 'none' : '1px solid var(--border)',
-                     background: activeHub.name === city ? 'var(--primary)' : 'white',
-                     color: activeHub.name === city ? 'white' : 'var(--text-main)',
-                     fontWeight: '800',
-                     fontSize: '0.75rem',
-                     cursor: 'pointer',
-                     transition: '0.3s'
-                   }}
-                 >{city}</button>
-               ))}
-             </div>
-           </div>
-           
-           <div style={{ position: 'relative' }}>
-             <Search size={16} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-             <input 
-               type="text" 
-               placeholder="Ketik lokasi tujuan lainnya..." 
-               onKeyDown={(e) => {
-                 if (e.key === 'Enter' && e.target.value) {
-                   const val = e.target.value;
-                   setActiveHub({ name: val, url: `https://maps.google.com/maps?q=${val}&output=embed` });
-                   e.target.value = '';
-                 }
-               }}
-               style={{
-                 padding: '10px 20px 10px 40px',
-                 borderRadius: '12px',
-                 border: '1px solid var(--border)',
-                 background: 'white',
-                 fontWeight: '800',
-                 fontSize: '0.8rem',
-                 width: '240px',
-                 outline: 'none',
-                 boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
-               }}
-             />
-           </div>
-        </div>
-
-        <div className="card dashboard-card-vibrant" style={{ padding: '0', borderRadius: '16px', overflow: 'hidden', height: '450px', background: '#e5e7eb', border: 'none', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}>
-           <iframe 
-             key={activeHub.url}
-             title="Distribution Map"
-             src={activeHub.url} 
-             width="100%" 
-             height="100%" 
-             style={{ border: 0, filter: 'grayscale(0.2) contrast(1.1) brightness(1.05)' }} 
-             allowFullScreen="" 
-             loading="lazy"
-           ></iframe>
-
-           <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at center, transparent 40%, rgba(6, 78, 59, 0.05) 100%)' }}></div>
-           
-           {distribusi.filter(d => !['TIBA', 'SELESAI'].includes(d.status)).map((d, i) => (
-             <motion.div 
-               key={i}
-               initial={{ x: 100 + (i * 50), y: 150 + (i * 30) }}
-               animate={{ 
-                 x: [100 + (i * 50), 120 + (i * 50), 110 + (i * 50), 130 + (i * 50)],
-                 y: [150 + (i * 30), 140 + (i * 30), 160 + (i * 30), 150 + (i * 30)] 
-               }}
-               transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-               style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-             >
-                <div style={{ background: 'var(--primary)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: '900', marginBottom: '4px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', border: '2px solid white' }}>
-                  {d.kode_transaksi}
-                </div>
-                <div style={{ width: '12px', height: '12px', background: 'var(--primary)', borderRadius: '50%', border: '2px solid white', boxShadow: '0 0 15px var(--primary)' }}></div>
-                <div style={{ width: '30px', height: '30px', position: 'absolute', background: 'var(--primary)', opacity: 0.2, borderRadius: '50%', animation: 'pulse 2s infinite', top: '21px' }}></div>
-             </motion.div>
-           ))}
-
-           <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(255,255,255,0.95)', border: '1px solid var(--border)', padding: '15px 25px', borderRadius: '8px', backdropFilter: 'blur(10px)', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '10px', height: '100%', background: 'var(--primary)', borderRadius: '10px' }}></div>
-                <div>
-                  <p style={{ fontSize: '0.9rem', fontWeight: '950', color: 'var(--text-main)' }}>Peta Distribusi {activeHub.name}</p>
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '700' }}>GPS Status: <span style={{ color: 'var(--primary)' }}>● ONLINE</span></p>
-                </div>
-              </div>
-           </div>
-        </div>
-        
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          {distribusi.length === 0 ? (
-            <div className="card dashboard-card-vibrant" style={{ padding: '1.5rem', gridColumn: 'span 2', textAlign: 'center' }}>
-              <p style={{ fontWeight: '800', color: 'var(--text-muted)' }}>Belum ada data distribusi atau pengiriman armada.</p>
-            </div>
-          ) : (
-            distribusi.map((d, i) => {
-              const isDelivered = d.status === 'SELESAI';
-              const statusTone = distribusiStatusMeta[d.status] || distribusiStatusMeta.DIJADWALKAN
-              return (
-                <div key={i} className="card dashboard-card-vibrant" style={{ padding: '1.5rem', borderRadius: '16px', opacity: isDelivered ? 0.7 : 1 }}>
-                   <div className="flex justify-between" style={{ marginBottom: '1.5rem' }}>
-                     <p style={{ fontWeight: '950', color: 'var(--primary)', fontSize: '0.9rem' }}>TX KODE: {d.kode_transaksi}</p>
-                     <span className="badge" style={{ 
-                       background: statusTone.background, 
-                       color: statusTone.color, 
-                       fontWeight: '900' 
-                     }}>
-                       {d.status}
-                     </span>
-                   </div>
-                   <h4 style={{ fontSize: '1.4rem', fontWeight: '950', marginBottom: '8px' }}>{d.nama_sekolah}</h4>
-                   <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: '600' }}>
-                     Menu: {d.nama_menu} ({d.jumlah_porsi} Porsi)
-                   </p>
-                   <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                     <div style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '15px', textAlign: 'center' }}>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800' }}>WAKTU KIRIM</p>
-                        <p style={{ fontWeight: '950', fontSize: '1.1rem' }}>{d.waktu_kirim ? new Date(d.waktu_kirim).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
-                     </div>
-                     <div style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '15px', textAlign: 'center' }}>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '800' }}>LEDGER HASH</p>
-                        <p style={{ fontWeight: '950', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.blockchain_hash ? d.blockchain_hash.substring(0, 10) + '...' : 'PENDING'}</p>
-                     </div>
-                   </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-      </div>
-    )
-    
     return (
       <div style={{ textAlign: 'center', padding: '5rem', display: 'grid', placeItems: 'center', flex: 1 }}>
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>

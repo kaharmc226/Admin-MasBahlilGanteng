@@ -190,12 +190,7 @@ function saveUploadFromDataUrl({ imageData, fileName, targetDir, publicPath, all
 }
 
 const produksiStatusFlow = ['pending', 'persiapan', 'memasak', 'siap_kirim', 'selesai']
-
-function getDistribusiStatusForProduksi(status, currentDistribusiStatus) {
-  if (status === 'siap_kirim') return 'DISTRIBUSI'
-  if (status === 'selesai') return currentDistribusiStatus === 'SELESAI' ? 'SELESAI' : 'TIBA'
-  return 'DIJADWALKAN'
-}
+const distribusiStatusFlow = ['DIJADWALKAN', 'DISTRIBUSI', 'TIBA', 'SELESAI']
 
 async function getDapurStatusRecord(executor, idDapur) {
   const [rows] = await executor.query(
@@ -1219,26 +1214,6 @@ app.put('/api/produksi/:id', async (req, res) => {
       })
     }
 
-    const [deliveryRows] = await connection.query(
-      'SELECT id_distribusi, status FROM distribusi WHERE id_produksi=? ORDER BY id_distribusi DESC',
-      [req.params.id]
-    )
-    for (const delivery of deliveryRows) {
-      const syncedStatus = getDistribusiStatusForProduksi(status, delivery.status)
-      let deliveryExtra = ''
-      if (syncedStatus === 'DISTRIBUSI') {
-        deliveryExtra = ', waktu_kirim=COALESCE(waktu_kirim, NOW())'
-      } else if (syncedStatus === 'TIBA') {
-        deliveryExtra = ', waktu_kirim=COALESCE(waktu_kirim, NOW()), waktu_tiba=COALESCE(waktu_tiba, NOW())'
-      } else if (syncedStatus === 'DIJADWALKAN') {
-        deliveryExtra = ', waktu_kirim=NULL, waktu_tiba=NULL'
-      }
-      await connection.query(
-        `UPDATE distribusi SET status=?${deliveryExtra} WHERE id_distribusi=?`,
-        [syncedStatus, delivery.id_distribusi]
-      )
-    }
-
     await connection.commit()
     res.json({ message: 'Updated' })
   } catch (err) {
@@ -1258,10 +1233,20 @@ app.put('/api/produksi/:id', async (req, res) => {
 app.get('/api/distribusi', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT d.*, s.nama_sekolah, m.nama_menu, p.id_menu
+      SELECT
+        d.*,
+        s.nama_sekolah,
+        p.id_dapur,
+        dap.lokasi AS dapur_lokasi,
+        v.id_vendor,
+        v.nama_vendor,
+        m.nama_menu,
+        p.id_menu
       FROM distribusi d
       JOIN sekolah s ON d.id_sekolah = s.id_sekolah
       JOIN produksi p ON d.id_produksi = p.id_produksi
+      JOIN dapur dap ON p.id_dapur = dap.id_dapur
+      JOIN vendors v ON dap.id_vendor = v.id_vendor
       JOIN menus m ON p.id_menu = m.id_menu
       ORDER BY d.created_at DESC
     `)
@@ -1275,7 +1260,7 @@ app.post('/api/distribusi', async (req, res) => {
     const kode = `TX-${String(Date.now()).slice(-6)}`
     const hash = '0x' + [...Array(12)].map(() => Math.floor(Math.random()*16).toString(16)).join('')
     const [result] = await pool.query(
-      'INSERT INTO distribusi (kode_transaksi, id_produksi, id_sekolah, jumlah_porsi, waktu_kirim, status, blockchain_hash) VALUES (?,?,?,?,NOW(),?,?)',
+      'INSERT INTO distribusi (kode_transaksi, id_produksi, id_sekolah, jumlah_porsi, status, blockchain_hash) VALUES (?,?,?,?,?,?)',
       [kode, id_produksi, id_sekolah, jumlah_porsi, 'DIJADWALKAN', hash]
     )
     res.status(201).json({ id_distribusi: result.insertId, kode_transaksi: kode })
@@ -1285,6 +1270,22 @@ app.post('/api/distribusi', async (req, res) => {
 app.put('/api/distribusi/:id', async (req, res) => {
   try {
     const { status } = req.body
+    if (!distribusiStatusFlow.includes(status)) {
+      return res.status(400).json({ error: 'Status distribusi tidak valid.' })
+    }
+
+    const [rows] = await pool.query('SELECT id_distribusi, status FROM distribusi WHERE id_distribusi = ? LIMIT 1', [req.params.id])
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Distribusi tidak ditemukan.' })
+    }
+
+    const currentStatus = rows[0].status
+    const currentIndex = distribusiStatusFlow.indexOf(currentStatus)
+    const nextIndex = distribusiStatusFlow.indexOf(status)
+    if (currentIndex === -1 || nextIndex === -1 || nextIndex < currentIndex || nextIndex - currentIndex > 1) {
+      return res.status(400).json({ error: `Transisi status distribusi tidak valid dari ${currentStatus} ke ${status}.` })
+    }
+
     let extra = ''
     if (status === 'DISTRIBUSI') {
       extra = ', waktu_kirim=COALESCE(waktu_kirim, NOW())'
@@ -1514,12 +1515,33 @@ app.get('/api/konfirmasi', async (req, res) => {
 app.post('/api/konfirmasi', async (req, res) => {
   try {
     const { id_distribusi, id_user, kondisi_makanan, jumlah_diterima, catatan, foto_bukti } = req.body
+    const [deliveryRows] = await pool.query(
+      'SELECT id_distribusi, status, jumlah_porsi FROM distribusi WHERE id_distribusi = ? LIMIT 1',
+      [id_distribusi]
+    )
+    if (deliveryRows.length === 0) {
+      return res.status(404).json({ error: 'Distribusi tidak ditemukan.' })
+    }
+    if (deliveryRows[0].status !== 'TIBA') {
+      return res.status(400).json({ error: 'Sekolah hanya dapat menyelesaikan distribusi setelah status TIBA.' })
+    }
+
     const [result] = await pool.query(
       'INSERT INTO konfirmasi_kedatangan (id_distribusi, id_user, waktu_konfirmasi, kondisi_makanan, jumlah_diterima, catatan, foto_bukti) VALUES (?,?,NOW(),?,?,?,?)',
-      [id_distribusi, id_user, kondisi_makanan || 'baik', jumlah_diterima, catatan, foto_bukti || null]
+      [
+        id_distribusi,
+        id_user,
+        kondisi_makanan || 'baik',
+        jumlah_diterima ?? deliveryRows[0].jumlah_porsi ?? 0,
+        catatan || null,
+        foto_bukti || null
+      ]
     )
     // Update distribution status
-    await pool.query('UPDATE distribusi SET status="SELESAI" WHERE id_distribusi=?', [id_distribusi])
+    await pool.query(
+      'UPDATE distribusi SET status="SELESAI", waktu_kirim=COALESCE(waktu_kirim, NOW()), waktu_tiba=COALESCE(waktu_tiba, NOW()) WHERE id_distribusi=?',
+      [id_distribusi]
+    )
     res.status(201).json({ id_konfirmasi: result.insertId })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

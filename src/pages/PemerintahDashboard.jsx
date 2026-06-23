@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { 
   Building, 
   ChefHat, 
@@ -11,13 +11,11 @@ import {
   BarChart as BarChartIcon, 
   Activity,
   ArrowUpRight,
-  Map as MapIcon,
   BadgeAlert,
   Zap,
   Globe,
   Fingerprint,
   PieChart as PieChartIcon,
-  MapPin,
   Lock,
   ChevronRight,
   Filter,
@@ -27,7 +25,6 @@ import {
   Leaf,
   Link2,
   Plus,
-  Search,
   FileText,
   X
 } from 'lucide-react'
@@ -61,6 +58,7 @@ import VendorAuditModal from '../components/modals/VendorAuditModal'
 
 const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const location = useLocation()
+  const navigate = useNavigate()
   const [showAddForm, setShowAddForm] = useState(false)
   const [showToast, setShowToast] = useState({ show: false, message: '' })
   const [selectedVendorAudit, setSelectedVendorAudit] = useState(null)
@@ -114,8 +112,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const path = location.pathname.replace(/\/$/, '')
   const isMain = path === '/pemerintah'
   const isVendor = path === '/pemerintah/vendor'
-  const isPeta = path === '/pemerintah/peta'
-  const isMapping = path === '/pemerintah/mapping'
+  const isMapping = path === '/pemerintah/mapping' || path === '/pemerintah/peta'
   const isStatistik = path === '/pemerintah/statistik'
   const isAlert = path === '/pemerintah/alert'
 
@@ -134,6 +131,12 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
     { jenjang: 'SMA/SMK', penerima: 2100, kondisi_khusus: 50 },
     { jenjang: 'SLB', penerima: 800, kondisi_khusus: 8 }
   ])
+
+  useEffect(() => {
+    if (path === '/pemerintah/peta') {
+      navigate('/pemerintah/mapping', { replace: true })
+    }
+  }, [navigate, path])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -627,34 +630,6 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
               </div>
             ))
           )}
-        </div>
-      </div>
-    )
-
-    if (isPeta) return (
-      <div className="grid">
-        <Header title="Peta Distribusi Real-time" subtitle="Visualisasi sebaran dapur dan sekolah di seluruh Nusantara." variant="simple" />
-        <div className="card" style={{ minHeight: '600px', background: 'var(--bg)', borderRadius: '16px', padding: '1.5rem', position: 'relative' }}>
-           <div style={{ display: 'grid', gap: '1rem' }}>
-             {mappingData.length === 0 ? (
-               <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-                 <Globe size={100} color="var(--primary)" style={{ opacity: 0.1 }} />
-                 <p style={{ color: 'var(--text-muted)', fontWeight: '700' }}>Belum ada pemetaan dapur dan sekolah.</p>
-               </div>
-             ) : mappingData.map((m) => (
-               <div key={m.id_mapping} style={{ padding: '1.1rem', borderRadius: '14px', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <div>
-                   <p style={{ fontWeight: '900' }}>{m.dapur_lokasi}</p>
-                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Dapur Aktif</p>
-                 </div>
-                 <ChevronRight color="var(--primary)" />
-                 <div style={{ textAlign: 'right' }}>
-                   <p style={{ fontWeight: '900' }}>{m.nama_sekolah}</p>
-                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700' }}>Sekolah Terlayani</p>
-                 </div>
-               </div>
-             ))}
-           </div>
         </div>
       </div>
     )
