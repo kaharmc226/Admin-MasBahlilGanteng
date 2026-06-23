@@ -405,6 +405,22 @@ pool.query(`
   } catch (err) {
     if (!String(err.message || '').includes('Duplicate key name')) throw err
   }
+}).then(async () => {
+  const activeAhliGizi = await getActiveAhliGizi(pool)
+  if (!activeAhliGizi) {
+    console.warn('⚠️ No active ahli gizi found. Skipping vendor supervisor backfill.')
+    return null
+  }
+
+  const [result] = await pool.query(
+    'UPDATE vendors SET id_ahli_gizi_pengawas = ? WHERE id_ahli_gizi_pengawas IS NULL',
+    [activeAhliGizi.id_user]
+  )
+  if (result.affectedRows > 0) {
+    console.log(`✅ Backfilled ${result.affectedRows} vendor supervisor assignment(s) to ahli gizi ${activeAhliGizi.id_user}.`)
+  } else {
+    console.log('ℹ️ Vendor supervisor backfill not needed.')
+  }
 }).then(() => {
   return pool.query(`
     CREATE TABLE IF NOT EXISTS vendor_registrations (
