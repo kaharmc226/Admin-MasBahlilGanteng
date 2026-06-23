@@ -5,55 +5,59 @@
 ```mermaid
 flowchart TD
     A[Vendor Login] --> B[Kelola Dapur]
-    B --> C[Kelola Stok Bahan]
-    C --> D[Buat atau Edit Menu]
-    D --> E[Ajukan Menu untuk Validasi]
-    E --> F[Ahli Gizi Review Menu]
-    F -->|Disetujui| G[Menu Approved]
-    F -->|Ditolak| H[Revisi Menu oleh Vendor]
-    H --> D
-    G --> I[Buat Tiket Produksi]
-    I --> J[Status Produksi Berjalan]
-    J --> K[Stok Berkurang Otomatis]
-    K --> L[Siapkan Distribusi]
-    L --> M[Kirim ke Sekolah]
-    M --> N[Sekolah Konfirmasi Kedatangan]
-    N --> O[Upload Bukti Foto]
-    O --> P[Sekolah Beri Feedback]
-    P --> Q[Pemerintah Monitoring]
-    M --> Q
-    F --> Q
-    N --> Q
+    B --> C[Review Dapur oleh Pemerintah]
+    C -->|Approved| D[Kelola Stok Bahan]
+    C -->|Rejected atau Pending| Z[Dapur Belum Operasional]
+    D --> E[Buat atau Edit Menu]
+    E --> F[Ajukan Menu untuk Validasi]
+    F --> G[Ahli Gizi Review Menu]
+    G -->|Disetujui| H[Menu Approved]
+    G -->|Ditolak| I[Revisi Menu oleh Vendor]
+    I --> E
+    H --> J[Buat Tiket Produksi]
+    J --> K[Status Produksi Berjalan]
+    K --> L[Stok Berkurang Sesuai Aturan Backend]
+    L --> M[Distribusi Dijadwalkan]
+    M --> N[Vendor Ubah Status ke DISTRIBUSI]
+    N --> O[Vendor Ubah Status ke TIBA]
+    O --> P[Sekolah Selesaikan Distribusi]
+    P --> Q[Feedback atau Laporan Kendala]
+    Q --> R[Pemerintah Monitoring]
+    G --> R
+    P --> R
 ```
 
 ## Flowmap Registrasi Vendor
 
 ```mermaid
 flowchart TD
-    A[Calon Vendor Isi Form Registrasi] --> B[Upload Dokumen]
-    B --> C[Data Masuk ke Vendor Registrations]
+    A[Calon Vendor Isi Form Registrasi] --> B[Upload Dokumen Awal]
+    B --> C[Data Masuk ke vendor_registrations]
     C --> D[Pemerintah Review]
-    D -->|Approve| E[Vendor Resmi Dibuat]
-    D -->|Revision| F[Vendor Perbaiki Data]
-    D -->|Reject| G[Registrasi Ditolak]
-    F --> C
+    D -->|Approve| E[Buat Akun Vendor dan Data Vendor]
+    E --> F[Dokumen Masuk ke Review Dokumen Vendor]
+    D -->|Revision| G[Status Registrasi Menjadi revision]
+    D -->|Reject| H[Status Registrasi Menjadi rejected]
 ```
 
-## Flowmap Konfirmasi Sekolah
+## Flowmap Penyelesaian Distribusi Sekolah
 
 ```mermaid
 flowchart TD
-    A[Distribusi Aktif] --> B[Sekolah Buka Halaman Konfirmasi]
-    B --> C[Upload Foto Bukti]
-    C --> D[Isi Kondisi dan Jumlah Diterima]
-    D --> E[Simpan Konfirmasi]
-    E --> F[Status Distribusi Menjadi SELESAI]
-    F --> G[Riwayat Konfirmasi Tersimpan]
+    A[Tiket Distribusi Aktif] --> B[Sekolah Buka Dashboard Distribusi]
+    B --> C{Status Sudah TIBA?}
+    C -->|Belum| D[Sekolah Hanya Memantau Status]
+    C -->|Ya| E[Isi Catatan Penyelesaian]
+    E --> F[Upload Foto Bukti Opsional]
+    F --> G[Simpan Konfirmasi]
+    G --> H[Status Distribusi Menjadi SELESAI]
+    H --> I[Riwayat Konfirmasi Tersimpan]
 ```
 
 ## Catatan untuk Flowmap Final
 
-- Flowmap utama yang paling kuat untuk presentasi adalah:
+- Flowmap utama yang paling aman untuk presentasi adalah:
   `Vendor -> Ahli Gizi -> Produksi -> Distribusi -> Sekolah -> Pemerintah`
 - Jika dosen meminta flowmap per aktor, pisahkan menjadi:
   vendor flow, ahli gizi flow, sekolah flow, dan pemerintah flow.
+- Status `revision` pada registrasi vendor memang ada di backend, tetapi tindak lanjut revisi tidak dibangun sebagai portal self-service terpisah pada implementasi saat ini.

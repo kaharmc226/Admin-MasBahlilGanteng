@@ -1290,16 +1290,26 @@ app.put('/api/distribusi/:id', async (req, res) => {
       return res.status(400).json({ error: 'Status distribusi tidak valid.' })
     }
 
-    const [rows] = await pool.query('SELECT id_distribusi, status FROM distribusi WHERE id_distribusi = ? LIMIT 1', [req.params.id])
+    const [rows] = await pool.query(`
+      SELECT d.id_distribusi, d.status, p.status AS produksi_status
+      FROM distribusi d
+      JOIN produksi p ON d.id_produksi = p.id_produksi
+      WHERE d.id_distribusi = ?
+      LIMIT 1
+    `, [req.params.id])
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Distribusi tidak ditemukan.' })
     }
 
     const currentStatus = rows[0].status
+    const produksiStatus = rows[0].produksi_status
     const currentIndex = distribusiStatusFlow.indexOf(currentStatus)
     const nextIndex = distribusiStatusFlow.indexOf(status)
     if (currentIndex === -1 || nextIndex === -1 || nextIndex < currentIndex || nextIndex - currentIndex > 1) {
       return res.status(400).json({ error: `Transisi status distribusi tidak valid dari ${currentStatus} ke ${status}.` })
+    }
+    if (status === 'DISTRIBUSI' && !['siap_kirim', 'selesai'].includes(produksiStatus)) {
+      return res.status(400).json({ error: 'Distribusi hanya bisa dimulai setelah produksi siap kirim.' })
     }
 
     let extra = ''

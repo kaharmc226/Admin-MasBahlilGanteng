@@ -137,6 +137,11 @@ const distribusiStatusMeta = {
   }
 }
 
+const canAdvanceDistribusiFromCurrentProduksi = (deliveryStatus, produksiStatus) => {
+  if (deliveryStatus !== 'DIJADWALKAN') return true
+  return produksiStatus === 'siap_kirim' || produksiStatus === 'selesai'
+}
+
 const dapurStatusMeta = {
   approved: {
     label: 'AKTIF',
@@ -1709,8 +1714,14 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                     .map((p) => {
                    const delivery = distribusiByProduksiId.get(p.id_produksi)
                    const deliveryMeta = delivery ? (distribusiStatusMeta[delivery.status] || distribusiStatusMeta.DIJADWALKAN) : null
+                   const canAdvanceDistribusi = delivery
+                     ? canAdvanceDistribusiFromCurrentProduksi(delivery.status, p.status)
+                     : false
+                   const isTicketCompleted = delivery
+                     ? delivery.status === 'SELESAI'
+                     : p.status === 'selesai'
                    return (
-                   <tr key={p.id_produksi} style={{ background: 'var(--bg)', opacity: p.status === 'selesai' ? 0.6 : 1 }}>
+                   <tr key={p.id_produksi} style={{ background: 'var(--bg)', opacity: isTicketCompleted ? 0.6 : 1 }}>
                      <td style={{ padding: '1.5rem', fontWeight: '900', borderRadius: '15px 0 0 15px', color: 'var(--primary)' }}>#PRD-{p.id_produksi}</td>
                      <td style={{ padding: '1.5rem' }}>
                        <p style={{ fontWeight: '900', margin: 0 }}>{p.nama_menu}</p>
@@ -1754,13 +1765,17 @@ const VendorDashboard = ({ user, onLogout, onSwitchRole }) => {
                          ) : (
                            <span style={{ color: 'var(--text-muted)', fontWeight: '800', fontSize: '0.85rem' }}>Batch produksi ditutup</span>
                          )}
-                         {delivery?.id_distribusi && deliveryMeta?.nextStatus ? (
+                         {delivery?.id_distribusi && deliveryMeta?.nextStatus && canAdvanceDistribusi ? (
                            <button
                              onClick={() => handleUpdateDistribusiStatus(delivery.id_distribusi, deliveryMeta.nextStatus)}
                              style={{ background: deliveryMeta.actionBackground, color: 'white', border: 'none', padding: '10px 15px', borderRadius: '24px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 10px rgba(15,23,42,0.12)' }}
                            >
                              {deliveryMeta.actionLabel}
                            </button>
+                         ) : delivery?.status === 'DIJADWALKAN' && !canAdvanceDistribusi ? (
+                           <span style={{ color: 'var(--text-muted)', fontWeight: '800', fontSize: '0.82rem' }}>
+                             Distribusi menunggu produksi siap kirim
+                           </span>
                          ) : delivery?.status === 'SELESAI' ? (
                            <span style={{ color: 'var(--primary)', fontWeight: '800', fontSize: '0.82rem' }}>Sekolah sudah menutup distribusi</span>
                          ) : delivery?.status === 'TIBA' ? (

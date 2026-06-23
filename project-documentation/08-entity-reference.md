@@ -10,6 +10,7 @@
 - `password`
 - `role`
 - `status`
+- `created_at`
 
 ### vendors
 
@@ -19,6 +20,7 @@
 - `status_verifikasi`
 - `izin_usaha`
 - `id_user`
+- `id_ahli_gizi_pengawas`
 
 ### vendor_registrations
 
@@ -30,9 +32,13 @@
 - `email`
 - `izin_usaha`
 - `status`
-- `documents`
+- `review_note`
 - `reviewed_by`
+- `reviewed_at`
 - `id_vendor`
+- `documents`
+- `created_at`
+- `updated_at`
 
 ### sekolah
 
@@ -52,6 +58,10 @@
 - `id_vendor`
 - `lokasi`
 - `kapasitas_produksi`
+- `status_verifikasi`
+- `review_note`
+- `reviewed_by`
+- `reviewed_at`
 
 ### dapur_stok
 
@@ -60,6 +70,17 @@
 - `nama_bahan`
 - `jumlah`
 - `satuan`
+
+### dapur_stok_history
+
+- `id_log`
+- `id_dapur`
+- `nama_bahan`
+- `tipe`
+- `jumlah`
+- `satuan`
+- `keterangan`
+- `created_at`
 
 ### mapping_dapur_sekolah
 
@@ -118,6 +139,7 @@
 - `id_user`
 - `aksi`
 - `catatan`
+- `created_at`
 
 ### konfirmasi_kedatangan
 
@@ -150,6 +172,8 @@
 - `is_resolved`
 - `resolved_by`
 - `resolved_at`
+- `is_archived`
+- `created_at`
 
 ### dokumen_vendor
 
@@ -162,6 +186,8 @@
 - `tanggal_kadaluarsa`
 - `file_path`
 - `review_note`
+- `reviewed_by`
+- `is_archived`
 
 ### nutrition_database
 
@@ -176,6 +202,8 @@
 - `serat`
 - `natrium`
 - `status`
+- `created_at`
+- `updated_at`
 
 ### nutrition_requests
 
@@ -188,26 +216,36 @@
 - `status`
 - `reviewed_by`
 - `id_nutrition`
+- `review_note`
+- `created_at`
+- `reviewed_at`
 
 ## Relasi Inti
 
 - Satu `user` dapat terhubung ke satu `vendor` atau satu `sekolah`.
 - Satu `vendor` dapat memiliki banyak `dapur`.
+- Satu `vendor` dapat memiliki satu pengawas ahli gizi aktif melalui `id_ahli_gizi_pengawas`.
 - Satu `dapur` dapat memiliki banyak `stok`.
+- Satu `dapur` dapat memiliki banyak log mutasi stok.
 - Satu `dapur` dapat melayani banyak `sekolah` melalui `mapping_dapur_sekolah`.
 - Satu `vendor` dapat memiliki banyak `menu`.
 - Satu `menu` dapat memiliki banyak catatan validasi.
 - Satu `dapur` dapat memiliki banyak `produksi`.
-- Satu `produksi` dapat menghasilkan banyak `distribusi`.
-- Satu `distribusi` dapat memiliki satu atau lebih catatan konfirmasi tergantung kebutuhan bisnis, tetapi implementasi saat ini dipakai sebagai konfirmasi penerimaan.
+- Satu `produksi` dapat menghasilkan satu atau lebih `distribusi`.
+- Satu `distribusi` dipakai sebagai dasar satu alur penyelesaian sekolah pada implementasi saat ini.
+- Satu `vendor_registration` dapat berubah menjadi `vendor` resmi setelah approval pemerintah.
+- Satu `nutrition_request` dapat menghasilkan satu data baru pada `nutrition_database`.
 
 ## Kandidat untuk UML Class Diagram
 
 - User
 - Vendor
+- VendorRegistration
 - Sekolah
 - Dapur
-- Stok
+- DapurStok
+- DapurStokHistory
+- MappingDapurSekolah
 - Menu
 - Produksi
 - Distribusi
@@ -215,5 +253,6 @@
 - Feedback
 - StandarGizi
 - NutritionItem
+- NutritionRequest
 - Alert
 - DokumenVendor

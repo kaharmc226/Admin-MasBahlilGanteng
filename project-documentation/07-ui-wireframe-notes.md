@@ -6,15 +6,15 @@
 - Login
 - Registrasi vendor
 - Dashboard vendor
+- Halaman informasi vendor dan dapur
 - Halaman menu vendor
 - Halaman stok vendor
-- Halaman produksi vendor
-- Halaman distribusi vendor
+- Halaman status produksi vendor
 - Dashboard ahli gizi
 - Halaman validasi menu
 - Halaman standar gizi
 - Dashboard sekolah
-- Halaman konfirmasi sekolah
+- Halaman status distribusi dan penyelesaian sekolah
 - Halaman feedback sekolah
 - Dashboard pemerintah
 - Halaman monitoring vendor
@@ -26,7 +26,7 @@
 
 - Sidebar kiri untuk navigasi role
 - Topbar untuk breadcrumb, notifikasi, dan switch role
-- Main content untuk dashboard atau form
+- Main content untuk dashboard, tabel, dan form
 - Modal atau side panel untuk tambah/edit data
 
 ## Komponen UI Penting
@@ -38,8 +38,8 @@
 - Modal tambah/edit
 - Upload file/image
 - Chart statistik
-- Map/peta distribusi
 - Timeline status produksi/distribusi
+- Viewer dokumen atau preview aset upload
 
 ## Prioritas Wireframe per Role
 
@@ -49,8 +49,8 @@
 - Form tambah dapur
 - Form tambah stok
 - Form tambah menu
-- Tabel produksi
-- Tabel distribusi
+- Tabel produksi dengan status lifecycle
+- Panel distribusi yang menyatu dengan tiket produksi
 - Viewer dokumen vendor
 
 ### Ahli Gizi
@@ -65,8 +65,8 @@
 ### Sekolah
 
 - Dashboard distribusi aktif
-- Form konfirmasi kedatangan
-- Upload bukti foto
+- Form penyelesaian distribusi
+- Upload bukti foto opsional
 - Form feedback
 - Form laporan kendala
 
@@ -90,11 +90,11 @@
 +-----------------------------------------------------------+
 | Welcome Banner                                            |
 +-------------------+-------------------+-------------------+
-| Card Stok         | Card Produksi     | Card Distribusi   |
+| Card Stok         | Card Produksi     | Card Menu         |
 +-----------------------------------------------------------+
-| Feed Logistik Terkini                                    |
+| Daftar dapur approved / pending review                    |
 +-----------------------------------------------------------+
-| Tabel tiket produksi / aktivitas                         |
+| Tabel tiket produksi dan distribusi terkait               |
 +-----------------------------------------------------------+
 ```
 
@@ -106,13 +106,13 @@
 +-----------------------------------------------------------+
 | Statistik pending | revisi | approved                     |
 +-----------------------------------------------------------+
-| List Menu | Detail Menu | Hasil Audit Gizi                |
+| List Menu | Detail Menu | Hasil Review Gizi              |
 +-----------------------------------------------------------+
-| Tombol Approve | Reject | Generate Report                 |
+| Tombol Approve | Reject | Generate Report JSON           |
 +-----------------------------------------------------------+
 ```
 
-### Halaman Konfirmasi Sekolah
+### Halaman Status Distribusi Sekolah
 
 ```text
 +-----------------------------------------------------------+
@@ -120,9 +120,9 @@
 +-----------------------------------------------------------+
 | Card Distribusi Aktif                                     |
 +-----------------------------+-----------------------------+
-| Upload Bukti Foto           | Riwayat Konfirmasi          |
+| Timeline Distribusi         | Riwayat Konfirmasi          |
 +-----------------------------+-----------------------------+
-| Tombol Konfirmasi Sesuai    | Tombol Lapor Selisih        |
+| Form Selesaikan Distribusi  | Tombol Feedback / Kendala   |
 +-----------------------------------------------------------+
 ```
 
@@ -132,11 +132,11 @@
 +-----------------------------------------------------------+
 | Sidebar | Topbar                                          |
 +-----------------------------------------------------------+
-| Card Vendor | Card Sekolah | Card Alert | Card Distribusi |
+| Card Vendor | Card Sekolah | Card Alert | Card Statistik  |
 +-----------------------------------------------------------+
-| Tabel Registrasi Vendor                                     |
+| Tabel Registrasi Vendor                                   |
 +-----------------------------------------------------------+
-| Tabel Vendor Aktif / Statistik / Alert                      |
+| Tabel Vendor Aktif / Mapping / Alert                      |
 +-----------------------------------------------------------+
 ```
 
@@ -146,3 +146,4 @@
 - Gunakan status badge yang konsisten.
 - Jaga alur input tetap pendek untuk vendor dan sekolah.
 - Prioritaskan informasi status real-time di dashboard.
+- Dokumentasikan vendor distribution sebagai bagian dari lifecycle produksi, bukan halaman terpisah.
