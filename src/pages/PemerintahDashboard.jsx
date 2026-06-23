@@ -72,14 +72,17 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
   const handleModalSave = async (type, data) => {
     try {
       if (type === 'Vendor') {
-        const created = await api.createVendor({
+        await api.createVendor({
           nama_vendor: data.nama_vendor,
           izin_usaha: data.izin_usaha,
           region: data.region,
+          account_name: data.account_name,
+          email: data.email,
+          password: data.password,
           status_verifikasi: 'approved',
           date_pendaftaran: new Date().toISOString().split('T')[0]
         })
-        setActiveVendors(prev => [created, ...prev])
+        await refreshGovernmentData()
       } else if (type === 'Sekolah') {
         const createdSekolah = await api.createSekolah({
           nama_sekolah: data.nama_sekolah,
@@ -87,9 +90,11 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
           alamat: data.alamat,
           jenjang: 'SD',
           alergi_count: 0,
-          intoleran_count: 0
+          intoleran_count: 0,
+          account_name: data.account_name,
+          email: data.email,
+          password: data.password
         })
-        setSekolahList(prev => [...prev, createdSekolah])
         if (!data.id_dapur) {
           throw new Error('Pilih dapur penanggung jawab sebelum membuat mapping.')
         }
@@ -98,8 +103,7 @@ const PemerintahDashboard = ({ user, onLogout, onSwitchRole }) => {
           id_dapur: data.id_dapur,
           id_sekolah: createdSekolah.id_sekolah
         })
-        const m = await api.getMapping()
-        setMappingData(m)
+        await refreshGovernmentData()
       }
       setShowAddForm(false)
       triggerToast(`Data ${type} baru berhasil ditambahkan!`)
